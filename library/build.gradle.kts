@@ -1,6 +1,5 @@
 import java.util.Properties
 
-// UPDATED: Replaced aliases with standard plugin IDs for compatibility.
 plugins {
     id("com.android.library")
     id("org.jetbrains.kotlin.android")
@@ -8,11 +7,13 @@ plugins {
     id("maven-publish")
 }
 
-val versionName = rootProject.extra["versionName"] as String
+// REMOVED: This line was causing the build to fail as 'versionName' is not defined in the root project.
+// val versionName = rootProject.extra["versionName"] as String
 
-val localProperties = Properties().apply {
-    load(project.rootDir.resolve("local.properties").inputStream())
-}
+// REMOVED: This logic is also not needed as it depends on local.properties which we are avoiding.
+// val localProperties = Properties().apply {
+//     load(project.rootDir.resolve("local.properties").inputStream())
+// }
 
 android {
     namespace = "com.bobbyesp.library"
@@ -47,17 +48,8 @@ android {
     }
 
     buildTypes {
-        all {
-            // Note: Even though we removed the requirement from the :app module,
-            // this module still tries to read them. It's safe to leave as long
-            // as a placeholder local.properties exists during CI build.
-            buildConfigField(
-                "String", "CLIENT_ID", "\"${localProperties.getProperty("CLIENT_ID")}\""
-            )
-            buildConfigField(
-                "String", "CLIENT_SECRET", "\"${localProperties.getProperty("CLIENT_SECRET")}\""
-            )
-        }
+        // REMOVED: The buildConfigFields are not needed and depend on local.properties.
+        // all { ... }
         release {
             isMinifyEnabled = false
             proguardFiles(
@@ -76,7 +68,7 @@ android {
         jvmTarget = "17"
     }
     buildFeatures {
-        buildConfig = true
+        buildConfig = true // Kept, as some internal logic might use it.
     }
 
     publishing {
@@ -101,34 +93,17 @@ tasks.register<Jar>("androidNonbundledSourcesJar") {
     from(android.sourceSets.getByName("main").java.srcDirs, android.sourceSets.getByName("nonbundled").java.srcDirs)
 }
 
-afterEvaluate{
-    publishing {
-        publications {
-            create<MavenPublication>("bundledRelease") {
-                from(components["bundledRelease"])
-                groupId = "com.github.BobbyESP.spotdl_android"
-                artifactId = "library"
-                version = project.version.toString()
-            }
-
-            create<MavenPublication>("nonbundledRelease") {
-                from(components["nonbundledRelease"])
-                groupId = "com.github.BobbyESP.spotdl_android"
-                artifactId = "library-nonbundled"
-                version = project.version.toString()
-            }
-        }
-    }
-}
+// REMOVED: The entire publishing block is not relevant for building the Spowlo APK.
+// It was for publishing the library as a standalone artifact.
+// afterEvaluate { ... }
 
 dependencies {
     implementation(fileTree(mapOf("dir" to "libs", "include" to listOf("*.jar"))))
     
-    // IMPORTANT: This :common module might be the next missing piece.
-    // If the build fails again, we may need to migrate a 'common' module as well.
-    // For now, we will comment it out as it likely doesn't exist in the Spowlo project.
+    // As identified, :common does not exist in Spowlo, so this is removed for good.
     // implementation(project(":common")) 
     
+    // Using explicit versions for clarity and stability.
     implementation("androidx.core:core-ktx:1.13.1")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.8.0")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.0")

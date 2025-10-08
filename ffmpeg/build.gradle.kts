@@ -1,11 +1,11 @@
-// UPDATED: Replaced aliases with standard plugin IDs for compatibility.
 plugins {
     id("com.android.library")
     id("org.jetbrains.kotlin.android")
     id("maven-publish")
 }
 
-val versionName = rootProject.extra["versionName"] as String
+// REMOVED: This line was causing the build to fail.
+// val versionName = rootProject.extra["versionName"] as String
 
 android {
     namespace = "com.bobbyesp.ffmpeg"
@@ -75,31 +75,14 @@ dependencies {
     implementation(fileTree(mapOf("dir" to "libs", "include" to listOf("*.jar"))))
     implementation("androidx.core:core-ktx:1.13.1")
     
-    // This module also has dependencies we are migrating.
+    // The modules being migrated.
     implementation(project(":library"))
 
-    // Commented out the :common dependency for now.
+    // Commented out as it doesn't exist in Spowlo.
     // implementation(project(":common"))
     
     implementation("commons-io:commons-io:2.11.0")
 }
 
-afterEvaluate {
-    publishing {
-        publications {
-            create<MavenPublication>("bundledRelease") {
-                from(components["bundledRelease"])
-                groupId = "com.github.BobbyESP.spotdl_android"
-                artifactId = "ffmpeg"
-                version = project.version.toString()
-            }
-
-            create<MavenPublication>("nonbundledRelease") {
-                from(components["nonbundledRelease"])
-                groupId = "com.github.BobbyESP.spotdl_android"
-                artifactId = "ffmpeg-nonbundled"
-                version = project.version.toString()
-            }
-        }
-    }
-}
+// REMOVED: This entire block is for publishing to Maven and not needed for the APK build.
+// afterEvaluate { ... }
