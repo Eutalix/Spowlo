@@ -206,13 +206,10 @@ abstract class SpotDLCore {
         val totalDurationEstimate = 30L
         while (downloadJob.isActive && progress < 99f) {
             progress += 2f
-            
-            val etaFloat = totalDurationEstimate.toFloat() * (100f - progress) / 100f
-            val eta = etaFloat.coerceAtLeast(0f).toLong()
+            val eta = (totalDurationEstimate * (100 - progress) / 100).coerceAtLeast(0).toLong()
             val progressBar = generateProgressBarString(progress)
             val progressInt = progress.roundToInt()
             val line = "Downloading... [$progressBar] $progressInt% ETA: 00:00:${String.format("%02d", eta)}"
-            
             callback(progress / 100f, eta, line)
             delay(500)
         }
