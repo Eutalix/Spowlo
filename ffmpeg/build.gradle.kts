@@ -1,6 +1,7 @@
 plugins {
     id("com.android.library")
     id("org.jetbrains.kotlin.android")
+    // maven-publish can be removed if you don't plan to publish this module standalone.
     id("maven-publish")
 }
 
@@ -51,7 +52,7 @@ android {
         }
     }
 
-    // UPDATED: Standardized Java and Kotlin target versions for library compatibility.
+    // UPDATED: Standardized Java and Kotlin target versions for compatibility.
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_1_8
         targetCompatibility = JavaVersion.VERSION_1_8
@@ -64,6 +65,7 @@ android {
         buildConfig = true
     }
     
+    // This block is for publishing and can be removed if not needed.
     publishing {
         singleVariant("bundledRelease") {
             withSourcesJar()
@@ -82,6 +84,9 @@ dependencies {
     
     // The modules being migrated.
     implementation(project(":library"))
+
+    // UPDATED: Correctly declares the dependency on the now-migrated :common module.
+    implementation(project(":common"))
     
     implementation("commons-io:commons-io:2.11.0")
 }

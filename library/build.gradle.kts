@@ -2,7 +2,8 @@ plugins {
     id("com.android.library")
     id("org.jetbrains.kotlin.android")
     id("org.jetbrains.kotlin.plugin.serialization")
-    id("maven-publish")
+    // maven-publish can be removed if you don't plan to publish this module standalone.
+    id("maven-publish") 
 }
 
 // NEW: Aligns the Kotlin toolchain with the main app module.
@@ -51,7 +52,7 @@ android {
         }
     }
 
-    // UPDATED: Standardized Java and Kotlin target versions for library compatibility.
+    // UPDATED: Standardized Java and Kotlin target versions for compatibility.
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_1_8
         targetCompatibility = JavaVersion.VERSION_1_8
@@ -64,6 +65,7 @@ android {
         buildConfig = true
     }
 
+    // This block is for publishing and can be removed if not needed.
     publishing {
         singleVariant("bundledRelease") {
             withSourcesJar()
@@ -78,6 +80,9 @@ android {
 
 dependencies {
     implementation(fileTree(mapOf("dir" to "libs", "include" to listOf("*.jar"))))
+    
+    // UPDATED: Correctly declares the dependency on the now-migrated :common module.
+    implementation(project(":common"))
     
     // Using explicit versions for clarity and stability.
     implementation("androidx.core:core-ktx:1.13.1")
