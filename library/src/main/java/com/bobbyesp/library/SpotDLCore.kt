@@ -35,28 +35,21 @@ import kotlin.math.roundToInt
 abstract class SpotDLCore {
     private var initialized = false
     protected lateinit var binariesDirectory: File
-
     private var pythonPath: File? = null
     private var ffmpegPath: File? = null
-
-    /* ENVIRONMENT VARIABLES */
     private lateinit var ENV_LD_LIBRARY_PATH: String
     private lateinit var ENV_SSL_CERT_FILE: String
     private lateinit var ENV_PYTHONHOME: String
     private lateinit var HOME: String
     private lateinit var LDFLAGS: String
     private lateinit var TMPDIR: String
-
     private val pythonLibVersion = "pythonLibVersion"
-
     protected open val idProcessMap: MutableMap<String, Process> =
         Collections.synchronizedMap(HashMap<String, Process>())
-
     internal val isDebug = BuildConfig.DEBUG
 
     open fun init(context: Context) {
         if (initialized) return
-
         val baseDirectory = File(context.noBackupFilesDir, LIBRARY_NAME).ensure()
         val packagesDir = File(baseDirectory, PACKAGES_ROOT_NAME)
         binariesDirectory = File(context.applicationInfo.nativeLibraryDir)
@@ -64,7 +57,6 @@ abstract class SpotDLCore {
         ffmpegPath = File(binariesDirectory, Constants.BinariesName.FFMPEG)
         val pythonDir = File(packagesDir, Constants.DirectoriesName.PYTHON)
         val ffmpegDir = File(packagesDir, Constants.DirectoriesName.FFMPEG)
-
         ENV_LD_LIBRARY_PATH =
             pythonDir.absolutePath + "/usr/lib" + ":" + ffmpegDir.absolutePath + "/usr/lib"
         ENV_SSL_CERT_FILE = pythonDir.absolutePath + "/usr/etc/tls/cert.pem"
@@ -72,7 +64,6 @@ abstract class SpotDLCore {
         HOME = baseDirectory.absolutePath
         TMPDIR = context.cacheDir.absolutePath
         LDFLAGS = "-L" + pythonDir.absolutePath + "/usr/lib -rdynamic"
-
         try {
             initPython(context, pythonDir)
         } catch (e: Exception) {
@@ -81,7 +72,6 @@ abstract class SpotDLCore {
         initialized = true
     }
 
-    @Throws(IllegalStateException::class)
     abstract fun ensureDependencies(
         appContext: Context,
         skipDependencies: List<Dependency> = emptyList(),
@@ -106,7 +96,6 @@ abstract class SpotDLCore {
         return false
     }
 
-    @Throws(SpotDLException::class)
     fun updateSpotDL(appContext: Context): UpdateStatus? {
         assertInit()
         return try {
@@ -129,19 +118,15 @@ abstract class SpotDLCore {
     ): SpotDLResponse {
         assertInit()
         if (processId != null && idProcessMap.containsKey(processId)) throw SpotDLException("Process ID already exists")
-
         request.addOption("--ffmpeg", ffmpegPath!!.absolutePath)
         if (!request.hasOption("--cache-path")) {
             request.addOption("--no-cache")
         }
-
         val startTime = System.currentTimeMillis()
         val args = request.buildCommand()
         val command: MutableList<String?> = ArrayList()
-
         command.addAll(listOf(pythonPath!!.absolutePath, "-m", "spotdl"))
         command.addAll(args)
-
         val processBuilder = ProcessBuilder(command)
         processBuilder.environment().apply {
             this["LD_LIBRARY_PATH"] = ENV_LD_LIBRARY_PATH
@@ -152,26 +137,21 @@ abstract class SpotDLCore {
             this["LDFLAGS"] = LDFLAGS
             this["TERM"] = "xterm-256color"
         }
-
         val process: Process
         try {
             process = processBuilder.start()
         } catch (e: IOException) {
             throw SpotDLException(e)
         }
-
         if (processId != null) {
             idProcessMap[processId] = process
         }
-
         val outBuffer = StringBuilder()
         val errBuffer = StringBuilder()
-        
         val coroutineScope = CoroutineScope(Dispatchers.IO)
         var downloadJob: Job? = null
         var progressJob: Job? = null
         var exitCode: Int = -1
-
         try {
             runBlocking {
                 downloadJob = launch {
@@ -180,13 +160,11 @@ abstract class SpotDLCore {
                     stdOutGobbler.join()
                     stdErrGobbler.join()
                 }
-
                 if (callback != null) {
                     progressJob = launch {
                         runFakeProgressUpdater(downloadJob!!, callback)
                     }
                 }
-
                 exitCode = process.waitFor()
             }
         } catch (e: InterruptedException) {
@@ -197,10 +175,8 @@ abstract class SpotDLCore {
         } finally {
             coroutineScope.cancel()
         }
-
         val out = outBuffer.toString()
         val err = errBuffer.toString()
-
         if (exitCode > 0) {
             if (processId != null && !idProcessMap.containsKey(processId)) throw CanceledException()
             if (!ignoreErrors(request, out)) {
@@ -210,13 +186,11 @@ abstract class SpotDLCore {
             }
         }
         idProcessMap.remove(processId)
-        
         callback?.invoke(1.0f, 0L, "Done.")
-
         val elapsedTime = System.currentTimeMillis() - startTime
         return SpotDLResponse(command, exitCode, elapsedTime, out, err)
     }
-    
+
     private fun generateProgressBarString(percentage: Float): String {
         val barLength = 20
         val filledLength = (barLength * percentage / 100).roundToInt()
@@ -230,29 +204,22 @@ abstract class SpotDLCore {
     ) {
         var progress = 0f
         val totalDurationEstimate = 30L
-
         while (downloadJob.isActive && progress < 99f) {
-            progress += 2f 
-            
-            // THE FIX (Part 1): The calculation results in a Float, but ETA needs to be a Long.
-            val eta = ((totalDurationEstimate * (100 - progress) / 100).coerceAtLeast(0)).toLong()
-            
+            progress += 2f
+            val eta = (totalDurationEstimate * (100 - progress) / 100).coerceAtLeast(0).toLong()
             val progressBar = generateProgressBarString(progress)
             val progressInt = progress.roundToInt()
             val line = "Downloading... [$progressBar] $progressInt% ETA: 00:00:${String.format("%02d", eta)}"
-            
-            // THE FIX (Part 2): The first argument needs to be a Float between 0.0 and 1.0.
             callback(progress / 100f, eta, line)
-            
             delay(500)
         }
     }
-    
+
     @Throws(SpotDLException::class)
     fun getAnonymousToken(): String {
         assertInit()
         val request = SpotDLRequest()
-        request.addOption("save", "") 
+        request.addOption("save", "")
         request.addOption("--print-errors")
         request.addOption("--no-download")
         val response = try {
