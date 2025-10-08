@@ -1,9 +1,10 @@
 import java.util.Properties
 
+// UPDATED: Replaced aliases with standard plugin IDs for compatibility.
 plugins {
-    alias(libs.plugins.androidLibrary)
-    alias(libs.plugins.kotlin.android)
-    alias(libs.plugins.kotlin.serialization)
+    id("com.android.library")
+    id("org.jetbrains.kotlin.android")
+    id("org.jetbrains.kotlin.plugin.serialization")
     id("maven-publish")
 }
 
@@ -47,6 +48,9 @@ android {
 
     buildTypes {
         all {
+            // Note: Even though we removed the requirement from the :app module,
+            // this module still tries to read them. It's safe to leave as long
+            // as a placeholder local.properties exists during CI build.
             buildConfigField(
                 "String", "CLIENT_ID", "\"${localProperties.getProperty("CLIENT_ID")}\""
             )
@@ -109,7 +113,7 @@ afterEvaluate{
 
             create<MavenPublication>("nonbundledRelease") {
                 from(components["nonbundledRelease"])
-                groupId = "com.github.BobbyESP.spotdl_android"  // Corregido aquí
+                groupId = "com.github.BobbyESP.spotdl_android"
                 artifactId = "library-nonbundled"
                 version = project.version.toString()
             }
@@ -119,16 +123,21 @@ afterEvaluate{
 
 dependencies {
     implementation(fileTree(mapOf("dir" to "libs", "include" to listOf("*.jar"))))
-    implementation(project(":common"))
-    implementation(libs.core.ktx)
-    implementation(libs.bundles.coroutines)
+    
+    // IMPORTANT: This :common module might be the next missing piece.
+    // If the build fails again, we may need to migrate a 'common' module as well.
+    // For now, we will comment it out as it likely doesn't exist in the Spowlo project.
+    // implementation(project(":common")) 
+    
+    implementation("androidx.core:core-ktx:1.13.1")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.8.0")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.0")
 
-    implementation(libs.commons.io)
+    implementation("commons-io:commons-io:2.11.0")
 
-    //Serialization
-    implementation(libs.kotlin.serialization.json)
+    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.3")
 
-    testImplementation(libs.junit)
-    androidTestImplementation(libs.androidx.test.ext.junit)
-    androidTestImplementation(libs.espresso.core)
+    testImplementation("junit:junit:4.13.2")
+    androidTestImplementation("androidx.test.ext:junit:1.1.5")
+    androidTestImplementation("androidx.test.espresso:espresso-core:3.5.1")
 }

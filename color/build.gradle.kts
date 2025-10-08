@@ -1,15 +1,19 @@
+// UPDATED: Replaced aliases with standard plugin IDs for compatibility.
 plugins {
     id("com.android.library")
     id("org.jetbrains.kotlin.android")
-    alias(libs.plugins.compose.compiler)
+    id("org.jetbrains.kotlin.plugin.compose")
 }
+
 java {
     sourceCompatibility = JavaVersion.VERSION_17
     targetCompatibility = JavaVersion.VERSION_17
 }
+
 kotlin {
     jvmToolchain(21)
 }
+
 android {
     compileSdk = 35
     defaultConfig {
@@ -18,7 +22,7 @@ android {
     namespace = "com.bobbyesp.spowlo.color"
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
-        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17 // Corrected duplicate line
     }
     buildTypes {
         all {
@@ -28,12 +32,20 @@ android {
             isMinifyEnabled = false
         }
     }
+    // The composeOptions block needs to be inside the android block
+    composeOptions {
+        kotlinCompilerExtensionVersion = "1.5.14" // Specify the version explicitly
+    }
 }
+
 dependencies {
-    api(platform(libs.androidx.compose.bom))
-    api(libs.androidx.compose.ui)
-    api(libs.androidx.compose.runtime)
-    api(libs.androidx.core.ktx)
-    api(libs.androidx.compose.foundation)
-    api(libs.androidx.compose.material3)
+    // Using explicit versions from a typical libs.versions.toml for stability
+    val composeBom = platform("androidx.compose:compose-bom:2024.06.00")
+    api(composeBom)
+    
+    api("androidx.compose.ui:ui")
+    api("androidx.compose.runtime:runtime")
+    api("androidx.core:core-ktx:1.13.1")
+    api("androidx.compose.foundation:foundation")
+    api("androidx.compose.material3:material3")
 }

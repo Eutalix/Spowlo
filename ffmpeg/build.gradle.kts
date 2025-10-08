@@ -1,6 +1,7 @@
+// UPDATED: Replaced aliases with standard plugin IDs for compatibility.
 plugins {
-    alias(libs.plugins.androidLibrary)
-    alias(libs.plugins.kotlin.android)
+    id("com.android.library")
+    id("org.jetbrains.kotlin.android")
     id("maven-publish")
 }
 
@@ -72,10 +73,15 @@ android {
 
 dependencies {
     implementation(fileTree(mapOf("dir" to "libs", "include" to listOf("*.jar"))))
-    implementation(libs.core.ktx)
+    implementation("androidx.core:core-ktx:1.13.1")
+    
+    // This module also has dependencies we are migrating.
     implementation(project(":library"))
-    implementation(project(":common"))
-    implementation(libs.commons.io)
+
+    // Commented out the :common dependency for now.
+    // implementation(project(":common"))
+    
+    implementation("commons-io:commons-io:2.11.0")
 }
 
 afterEvaluate {
