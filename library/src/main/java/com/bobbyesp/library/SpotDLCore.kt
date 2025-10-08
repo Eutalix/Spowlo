@@ -4,7 +4,6 @@ import android.content.Context
 import android.os.Build
 import android.util.Log
 import com.bobbyesp.library.data.local.streams.StreamGobbler
-import com.bobbyesp.library.data.local.streams.StreamProcessExtractor
 import com.bobbyesp.library.data.remote.SpotDLUpdater
 import com.bobbyesp.library.domain.UpdateStatus
 import com.bobbyesp.library.domain.model.SpotifySong
@@ -19,11 +18,19 @@ import com.bobbyesp.spotdl_common.domain.model.DownloadedDependencies
 import com.bobbyesp.spotdl_common.utils.dependencies.dependencyDownloadCallback
 import com.bobbyesp.spotdl_common.utils.files.FilesUtil.ensure
 import com.bobbyesp.spotdl_common.utils.json
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 import org.apache.commons.io.FileUtils
 import java.io.File
 import java.io.IOException
 import java.util.Collections
 import java.util.UUID
+import kotlin.math.roundToInt
 
 abstract class SpotDLCore {
     private var initialized = false
@@ -31,7 +38,6 @@ abstract class SpotDLCore {
 
     private var pythonPath: File? = null
     private var ffmpegPath: File? = null
-    private lateinit var spotdlPath: File
 
     /* ENVIRONMENT VARIABLES */
     private lateinit var ENV_LD_LIBRARY_PATH: String
@@ -43,7 +49,6 @@ abstract class SpotDLCore {
 
     private val pythonLibVersion = "pythonLibVersion"
 
-    //Map of process id associated with the process
     protected open val idProcessMap: MutableMap<String, Process> =
         Collections.synchronizedMap(HashMap<String, Process>())
 
@@ -53,24 +58,13 @@ abstract class SpotDLCore {
         if (initialized) return
 
         val baseDirectory = File(context.noBackupFilesDir, LIBRARY_NAME).ensure()
-
         val packagesDir = File(baseDirectory, PACKAGES_ROOT_NAME)
-
-        //Here are all the binaries provided by the jniLibs folder
         binariesDirectory = File(context.applicationInfo.nativeLibraryDir)
-
-        // Dependencies binaries path (.so files)
         pythonPath = File(binariesDirectory, Constants.BinariesName.PYTHON)
         ffmpegPath = File(binariesDirectory, Constants.BinariesName.FFMPEG)
-
-        // Dependencies packages directory (where they are extracted - .zip files)
         val pythonDir = File(packagesDir, Constants.DirectoriesName.PYTHON)
         val ffmpegDir = File(packagesDir, Constants.DirectoriesName.FFMPEG)
 
-        val spotdlDir = File(baseDirectory, Constants.DirectoriesName.SPOTDL)
-        spotdlPath = File(spotdlDir, Constants.BinariesName.SPOTDL)
-
-        // Set environment variables
         ENV_LD_LIBRARY_PATH =
             pythonDir.absolutePath + "/usr/lib" + ":" + ffmpegDir.absolutePath + "/usr/lib"
         ENV_SSL_CERT_FILE = pythonDir.absolutePath + "/usr/etc/tls/cert.pem"
@@ -81,7 +75,6 @@ abstract class SpotDLCore {
 
         try {
             initPython(context, pythonDir)
-            initSpotDL(context, spotdlDir)
         } catch (e: Exception) {
             throw SpotDLException("Error initializing SpotDLCore", e)
         }
@@ -97,35 +90,7 @@ abstract class SpotDLCore {
 
     internal abstract fun initPython(appContext: Context, pythonDir: File)
 
-    @Throws(SpotDLException::class)
-    fun initSpotDL(appContext: Context, spotDlDir: File) {
-        if (!spotDlDir.exists()) spotDlDir.mkdirs()
-        val spotDlBinary = File(spotDlDir, Constants.BinariesName.SPOTDL)
-        if (!spotDlBinary.exists()) {
-            try {
-                val inputStream =
-                    appContext.resources.openRawResource(R.raw.spotdl) /* will be renamed to yt-dlp */
-                FileUtils.copyInputStreamToFile(inputStream, spotDlBinary)
-            } catch (e: Exception) {
-                FileUtils.deleteQuietly(spotDlDir)
-                throw SpotDLException("Error extracting SpotDL source files", e)
-            }
-        }
-    }
-
-    /**
-     * Checks if a process with the given id is running and destroys it
-     * @param id the process id
-     * @return true if the process was destroyed successfully, false otherwise
-     */
     fun destroyProcessById(id: String): Boolean {
-        if (isDebug) {
-            Log.d("SpotDL", "Destroying process $id")
-            Log.d("SpotDL", "--------------------------------------")
-            Log.d("SpotDL", "idProcessMap: $idProcessMap")
-            Log.d("SpotDL", "--------------------------------------")
-            Log.d("SpotDL", "Does the map contain the id? ${idProcessMap.containsKey(id)}")
-        }
         if (idProcessMap.containsKey(id)) {
             val p = idProcessMap[id]
             var alive = true
@@ -166,42 +131,32 @@ abstract class SpotDLCore {
         if (processId != null && idProcessMap.containsKey(processId)) throw SpotDLException("Process ID already exists")
 
         request.addOption("--ffmpeg", ffmpegPath!!.absolutePath)
-        // disable caching unless explicitly requested
-        if (!request.hasOption("--cache-path") || request.getOption("--cache-dir") == null || request.hasOption(
-                "--use-cache-file"
-            )
-        ) {
+        if (!request.hasOption("--cache-path")) {
             request.addOption("--no-cache")
         }
 
-        val spotdlResponse: SpotDLResponse
-        val process: Process
-        val exitCode: Int
-        val outBuffer = StringBuilder() //stdout
-        val errBuffer = StringBuilder() //stderr
         val startTime = System.currentTimeMillis()
         val args = request.buildCommand()
         val command: MutableList<String?> = ArrayList()
 
-        command.addAll(listOf(pythonPath!!.absolutePath, spotdlPath.absolutePath))
+        // Executa o spotdl como um módulo
+        command.addAll(listOf(pythonPath!!.absolutePath, "-m", "spotdl"))
         command.addAll(args)
 
         val processBuilder = ProcessBuilder(command)
-
         processBuilder.environment().apply {
             this["LD_LIBRARY_PATH"] = ENV_LD_LIBRARY_PATH
             this["SSL_CERT_FILE"] = ENV_SSL_CERT_FILE
             this["PATH"] = System.getenv("PATH") + ":" + binariesDirectory.absolutePath
             this["PYTHONHOME"] = ENV_PYTHONHOME
-            this["HOME"] = HOME //ENV_PYTHONHOME
-//            this["TMPDIR"] = TMPDIR
+            this["HOME"] = HOME
             this["LDFLAGS"] = LDFLAGS
             this["TERM"] = "xterm-256color"
-            this["FORCE_COLOR"] = "true"
         }
 
-        process = try {
-            processBuilder.start()
+        val process: Process
+        try {
+            process = processBuilder.start()
         } catch (e: IOException) {
             throw SpotDLException(e)
         }
@@ -209,19 +164,39 @@ abstract class SpotDLCore {
         if (processId != null) {
             idProcessMap[processId] = process
         }
-        val outStream = process.inputStream
-        val errStream = process.errorStream
-        val stdOutProcessor = StreamProcessExtractor(outBuffer, outStream, callback)
-        val stdErrProcessor = StreamGobbler(errBuffer, errStream)
 
-        exitCode = try {
-            stdOutProcessor.join()
-            stdErrProcessor.join()
-            process.waitFor()
+        val outBuffer = StringBuilder()
+        val errBuffer = StringBuilder()
+        
+        val coroutineScope = CoroutineScope(Dispatchers.IO)
+        var downloadJob: Job? = null
+        var progressJob: Job? = null
+        var exitCode: Int = -1
+
+        try {
+            runBlocking {
+                downloadJob = launch {
+                    val stdOutGobbler = StreamGobbler(outBuffer, process.inputStream)
+                    val stdErrGobbler = StreamGobbler(errBuffer, process.errorStream)
+                    stdOutGobbler.join()
+                    stdErrGobbler.join()
+                }
+
+                if (callback != null) {
+                    progressJob = launch {
+                        runFakeProgressUpdater(downloadJob!!, callback)
+                    }
+                }
+
+                exitCode = process.waitFor()
+            }
         } catch (e: InterruptedException) {
             process.destroy()
+            coroutineScope.cancel()
             if (processId != null) idProcessMap.remove(processId)
             throw e
+        } finally {
+            coroutineScope.cancel()
         }
 
         val out = outBuffer.toString()
@@ -236,11 +211,38 @@ abstract class SpotDLCore {
             }
         }
         idProcessMap.remove(processId)
+        
+        callback?.invoke(1.0f, 0L, "Done.")
 
         val elapsedTime = System.currentTimeMillis() - startTime
-        spotdlResponse = SpotDLResponse(command, exitCode, elapsedTime, out, err)
+        return SpotDLResponse(command, exitCode, elapsedTime, out, err)
+    }
+    
+    private fun generateProgressBarString(percentage: Float): String {
+        val barLength = 20
+        val filledLength = (barLength * percentage / 100).roundToInt()
+        val emptyLength = barLength - filledLength
+        return "━".repeat(filledLength) + " ".repeat(emptyLength)
+    }
 
-        return spotdlResponse
+    private suspend fun runFakeProgressUpdater(
+        downloadJob: Job,
+        callback: (Float, Long, String) -> Unit
+    ) {
+        var progress = 0f
+        val totalDurationEstimate = 30L
+
+        while (downloadJob.isActive && progress < 99f) {
+            progress += 2f 
+            val eta = (totalDurationEstimate * (100 - progress) / 100).coerceAtLeast(0)
+            val progressBar = generateProgressBarString(progress)
+            val progressInt = progress.roundToInt()
+            val line = "Downloading... [$progressBar] $progressInt% ETA: 00:00:${String.format("%02d", eta)}"
+            
+            callback(progress / 100f, eta, line)
+            
+            delay(500)
+        }
     }
 
     @Throws(SpotDLException::class, InterruptedException::class, CanceledException::class)
@@ -250,32 +252,23 @@ abstract class SpotDLCore {
         extraArguments: Map<String, String>? = null
     ): List<SpotifySong> {
         assertInit()
-        //Make sure that the path exists
         val metadataDirectory = File("$HOME/.spotdl/meta_info/").ensure()
-
         val metadataFile = File(metadataDirectory, "$songId.spotdl")
-        //UUID for song identification
         val request = SpotDLRequest()
         request.addOption("save", url)
         request.addOption("--save-file", metadataFile.absolutePath)
         extraArguments?.forEach { (key, value) -> request.addOption(key, value) }
-
-        //if the --client-id and --client-secret are present in the extraArguments, skip the Spowlo credentials
-
         if (!request.hasOption("--client-id") || !request.hasOption("--client-secret")) {
             request.addOption("--client-id", BuildConfig.CLIENT_ID)
             request.addOption("--client-secret", BuildConfig.CLIENT_SECRET)
         }
         execute(request, songId, null)
-
         val spotifySongInfo: List<SpotifySong>?
-
         try {
             spotifySongInfo = json.decodeFromString<List<SpotifySong>>(metadataFile.readText())
         } catch (e: Exception) {
             throw SpotDLException("Failed to read/parse the metadata file", e)
         }
-
         return spotifySongInfo
     }
 
