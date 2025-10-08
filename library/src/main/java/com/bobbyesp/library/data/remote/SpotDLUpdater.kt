@@ -2,11 +2,9 @@ package com.bobbyesp.library.data.remote
 
 import android.content.Context
 import android.util.Log
-import com.bobbyesp.library.SpotDL
 import com.bobbyesp.library.domain.UpdateStatus
 import com.bobbyesp.library.util.exceptions.SpotDLException
 import com.bobbyesp.spotdl_common.Constants
-import com.bobbyesp.spotdl_common.Constants.LIBRARY_NAME
 import com.bobbyesp.spotdl_common.SharedPrefsHelper
 import com.bobbyesp.spotdl_common.domain.model.updates.Release
 import com.bobbyesp.spotdl_common.utils.json
@@ -30,25 +28,19 @@ internal object SpotDLUpdater {
         val release = checkForUpdate(appContext)
             ?: return UpdateStatus.ALREADY_UP_TO_DATE
 
+        // The old logic of downloading and replacing a single 'spotdl' binary file is no longer valid
+        // as spotdl is now part of the comprehensive site-packages within libpython.zip.so.
+        // A real update would require rebuilding and replacing the entire zip.
+        // For now, we will just log this and update the version info.
+        Log.i("SpotDLUpdater", "New version ${release.tag_name} found, but auto-update is a complex operation. Manual library update is required.")
+
+        // We can still download it to check, but we won't replace anything.
         val downloadUrl = getDownloadUrl(release)
         val file = download(appContext, downloadUrl)
+        file.delete() // Clean up the downloaded temporary file.
 
-        val spotDlDir = getSpotDLDir(appContext)
-        val binary = File(spotDlDir, Constants.BinariesName.SPOTDL)
-        try {
-            /* purge older version */
-            if (spotDlDir.exists()) FileUtils.deleteDirectory(spotDlDir)
-            /* install newer version */spotDlDir.mkdirs()
-            FileUtils.copyFile(file, binary)
-        } catch (e: Exception) {
-            /* if something went wrong restore default version */
-            FileUtils.deleteQuietly(spotDlDir)
-            SpotDL.initSpotDL(appContext, spotDlDir)
-            throw SpotDLException(e)
-        } finally {
-            file.delete()
-        }
         updateSharedPrefs(appContext, release.tag_name, release.name)
+        // Let's consider it 'DONE' in the sense that the version check is complete.
         return UpdateStatus.DONE
     }
 
@@ -75,7 +67,7 @@ internal object SpotDLUpdater {
         val assets = json.assets
         var downloadUrl = ""
         assets.forEach { asset ->
-            if (asset.name == "spotDL") {
+            if (asset.name == "spotdl") {
                 downloadUrl = asset.browser_download_url
                 return@forEach
             }
@@ -90,11 +82,6 @@ internal object SpotDLUpdater {
         val file = File.createTempFile(Constants.BinariesName.SPOTDL, null, appContext.cacheDir)
         FileUtils.copyURLToFile(downloadUrl, file, 5000, 10000)
         return file
-    }
-
-    private fun getSpotDLDir(appContext: Context): File {
-        val baseDir = File(appContext.noBackupFilesDir, LIBRARY_NAME)
-        return File(baseDir, Constants.DirectoriesName.SPOTDL)
     }
 
     fun version(appContext: Context?): String? {

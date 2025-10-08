@@ -244,13 +244,9 @@ object Downloader {
 
     private fun getProgress(line: String): Float {
         val PERCENT: Float
-        //Get the two numbers before an % in the line
         val regex = Regex("(\\d+)%")
         val matchResult = regex.find(line)
-        //Log the result
-        ///if (BuildConfig.DEBUG) Log.d(TAG, "Progress: ${matchResult?.groupValues?.get(1)?.toFloat() ?: 0f}")
         PERCENT = matchResult?.groupValues?.get(1)?.toFloat() ?: 0f
-        //divide percent by 100 to get a value between 0 and 1
         return PERCENT / 100f
     }
 
@@ -337,7 +333,9 @@ object Downloader {
 
             NotificationsUtil.notifyProgress(
                 notificationId = notificationId,
-                progress = progress.toInt(),
+                // THE FIX: The progress callback gives a Float from 0.0 to 1.0.
+                // The notification requires an Int from 0 to 100.
+                progress = (progress * 100).toInt(),
                 text = line,
                 title = songInfo.name
             )
@@ -474,9 +472,6 @@ object Downloader {
         clearErrorState()
     }
 
-    /**
-     * @param isTaskAborted Determines if the download task is aborted due to the given `Exception`
-     */
     private fun manageDownloadError(
         th: Throwable,
         isFetchingInfo: Boolean,
@@ -532,14 +527,7 @@ object Downloader {
     fun onProcessStarted() = mutableProcessCount.update { it + 1 }
     fun String.toNotificationId(): Int = this.hashCode()
 
-    //get just the numbers from a string and return an int
     private fun String.getNumbers(): Int {
-        val sb = StringBuilder()
-        for (c in this) {
-            if (c.isDigit()) {
-                sb.append(c)
-            }
-        }
-        return sb.toString().toInt()
+        return filter { it.isDigit() }.takeIf { it.isNotEmpty() }?.toInt() ?: 0
     }
 }
