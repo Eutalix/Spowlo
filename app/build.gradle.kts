@@ -47,14 +47,15 @@ sealed class Version(
     }
 }
 
-val currentVersion: Version = Version.Stable(
+// This is now a fallback version for local builds.
+val fallbackVersion: Version = Version.Stable(
     versionMajor = 1,
     versionMinor = 5,
     versionPatch = 3,
 )
 
-
 val keystorePropertiesFile = rootProject.file("keystore.properties")
+
 val splitApks = !project.hasProperty("noSplits")
 
 android {
@@ -72,19 +73,26 @@ android {
         }
     }
 
-    // REMOVED: No longer reading local.properties.
-    // The new auth logic handles credentials from user preferences or spotdl.
-
     compileSdk = 35
     defaultConfig {
         applicationId = "com.bobbyesp.spowlo"
         minSdk = 26
         targetSdk = 35
-        versionCode = currentVersion.toVersionCode()
-        versionName = currentVersion.toVersionName().run {
-            if (!splitApks) "$this-(F-Droid)"
-            else this
+        
+        // --- NEW VERSIONING LOGIC ---
+        // It tries to read the version from a property passed by GitHub Actions.
+        // If the property doesn't exist (i.e., a local build), it uses the fallback version.
+        val versionNameFromTag = project.findProperty("versionNameFromTag") as? String
+        if (versionNameFromTag != null && versionNameFromTag.startsWith("v")) {
+            val versionParts = versionNameFromTag.removePrefix("v").split(".").map { it.toInt() }
+            versionCode = versionParts[0] * 1000000 + versionParts[1] * 10000 + versionParts[2] * 100
+            versionName = versionNameFromTag.removePrefix("v")
+        } else {
+            // Use the hardcoded version for local/debug builds.
+            versionCode = fallbackVersion.toVersionCode()
+            versionName = fallbackVersion.toVersionName()
         }
+        
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
             useSupportLibrary = true
@@ -120,9 +128,7 @@ android {
             }
             if (keystorePropertiesFile.exists())
                 signingConfig = signingConfigs.getByName("debug")
-            
-            // REMOVED: No longer embedding secrets from local.properties.
-            
+
             matchingFallbacks.add(0, "debug")
             matchingFallbacks.add(1, "release")
         }
@@ -132,8 +138,6 @@ android {
             packaging {
                 resources.excludes.add("META-INF/*.kotlin_module")
             }
-
-            // REMOVED: No longer embedding secrets from local.properties.
             
             matchingFallbacks.add(0, "debug")
             matchingFallbacks.add(1, "release")
@@ -142,24 +146,20 @@ android {
             isMinifyEnabled = false
         }
     }
-    
-    // ... (buildFeatures, lint, etc. remain the same)
+
     buildFeatures {
         compose = true
         buildConfig = true
     }
-
     lint {
         disable.addAll(listOf("MissingTranslation", "ExtraTranslation"))
     }
-
     applicationVariants.all {
         outputs.all {
             (this as com.android.build.gradle.internal.api.BaseVariantOutputImpl).outputFileName =
                 "Spowlo-${defaultConfig.versionName}-${name}.apk"
         }
     }
-
     kotlinOptions {
         freeCompilerArgs = freeCompilerArgs + "-opt-in=kotlin.RequiresOptIn"
     }
@@ -178,19 +178,18 @@ kotlin {
 }
 
 dependencies {
-
+    // UPDATED: All dependencies pointing to `project(":...")`
     implementation(project(":color"))
-    // ... (all other AndroidX, Hilt, Room, etc. dependencies remain the same)
+    implementation(project(":library"))
+    implementation(project(":ffmpeg"))
+    
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.appcompat)
     implementation(libs.android.material)
     implementation(libs.androidx.activity.compose)
-
     implementation(libs.androidx.lifecycle.runtimeCompose)
     implementation(libs.androidx.lifecycle.viewModelCompose)
-
     implementation(platform(libs.androidx.compose.bom))
-
     implementation(libs.androidx.compose.ui)
     implementation(libs.androidx.compose.ui.tooling.preview)
     implementation(libs.androidx.compose.material)
@@ -198,9 +197,7 @@ dependencies {
     implementation(libs.androidx.compose.material3)
     implementation(libs.androidx.compose.material3.windowSizeClass)
     implementation(libs.androidx.compose.foundation)
-
     implementation(libs.androidx.navigation.compose)
-
     implementation(libs.accompanist.systemuicontroller)
     implementation(libs.accompanist.permissions)
     implementation(libs.accompanist.navigation.animation)
@@ -210,45 +207,27 @@ dependencies {
     implementation(libs.accompanist.pager.indicators)
     implementation(libs.paging.compose)
     implementation(libs.paging.runtime)
-
     implementation(libs.coil.kt.compose)
-
     implementation(libs.kotlinx.serialization.json)
-
     implementation(libs.androidx.hilt.navigation.compose)
     ksp(libs.hilt.ext.compiler)
     implementation(libs.hilt.android)
     ksp(libs.hilt.compiler)
-
     implementation(libs.room.runtime)
     implementation(libs.room.ktx)
     ksp(libs.room.compiler)
-
-    // UPDATED: Point to local modules.
-    implementation(project(":library"))
-    implementation(project(":ffmpeg"))
-    
-    // KEPT: We are still using the spotify-web-api for its rich search capabilities.
-    implementation(libs.spotify.api.android)
-
-    // okhttp
     implementation(libs.okhttp)
     implementation(libs.bundles.ktor)
-    //MMKV
     implementation(libs.mmkv)
-
     implementation(libs.markdown)
     implementation(libs.customtabs)
-
     debugImplementation(libs.crash.handler)
-
     testImplementation(libs.junit4)
     androidTestImplementation(libs.androidx.test.ext)
     androidTestImplementation(libs.androidx.test.espresso.core)
-
     debugImplementation(libs.androidx.compose.ui.tooling)
 }
-// ... (helper functions at the end remain the same)
+
 fun String.capitalizeWord(): String {
     return this.replaceFirstChar {
         if (it.isLowerCase()) it.titlecase(
@@ -256,7 +235,6 @@ fun String.capitalizeWord(): String {
         ) else it.toString()
     }
 }
-
 class RoomSchemaArgProvider(
     @get:InputDirectory @get:PathSensitive(PathSensitivity.RELATIVE) val schemaDir: File
 ) : CommandLineArgumentProvider {
