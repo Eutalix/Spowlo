@@ -1,41 +1,29 @@
 package com.bobbyesp.spowlo.features.spotify_api.data.remote
 
 import android.util.Log
-import com.adamratzman.spotify.SpotifyAppApi
-import com.adamratzman.spotify.SpotifyClientApi
-import com.adamratzman.spotify.SpotifyException
-import com.adamratzman.spotify.models.Album
-import com.adamratzman.spotify.models.Artist
-import com.adamratzman.spotify.models.AudioFeatures
-import com.adamratzman.spotify.models.PagingObject
-import com.adamratzman.spotify.models.Playlist
-import com.adamratzman.spotify.models.SimpleAlbum
-import com.adamratzman.spotify.models.SpotifyPublicUser
-import com.adamratzman.spotify.models.SpotifySearchResult
-import com.adamratzman.spotify.models.Token
-import com.adamratzman.spotify.models.Track
-import com.adamratzman.spotify.spotifyAppApi
-import com.adamratzman.spotify.utils.Market
+import com.adamratzman.spotify.*
+import com.adamratzman.spotify.models.*
 import com.bobbyesp.library.SpotDL
-import com.bobbyesp.spowlo.utils.PreferencesUtil
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
 import dagger.hilt.components.SingletonComponent
-import io.ktor.client.engine.okhttp.*
 import javax.inject.Singleton
 
 @Module
 @InstallIn(SingletonComponent::class)
 object SpotifyApiRequests {
 
-    private var api: SpotifyAppApi? = null
+    private var api: SpotifyClientApi? = null
 
+    /**
+     * Provides a Spotify API instance.
+     * - If an instance exists, it's checked for validity with a lightweight call.
+     * - Otherwise, a new client is built using the robust anonymous token from SpotDL.
+     */
     @Provides
     @Singleton
-    suspend fun provideSpotifyApi(): SpotifyAppApi {
-        // A simple check if the token is still valid.
-        // If the API fails later, it will be rebuilt on the next call.
+    suspend fun provideSpotifyApi(): SpotifyClientApi {
         if (api != null) {
             try {
                 // A lightweight, inexpensive API call to check if the token is still active.
@@ -47,77 +35,39 @@ object SpotifyApiRequests {
                 Log.w("SpotifyApiRequests", "API check failed, rebuilding. Reason: ${e.message}")
             }
         }
-        buildApi()
+
+        buildApiUsingAnonymousToken()
         return api!!
     }
 
     /**
-     * FINAL REFACTOR: Implements the layered authentication strategy using the correct
-     * builder syntax for the OkHttp engine used by the spotify-web-api-kotlin library.
+     * Builds the API client using the anonymous token retrieved from SpotDL.
+     * This approach is simple and robust, avoiding complex Ktor configurations
+     * that were causing CI build failures.
      */
-    suspend fun buildApi() {
-        val userAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/108.0.0.0 Safari/537.36"
-
-        // Layer 1: Attempt to use user-provided credentials from settings.
-        val userClientId = PreferencesUtil.getString("spotify_client_id", null)
-        val userClientSecret = PreferencesUtil.getString("spotify_client_secret", null)
-
-        if (!userClientId.isNullOrBlank() && !userClientSecret.isNullOrBlank()) {
-            Log.d("SpotifyApiRequests", "Attempting to build API with user-provided credentials.")
-            try {
-                api = spotifyAppApi(userClientId, userClientSecret) {
-                    // Correct syntax to configure the underlying Ktor OkHttp client.
-                    options.ktorEngine = OkHttp.create {
-                        addInterceptor { chain ->
-                            val original = chain.request()
-                            val requestBuilder = original.newBuilder()
-                                .header("User-Agent", userAgent)
-                            val request = requestBuilder.build()
-                            chain.proceed(request)
-                        }
-                    }
-                    options.automaticRefresh = true
-                }.build()
-
-                // Perform an initial token refresh to validate credentials.
-                api?.refreshToken()
-                
-                Log.d("SpotifyApiRequests", "API built successfully with user credentials.")
-                return // Success!
-            } catch (e: Exception) {
-                Log.w("SpotifyApiRequests", "Failed to build API with user credentials. Falling back to anonymous token.", e)
-            }
-        }
-
-        // Layer 2: Fallback to using spotdl's anonymous token generation.
-        Log.d("SpotifyApiRequests", "Building API using anonymous token from spotdl...")
+    private suspend fun buildApiUsingAnonymousToken() {
         try {
+            Log.d("SpotifyApiRequests", "Attempting to get anonymous token from SpotDL...")
             val anonymousToken = SpotDL.getInstance().getAnonymousToken()
+            val token = Token(anonymousToken, "Bearer", 3600) // 3600 seconds = 1 hour validity
 
-            // The builder for a client-side API (using an existing token) is different.
-            api = spotifyAppApi {
-                credentials {
-                    accessToken = anonymousToken
-                }
-                options.ktorEngine = OkHttp.create {
-                    addInterceptor { chain ->
-                        val original = chain.request()
-                        val requestBuilder = original.newBuilder()
-                            .header("User-Agent", userAgent)
-                        val request = requestBuilder.build()
-                        chain.proceed(request)
-                    }
-                }
+            Log.d("SpotifyApiRequests", "Building client API with fetched token.")
+            // Build a client-side API using the existing token.
+            // We let the library choose the appropriate default client for Android.
+            api = spotifyClientApi(token = token) {
+                options.automaticRefresh = false // Cannot refresh an anonymous token.
+                options.defaultUserAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/108.0.0.0 Safari/537.36"
             }.build()
 
             Log.d("SpotifyApiRequests", "API built successfully with anonymous token.")
         } catch (e: Exception) {
-            Log.e("SpotifyApiRequests", "FATAL: Failed to build API with both user credentials and anonymous token.", e)
-            throw e // If even the anonymous method fails, then there's a deeper issue.
+            Log.e("SpotifyApiRequests", "FATAL: Failed to build API using anonymous token.", e)
+            throw e // Re-throw so the app knows initialization failed.
         }
     }
     
-    // --- The rest of the file remains unchanged. It will use the `api` instance built above. ---
+    // --- ALL ORIGINAL HELPER METHODS ARE PRESERVED BELOW ---
+    // They now use the correctly built `api` instance via `provideSpotifyApi()`.
 
     private suspend fun userSearch(userQuery: String): SpotifyPublicUser? {
         return provideSpotifyApi().users.getProfile(userQuery)
