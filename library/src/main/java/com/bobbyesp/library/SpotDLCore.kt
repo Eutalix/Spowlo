@@ -139,7 +139,7 @@ abstract class SpotDLCore {
         val args = request.buildCommand()
         val command: MutableList<String?> = ArrayList()
 
-        // Executa o spotdl como um módulo
+        // REFACTOR: Execute spotdl as a Python module for robustness.
         command.addAll(listOf(pythonPath!!.absolutePath, "-m", "spotdl"))
         command.addAll(args)
 
@@ -168,6 +168,8 @@ abstract class SpotDLCore {
         val outBuffer = StringBuilder()
         val errBuffer = StringBuilder()
         
+        // REFACTOR: Use a coroutine scope to manage the download and a "fake" progress updater in parallel.
+        // This is robust and not dependent on the fragile format of spotdl's CLI output.
         val coroutineScope = CoroutineScope(Dispatchers.IO)
         var downloadJob: Job? = null
         var progressJob: Job? = null
@@ -218,6 +220,7 @@ abstract class SpotDLCore {
         return SpotDLResponse(command, exitCode, elapsedTime, out, err)
     }
     
+    // NEW: Helper function to generate a progress bar string.
     private fun generateProgressBarString(percentage: Float): String {
         val barLength = 20
         val filledLength = (barLength * percentage / 100).roundToInt()
@@ -225,12 +228,13 @@ abstract class SpotDLCore {
         return "━".repeat(filledLength) + " ".repeat(emptyLength)
     }
 
+    // NEW: Coroutine function to run the fake progress updater logic.
     private suspend fun runFakeProgressUpdater(
         downloadJob: Job,
         callback: (Float, Long, String) -> Unit
     ) {
         var progress = 0f
-        val totalDurationEstimate = 30L
+        val totalDurationEstimate = 30L // 30-second estimate per song
 
         while (downloadJob.isActive && progress < 99f) {
             progress += 2f 
@@ -243,6 +247,43 @@ abstract class SpotDLCore {
             
             delay(500)
         }
+    }
+    
+    /**
+     * NEW: Executes spotdl to generate and retrieve an anonymous access token.
+     * This is the key to initializing the Spotify API without hardcoded credentials.
+     */
+    @Throws(SpotDLException::class)
+    fun getAnonymousToken(): String {
+        assertInit()
+
+        val request = SpotDLRequest()
+        // A dummy command to force spotdl to initialize its Spotify client,
+        // which will print the token to stderr.
+        request.addOption("save", "") 
+        request.addOption("--print-errors")
+        request.addOption("--no-download")
+
+        val response = try {
+            execute(request)
+        } catch (e: SpotDLException) {
+            // This exception is expected as no song is provided. We only need the stderr output.
+            SpotDLResponse(emptyList(), 1, 0, "", e.message ?: "")
+        }
+
+        // The token is printed to stderr. Extract it with a regex.
+        val tokenRegex = "token='([a-zA-Z0-9._-]+)'".toRegex()
+        val matchResult = tokenRegex.find(response.error)
+        
+        val token = matchResult?.groups?.get(1)?.value
+        
+        if (token.isNullOrBlank()) {
+            Log.e("SpotDL", "Failed to extract anonymous token. Stderr: ${response.error}")
+            throw SpotDLException("Could not retrieve anonymous Spotify token from spotdl.")
+        }
+        
+        Log.d("SpotDL", "Successfully extracted anonymous token.")
+        return token
     }
 
     @Throws(SpotDLException::class, InterruptedException::class, CanceledException::class)
@@ -258,10 +299,10 @@ abstract class SpotDLCore {
         request.addOption("save", url)
         request.addOption("--save-file", metadataFile.absolutePath)
         extraArguments?.forEach { (key, value) -> request.addOption(key, value) }
-        if (!request.hasOption("--client-id") || !request.hasOption("--client-secret")) {
-            request.addOption("--client-id", BuildConfig.CLIENT_ID)
-            request.addOption("--client-secret", BuildConfig.CLIENT_SECRET)
-        }
+
+        // REMOVED: No longer passing hardcoded client_id/secret to spotdl.
+        // It will now use its own anonymous authentication method.
+        
         execute(request, songId, null)
         val spotifySongInfo: List<SpotifySong>?
         try {

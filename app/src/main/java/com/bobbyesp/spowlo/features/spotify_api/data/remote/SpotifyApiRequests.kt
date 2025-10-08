@@ -10,11 +10,11 @@ import com.adamratzman.spotify.models.Playlist
 import com.adamratzman.spotify.models.SimpleAlbum
 import com.adamratzman.spotify.models.SpotifyPublicUser
 import com.adamratzman.spotify.models.SpotifySearchResult
-import com.adamratzman.spotify.models.Token
 import com.adamratzman.spotify.models.Track
 import com.adamratzman.spotify.spotifyAppApi
 import com.adamratzman.spotify.utils.Market
-import com.bobbyesp.spowlo.BuildConfig
+import com.bobbyesp.library.SpotDL // Import the SpotDL library
+import com.bobbyesp.spowlo.utils.PreferencesUtil // IMPORTANT: Ensure this is your actual preferences utility class
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -25,29 +25,75 @@ import javax.inject.Singleton
 @InstallIn(SingletonComponent::class)
 object SpotifyApiRequests {
 
-    private val clientId = BuildConfig.CLIENT_ID ?: System.getenv("CLIENT_ID")
-    private val clientSecret = BuildConfig.CLIENT_SECRET ?: System.getenv("CLIENT_SECRET")
     private var api: SpotifyAppApi? = null
-    private var token: Token? = null
 
     @Provides
     @Singleton
     suspend fun provideSpotifyApi(): SpotifyAppApi {
-        if (api == null) {
-            buildApi()
+        // If the API is already built and the token is not expired, reuse it.
+        if (api?.token?.isExpired == false) {
+            return api!!
         }
+        // Otherwise, build a new API instance.
+        buildApi()
         return api!!
     }
 
+    /**
+     * REFACTOR: Implements a layered authentication strategy for robustness.
+     * It prioritizes user-provided credentials from settings and falls back to
+     * spotdl's anonymous token generation if they are unavailable or fail.
+     */
     suspend fun buildApi() {
-        Log.d(
-            "SpotifyApiRequests",
-            "Building API with client ID: $clientId and client secret: $clientSecret"
-        )
-        token = spotifyAppApi(clientId, clientSecret).build().token
-        api = spotifyAppApi(clientId, clientSecret, token!!) {
-            automaticRefresh = true
-        }.build()
+        // Layer 1: Attempt to use user-provided credentials from settings.
+        val userClientId = PreferencesUtil.getString("spotify_client_id", null) // TODO: Adapt preference key if needed
+        val userClientSecret = PreferencesUtil.getString("spotify_client_secret", null) // TODO: Adapt preference key if needed
+
+        if (!userClientId.isNullOrBlank() && !userClientSecret.isNullOrBlank()) {
+            Log.d("SpotifyApiRequests", "Attempting to build API with user-provided credentials.")
+            try {
+                val apiBuilder = spotifyAppApi(userClientId, userClientSecret) {
+                    api {
+                        ktor {
+                            install("DefaultRequest") {
+                                headers.append("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/108.0.0.0 Safari/537.36")
+                            }
+                        }
+                    }
+                }.build()
+                
+                api = apiBuilder
+                Log.d("SpotifyApiRequests", "API built successfully with user credentials.")
+                return // Success! Exit the function.
+            } catch (e: Exception) {
+                Log.w("SpotifyApiRequests", "Failed to build API with user credentials. Falling back to anonymous token.", e)
+                // If this fails, don't crash. Proceed to Layer 2.
+            }
+        }
+
+        // Layer 2: Fallback to using spotdl's anonymous token generation.
+        Log.d("SpotifyApiRequests", "No user credentials found. Building API using anonymous token from spotdl...")
+        try {
+            val anonymousToken = SpotDL.getInstance().getAnonymousToken()
+
+            api = spotifyAppApi {
+                credentials {
+                    accessToken = anonymousToken
+                }
+                api {
+                    ktor {
+                        install("DefaultRequest") {
+                            headers.append("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/108.0.0.0 Safari/537.36")
+                        }
+                    }
+                }
+            }.build()
+
+            Log.d("SpotifyApiRequests", "API built successfully with anonymous token.")
+        } catch (e: Exception) {
+            Log.e("SpotifyApiRequests", "FATAL: Failed to build API with both user credentials and anonymous token.", e)
+            throw e // If even the anonymous method fails, there's a deeper issue.
+        }
     }
 
     //Performs Spotify database query for queries related to user information.
@@ -228,5 +274,4 @@ object SpotifyApiRequests {
     suspend fun providesGetArtistAlbums(id: String): PagingObject<SimpleAlbum>? {
         return getArtistAlbums(id)
     }
-    
 }
