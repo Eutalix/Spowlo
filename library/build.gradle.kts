@@ -1,5 +1,3 @@
-import java.util.Properties
-
 plugins {
     id("com.android.library")
     id("org.jetbrains.kotlin.android")
@@ -7,13 +5,10 @@ plugins {
     id("maven-publish")
 }
 
-// REMOVED: This line was causing the build to fail as 'versionName' is not defined in the root project.
-// val versionName = rootProject.extra["versionName"] as String
-
-// REMOVED: This logic is also not needed as it depends on local.properties which we are avoiding.
-// val localProperties = Properties().apply {
-//     load(project.rootDir.resolve("local.properties").inputStream())
-// }
+// NEW: Aligns the Kotlin toolchain with the main app module.
+kotlin {
+    jvmToolchain(21)
+}
 
 android {
     namespace = "com.bobbyesp.library"
@@ -21,7 +16,6 @@ android {
 
     defaultConfig {
         minSdk = 24
-
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         consumerProguardFiles("consumer-rules.pro")
     }
@@ -48,8 +42,6 @@ android {
     }
 
     buildTypes {
-        // REMOVED: The buildConfigFields are not needed and depend on local.properties.
-        // all { ... }
         release {
             isMinifyEnabled = false
             proguardFiles(
@@ -59,16 +51,17 @@ android {
         }
     }
 
-
+    // UPDATED: Standardized Java and Kotlin target versions for library compatibility.
     compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_17
-        targetCompatibility = JavaVersion.VERSION_17
+        sourceCompatibility = JavaVersion.VERSION_1_8
+        targetCompatibility = JavaVersion.VERSION_1_8
     }
     kotlinOptions {
-        jvmTarget = "17"
+        jvmTarget = "1.8"
     }
+    
     buildFeatures {
-        buildConfig = true // Kept, as some internal logic might use it.
+        buildConfig = true
     }
 
     publishing {
@@ -83,33 +76,14 @@ android {
     }
 }
 
-tasks.register<Jar>("androidBundledSourcesJar") {
-    archiveClassifier = "sources"
-    from(android.sourceSets.getByName("main").java.srcDirs, android.sourceSets.getByName("bundled").java.srcDirs)
-}
-
-tasks.register<Jar>("androidNonbundledSourcesJar") {
-    archiveClassifier = "sources"
-    from(android.sourceSets.getByName("main").java.srcDirs, android.sourceSets.getByName("nonbundled").java.srcDirs)
-}
-
-// REMOVED: The entire publishing block is not relevant for building the Spowlo APK.
-// It was for publishing the library as a standalone artifact.
-// afterEvaluate { ... }
-
 dependencies {
     implementation(fileTree(mapOf("dir" to "libs", "include" to listOf("*.jar"))))
-    
-    // As identified, :common does not exist in Spowlo, so this is removed for good.
-    // implementation(project(":common")) 
     
     // Using explicit versions for clarity and stability.
     implementation("androidx.core:core-ktx:1.13.1")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.8.0")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.0")
-
     implementation("commons-io:commons-io:2.11.0")
-
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.3")
 
     testImplementation("junit:junit:4.13.2")

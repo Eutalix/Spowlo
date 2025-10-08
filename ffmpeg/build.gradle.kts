@@ -4,8 +4,10 @@ plugins {
     id("maven-publish")
 }
 
-// REMOVED: This line was causing the build to fail.
-// val versionName = rootProject.extra["versionName"] as String
+// NEW: Aligns the Kotlin toolchain with the main app module.
+kotlin {
+    jvmToolchain(21)
+}
 
 android {
     namespace = "com.bobbyesp.ffmpeg"
@@ -13,7 +15,6 @@ android {
 
     defaultConfig {
         minSdk = 24
-
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         consumerProguardFiles("consumer-rules.pro")
     }
@@ -49,16 +50,20 @@ android {
             )
         }
     }
+
+    // UPDATED: Standardized Java and Kotlin target versions for library compatibility.
     compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_17
-        targetCompatibility = JavaVersion.VERSION_17
+        sourceCompatibility = JavaVersion.VERSION_1_8
+        targetCompatibility = JavaVersion.VERSION_1_8
     }
     kotlinOptions {
-        jvmTarget = "17"
+        jvmTarget = "1.8"
     }
+    
     buildFeatures {
         buildConfig = true
     }
+    
     publishing {
         singleVariant("bundledRelease") {
             withSourcesJar()
@@ -77,12 +82,6 @@ dependencies {
     
     // The modules being migrated.
     implementation(project(":library"))
-
-    // Commented out as it doesn't exist in Spowlo.
-    // implementation(project(":common"))
     
     implementation("commons-io:commons-io:2.11.0")
 }
-
-// REMOVED: This entire block is for publishing to Maven and not needed for the APK build.
-// afterEvaluate { ... }

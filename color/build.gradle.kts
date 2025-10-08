@@ -1,15 +1,13 @@
-// UPDATED: Replaced aliases with standard plugin IDs for compatibility.
 plugins {
     id("com.android.library")
     id("org.jetbrains.kotlin.android")
     id("org.jetbrains.kotlin.plugin.compose")
 }
 
-java {
-    sourceCompatibility = JavaVersion.VERSION_17
-    targetCompatibility = JavaVersion.VERSION_17
-}
+// REMOVED: The old java block. The jvmToolchain will handle this.
+// java { ... }
 
+// KEPT: This aligns the Kotlin compiler with the main app module.
 kotlin {
     jvmToolchain(21)
 }
@@ -20,10 +18,17 @@ android {
         minSdk = 21
     }
     namespace = "com.bobbyesp.spowlo.color"
+    
+    // UPDATED: This block now aligns the Java compiler with the Kotlin compiler.
     compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_17
-        targetCompatibility = JavaVersion.VERSION_17 // Corrected duplicate line
+        sourceCompatibility = JavaVersion.VERSION_1_8 // Standard for libraries
+        targetCompatibility = JavaVersion.VERSION_1_8 // Standard for libraries
     }
+
+    kotlinOptions {
+        jvmTarget = "1.8" // Ensure Kotlin output is also compatible
+    }
+    
     buildTypes {
         all {
             proguardFiles(
@@ -32,14 +37,13 @@ android {
             isMinifyEnabled = false
         }
     }
-    // The composeOptions block needs to be inside the android block
     composeOptions {
-        kotlinCompilerExtensionVersion = "1.5.14" // Specify the version explicitly
+        kotlinCompilerExtensionVersion = "1.5.14"
     }
 }
 
 dependencies {
-    // Using explicit versions from a typical libs.versions.toml for stability
+    // ... dependencies remain the same ...
     val composeBom = platform("androidx.compose:compose-bom:2024.06.00")
     api(composeBom)
     
