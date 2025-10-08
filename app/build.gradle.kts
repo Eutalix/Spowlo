@@ -53,8 +53,8 @@ val currentVersion: Version = Version.Stable(
     versionPatch = 3,
 )
 
-val keystorePropertiesFile = rootProject.file("keystore.properties")
 
+val keystorePropertiesFile = rootProject.file("keystore.properties")
 val splitApks = !project.hasProperty("noSplits")
 
 android {
@@ -72,8 +72,8 @@ android {
         }
     }
 
-    val localProperties = Properties()
-    localProperties.load(FileInputStream(rootProject.file("local.properties")))
+    // REMOVED: No longer reading local.properties.
+    // The new auth logic handles credentials from user preferences or spotdl.
 
     compileSdk = 35
     defaultConfig {
@@ -81,7 +81,6 @@ android {
         minSdk = 26
         targetSdk = 35
         versionCode = currentVersion.toVersionCode()
-
         versionName = currentVersion.toVersionName().run {
             if (!splitApks) "$this-(F-Droid)"
             else this
@@ -121,13 +120,9 @@ android {
             }
             if (keystorePropertiesFile.exists())
                 signingConfig = signingConfigs.getByName("debug")
-            //add client id and secret to build config
-            buildConfigField("String", "CLIENT_ID", "\"${localProperties["CLIENT_ID"]}\"")
-            buildConfigField(
-                "String",
-                "CLIENT_SECRET",
-                "\"${localProperties["CLIENT_SECRET"]}\""
-            )
+            
+            // REMOVED: No longer embedding secrets from local.properties.
+            
             matchingFallbacks.add(0, "debug")
             matchingFallbacks.add(1, "release")
         }
@@ -137,14 +132,9 @@ android {
             packaging {
                 resources.excludes.add("META-INF/*.kotlin_module")
             }
-            buildConfigField("String", "CLIENT_ID", "\"${localProperties["CLIENT_ID"]}\"")
-            buildConfigField(
-                "String",
-                "CLIENT_SECRET",
-                "\"${localProperties["CLIENT_SECRET"]}\""
-            )
-            System.setProperty("CLIENT_ID", "\"${localProperties["CLIENT_ID"]}\"")
-            System.setProperty("CLIENT_SECRET", "\"${localProperties["CLIENT_SECRET"]}\"")
+
+            // REMOVED: No longer embedding secrets from local.properties.
+            
             matchingFallbacks.add(0, "debug")
             matchingFallbacks.add(1, "release")
             applicationIdSuffix = ".debug"
@@ -152,7 +142,8 @@ android {
             isMinifyEnabled = false
         }
     }
-
+    
+    // ... (buildFeatures, lint, etc. remain the same)
     buildFeatures {
         compose = true
         buildConfig = true
@@ -189,6 +180,7 @@ kotlin {
 dependencies {
 
     implementation(project(":color"))
+    // ... (all other AndroidX, Hilt, Room, etc. dependencies remain the same)
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.appcompat)
     implementation(libs.android.material)
@@ -232,10 +224,11 @@ dependencies {
     implementation(libs.room.ktx)
     ksp(libs.room.compiler)
 
-    //spotDL library
-    implementation(libs.spotdl.android.library)
-    implementation(libs.spotdl.android.ffmpeg)
-
+    // UPDATED: Point to local modules.
+    implementation(project(":library"))
+    implementation(project(":ffmpeg"))
+    
+    // KEPT: We are still using the spotify-web-api for its rich search capabilities.
     implementation(libs.spotify.api.android)
 
     // okhttp
@@ -252,11 +245,10 @@ dependencies {
     testImplementation(libs.junit4)
     androidTestImplementation(libs.androidx.test.ext)
     androidTestImplementation(libs.androidx.test.espresso.core)
-//    androidTestImplementation(libs.androidx.compose.ui.test)
 
     debugImplementation(libs.androidx.compose.ui.tooling)
 }
-
+// ... (helper functions at the end remain the same)
 fun String.capitalizeWord(): String {
     return this.replaceFirstChar {
         if (it.isLowerCase()) it.titlecase(

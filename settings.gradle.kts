@@ -21,5 +21,9 @@ dependencyResolutionManagement {
     }
 }
 rootProject.name = "Spowlo"
+
+// UPDATED: Include the migrated modules as part of the project.
 include (":app")
 include(":color")
+include(":library")
+include(":ffmpeg")
