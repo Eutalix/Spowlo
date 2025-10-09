@@ -42,8 +42,8 @@ object SpotifyApiRequests {
 
     /**
      * Builds the API client using the anonymous token retrieved from SpotDL.
-     * This approach is simple and robust, avoiding complex Ktor configurations
-     * that were causing CI build failures.
+     * This approach uses the correct `spotifyClientApi` builder, which is designed
+     * for client-side applications with a pre-existing token.
      */
     private suspend fun buildApiUsingAnonymousToken() {
         try {
@@ -52,11 +52,20 @@ object SpotifyApiRequests {
             val token = Token(anonymousToken, "Bearer", 3600) // 3600 seconds = 1 hour validity
 
             Log.d("SpotifyApiRequests", "Building client API with fetched token.")
-            // Build a client-side API using the existing token.
-            // We let the library choose the appropriate default client for Android.
-            api = spotifyClientApi(token = token) {
-                options.automaticRefresh = false // Cannot refresh an anonymous token.
-                options.defaultUserAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/108.0.0.0 Safari/537.36"
+            
+            // THE FINAL FIX: Use the correct, simplest builder for a client with an existing token.
+            // This syntax is directly derived from SpotifyApiBuilder.kt
+            api = spotifyClientApi(
+                clientId = null, // Not needed
+                clientSecret = null, // Not needed
+                redirectUri = null, // Not needed
+                token = token
+            ) {
+                // Configuration block for the SpotifyApiOptions
+                options {
+                    automaticRefresh = false // Anonymous tokens cannot be refreshed.
+                    defaultUserAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/108.0.0.0 Safari/537.36"
+                }
             }.build()
 
             Log.d("SpotifyApiRequests", "API built successfully with anonymous token.")
