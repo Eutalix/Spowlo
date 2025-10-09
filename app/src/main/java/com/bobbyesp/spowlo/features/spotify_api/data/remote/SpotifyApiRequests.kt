@@ -13,35 +13,40 @@ import dagger.hilt.InstallIn
 import dagger.hilt.components.SingletonComponent
 import javax.inject.Singleton
 
+/**
+ * Centralized Spotify API provider used by the app.
+ *
+ * Behavior:
+ *  - Builds a SpotifyClientApi on first use using SpotDL anonymous token (so app works without user credentials).
+ *  - Exposes helper methods used across the UI (names preserved for compatibility).
+ *  - Exposes `setUserCredentialsAndRebuild()` to rebuild the client with user-provided credentials.
+ *  - Exposes `clearClient()` to drop current client and fallback to anonymous on next call.
+ */
+
 @Module
 @InstallIn(SingletonComponent::class)
 object SpotifyApiRequests {
 
-    // singleton client (may be anonymous or credentialed)
+    // Cached client (may be anonymous token client or credentialed)
     @Volatile
     private var api: SpotifyClientApi? = null
 
-    // mutex to avoid concurrent builds
+    // Prevent concurrent builds
     private val buildMutex = Mutex()
 
     /**
-     * Provide the SpotifyClientApi singleton.
-     * - First call will build using SpotDL anonymous token (if no credentialed client present).
-     * - Subsequent calls return cached client.
+     * Provide the singleton SpotifyClientApi. Builds lazily using SpotDL anonymous token if needed.
      */
     @Provides
     @Singleton
     suspend fun provideSpotifyApi(): SpotifyClientApi {
-        // fast path
-        api?.let { return it }
+        api?.let { return it } // fast path
 
-        // ensure only one builder runs at a time
         return buildMutex.withLock {
-            api?.let { return it }
+            api?.let { return it } // double-check
 
-            // try to build using anonymous token from SpotDL
             try {
-                Log.d("SpotifyApiRequests", "Building SpotifyClientApi using anonymous token from SpotDL...")
+                Log.d("SpotifyApiRequests", "Building SpotifyClientApi using SpotDL anonymous token...")
                 val anonymousToken = SpotDL.getInstance().getAnonymousToken()
                 val token = Token(anonymousToken, "Bearer", 3600)
 
@@ -51,21 +56,21 @@ object SpotifyApiRequests {
                     redirectUri = null,
                     token = token
                 ) {
-                    automaticRefresh = false // anonymous tokens won't auto-refresh
+                    automaticRefresh = false // anonymous tokens can't be refreshed automatically
                 }.build()
 
                 Log.d("SpotifyApiRequests", "Built anonymous SpotifyClientApi successfully.")
                 return api!!
             } catch (e: Exception) {
-                Log.w("SpotifyApiRequests", "Anonymous token build failed: ${e.message}. Will rethrow.", e)
+                Log.e("SpotifyApiRequests", "Failed to build anonymous SpotifyClientApi", e)
                 throw e
             }
         }
     }
 
     /**
-     * Force-rebuild the internal client using provided user credentials (clientId/clientSecret/redirectUri).
-     * Call this when user provides credentials in the UI.
+     * Rebuild internal client using user's credentials.
+     * Call this when the user provides clientId/clientSecret (optional redirectUri).
      */
     suspend fun setUserCredentialsAndRebuild(clientId: String, clientSecret: String, redirectUri: String?) {
         buildMutex.withLock {
@@ -77,37 +82,25 @@ object SpotifyApiRequests {
                     redirectUri = redirectUri
                 ) {
                     automaticRefresh = true
-                    // other options may be set here if needed
                 }.build()
-
-                Log.d("SpotifyApiRequests", "Rebuilt SpotifyClientApi with user credentials.")
+                Log.d("SpotifyApiRequests", "Rebuilt credentialed SpotifyClientApi.")
             } catch (e: Exception) {
-                Log.e("SpotifyApiRequests", "Failed to build credentialed SpotifyClientApi", e)
+                Log.e("SpotifyApiRequests", "Failed to rebuild SpotifyClientApi with user credentials", e)
                 throw e
             }
         }
     }
 
     /**
-     * Clear the current client (useful to force fallback to anonymous token on next request).
+     * Drop the cached client so next call falls back to anonymous token build.
      */
     fun clearClient() {
         api = null
     }
 
-    // -------------------------
-    // Convenience wrappers (suspend)
-    // -------------------------
-
-    private suspend fun userSearch(userQuery: String): SpotifyPublicUser? {
-        return provideSpotifyApi().users.getProfile(userQuery)
-    }
-
-    @Provides
-    @Singleton
-    suspend fun provideUserSearch(query: String): SpotifyPublicUser? {
-        return userSearch("bobbyesp")
-    }
+    // -----------------------
+    // Core helpers (suspend)
+    // -----------------------
 
     suspend fun searchAllTypes(searchQuery: String): SpotifySearchResult {
         return kotlin.runCatching {
@@ -177,6 +170,45 @@ object SpotifyApiRequests {
             provideSpotifyApi().artists.getArtistAlbums(artist = artistId, market = Market.US, limit = 20)
         }.onFailure {
             Log.d("SpotifyApiRequests", "Error getting artist albums: ${it.message}")
+        }.getOrNull()
+    }
+
+    suspend fun getAudioFeatures(id: String): AudioFeatures? {
+        return kotlin.runCatching {
+            provideSpotifyApi().tracks.getAudioFeatures(id)
+        }.onFailure {
+            Log.d("SpotifyApiRequests", "Error getting audio features: ${it.message}")
+        }.getOrNull()
+    }
+
+    // -----------------------
+    // Compatibility wrappers
+    // These functions preserve older names used across the UI. They simply delegate
+    // to the canonical implementations above so we don't need to change many UI files.
+    // -----------------------
+
+    // Provide / Provides naming (both variants) used in codebase
+    suspend fun provideGetTrackById(id: String): Track? = getTrackById(id)
+    suspend fun provideGetAlbumById(id: String): Album? = getAlbumById(id)
+    suspend fun provideGetPlaylistById(id: String): Playlist? = getPlaylistById(id)
+    suspend fun provideGetArtistById(id: String): Artist? = getArtistById(id)
+    suspend fun provideGetArtistTopTracks(id: String): List<Track>? = getArtistTopTracks(id)
+    suspend fun provideGetAudioFeatures(id: String): AudioFeatures? = getAudioFeatures(id)
+
+    suspend fun providesGetTrackById(id: String): Track? = getTrackById(id)
+    suspend fun providesGetAlbumById(id: String): Album? = getAlbumById(id)
+    suspend fun providesGetPlaylistById(id: String): Playlist? = getPlaylistById(id)
+    suspend fun providesGetArtistById(id: String): Artist? = getArtistById(id)
+    suspend fun providesGetArtistTopTracks(id: String): List<Track>? = getArtistTopTracks(id)
+    suspend fun providesGetAudioFeatures(id: String): AudioFeatures? = getAudioFeatures(id)
+
+    // For backward compatibility: a method named provideUserSearch existed previously in some code
+    @Provides
+    @Singleton
+    suspend fun provideUserSearch(query: String): SpotifyPublicUser? {
+        // older callers sometimes call with "bobbyesp" — keep compatibility by returning profile
+        return kotlin.runCatching {
+            provideSpotifyApi().users.getProfile(query)
         }.getOrNull()
     }
 }
