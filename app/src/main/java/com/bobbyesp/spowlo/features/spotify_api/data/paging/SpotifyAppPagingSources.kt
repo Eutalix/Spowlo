@@ -5,7 +5,7 @@ import androidx.paging.PagingState
 import com.adamratzman.spotify.SpotifyClientApi
 import com.adamratzman.spotify.models.*
 
-// MUDANÇA: A API agora é um parâmetro obrigatório e não-nulo (val em vez de var).
+// MUDANÇA: A API agora é um parâmetro de construtor obrigatório e não-nulo.
 class TrackPagingSource(
     private val spotifyApi: SpotifyClientApi,
     private val query: String,
@@ -14,8 +14,6 @@ class TrackPagingSource(
 
     override suspend fun load(params: LoadParams<Int>): LoadResult<Int, Track> {
         val offset = params.key ?: 0
-
-        // MUDANÇA: A verificação "if (spotifyApi == null)" foi removida.
         return try {
             val response = spotifyApi.search.searchTrack(
                 query = query,
@@ -24,7 +22,6 @@ class TrackPagingSource(
                 market = null,
                 filters = filters,
             )
-
             val tracks = response.items
             LoadResult.Page(
                 data = tracks,
@@ -36,9 +33,7 @@ class TrackPagingSource(
         }
     }
 
-    override fun getRefreshKey(state: PagingState<Int, Track>): Int? {
-        return state.anchorPosition
-    }
+    override fun getRefreshKey(state: PagingState<Int, Track>): Int? = state.anchorPosition
 }
 
 class SimpleAlbumPagingSource(
@@ -49,7 +44,6 @@ class SimpleAlbumPagingSource(
 
     override suspend fun load(params: LoadParams<Int>): LoadResult<Int, SimpleAlbum> {
         val offset = params.key ?: 0
-
         return try {
             val response = spotifyApi.search.searchAlbum(
                 query = query,
@@ -58,7 +52,6 @@ class SimpleAlbumPagingSource(
                 market = null,
                 filters = filters,
             )
-
             val albums = response.items
             LoadResult.Page(
                 data = albums,
@@ -70,9 +63,7 @@ class SimpleAlbumPagingSource(
         }
     }
 
-    override fun getRefreshKey(state: PagingState<Int, SimpleAlbum>): Int? {
-        return state.anchorPosition
-    }
+    override fun getRefreshKey(state: PagingState<Int, SimpleAlbum>): Int? = state.anchorPosition
 }
 
 class AlbumTracksPagingSource(
@@ -82,15 +73,13 @@ class AlbumTracksPagingSource(
 
     override suspend fun load(params: LoadParams<Int>): LoadResult<Int, SimpleTrack> {
         val offset = params.key ?: 0
-
         return try {
             val response = spotifyApi.albums.getAlbumTracks(
+                album = albumId,
                 limit = params.loadSize,
                 offset = offset,
-                album = albumId,
                 market = null,
             )
-
             val tracks = response.items
             LoadResult.Page(
                 data = tracks,
@@ -102,9 +91,7 @@ class AlbumTracksPagingSource(
         }
     }
 
-    override fun getRefreshKey(state: PagingState<Int, SimpleTrack>): Int? {
-        return state.anchorPosition
-    }
+    override fun getRefreshKey(state: PagingState<Int, SimpleTrack>): Int? = state.anchorPosition
 }
 
 class ArtistsPagingSource(
@@ -112,13 +99,9 @@ class ArtistsPagingSource(
     private val query: String,
     private val filters: List<SearchFilter> = emptyList(),
 ) : PagingSource<Int, Artist>() {
-    override fun getRefreshKey(state: PagingState<Int, Artist>): Int? {
-        return state.anchorPosition
-    }
 
     override suspend fun load(params: LoadParams<Int>): LoadResult<Int, Artist> {
         val offset = params.key ?: 0
-
         return try {
             val response = spotifyApi.search.searchArtist(
                 query = query,
@@ -127,7 +110,6 @@ class ArtistsPagingSource(
                 market = null,
                 filters = filters,
             )
-
             val artists = response.items
             LoadResult.Page(
                 data = artists,
@@ -138,6 +120,8 @@ class ArtistsPagingSource(
             LoadResult.Error(exception)
         }
     }
+
+    override fun getRefreshKey(state: PagingState<Int, Artist>): Int? = state.anchorPosition
 }
 
 class SimplePlaylistPagingSource(
@@ -145,13 +129,9 @@ class SimplePlaylistPagingSource(
     private val query: String,
     private val filters: List<SearchFilter> = emptyList(),
 ) : PagingSource<Int, SimplePlaylist>() {
-    override fun getRefreshKey(state: PagingState<Int, SimplePlaylist>): Int? {
-        return state.anchorPosition
-    }
 
     override suspend fun load(params: LoadParams<Int>): LoadResult<Int, SimplePlaylist> {
         val offset = params.key ?: 0
-
         return try {
             val response = spotifyApi.search.searchPlaylist(
                 query = query,
@@ -160,7 +140,6 @@ class SimplePlaylistPagingSource(
                 market = null,
                 filters = filters,
             )
-
             val playlists = response.items
             LoadResult.Page(
                 data = playlists,
@@ -171,6 +150,8 @@ class SimplePlaylistPagingSource(
             LoadResult.Error(exception)
         }
     }
+
+    override fun getRefreshKey(state: PagingState<Int, SimplePlaylist>): Int? = state.anchorPosition
 }
 
 class PlaylistTracksPagingSource(
@@ -180,15 +161,13 @@ class PlaylistTracksPagingSource(
 
     override suspend fun load(params: LoadParams<Int>): LoadResult<Int, PlaylistTrack> {
         val offset = params.key ?: 0
-
         return try {
             val response = spotifyApi.playlists.getPlaylistTracks(
+                playlist = playlistId,
                 limit = params.loadSize,
                 offset = offset,
-                playlist = playlistId,
                 market = null,
             )
-
             val tracks = response.items
             LoadResult.Page(
                 data = tracks,
@@ -200,9 +179,7 @@ class PlaylistTracksPagingSource(
         }
     }
 
-    override fun getRefreshKey(state: PagingState<Int, PlaylistTrack>): Int? {
-        return state.anchorPosition
-    }
+    override fun getRefreshKey(state: PagingState<Int, PlaylistTrack>): Int? = state.anchorPosition
 }
 
 class PlaylistTracksAsTracksPagingSource(
@@ -212,15 +189,13 @@ class PlaylistTracksAsTracksPagingSource(
 
     override suspend fun load(params: LoadParams<Int>): LoadResult<Int, Track> {
         val offset = params.key ?: 0
-
         return try {
             val response = spotifyApi.playlists.getPlaylistTracks(
+                playlist = playlistId,
                 limit = params.loadSize,
                 offset = offset,
-                playlist = playlistId,
                 market = null,
             )
-
             val tracks = response.items.mapNotNull { it.track?.asTrack }
             LoadResult.Page(
                 data = tracks,
@@ -232,32 +207,25 @@ class PlaylistTracksAsTracksPagingSource(
         }
     }
 
-    override fun getRefreshKey(state: PagingState<Int, Track>): Int? {
-        return state.anchorPosition
-    }
+    override fun getRefreshKey(state: PagingState<Int, Track>): Int? = state.anchorPosition
 }
 
 /*
  * ATENÇÃO: A lógica desta classe parece incorreta.
  * Ela sempre retorna a primeira página de 'pagingObject.items' e não implementa a paginação
- * para buscar as páginas seguintes. A implementação correta exigiria chamar o método `next()`
- * do PagingObject para carregar os próximos itens.
+ * para buscar as páginas seguintes.
  */
 class CustomPagingSource<T : Any>(
     private val pagingObject: PagingObject<T>,
 ) : PagingSource<Int, T>() {
-    override fun getRefreshKey(state: PagingState<Int, T>): Int? {
-        return state.anchorPosition
-    }
+    override fun getRefreshKey(state: PagingState<Int, T>): Int? = state.anchorPosition
 
     override suspend fun load(params: LoadParams<Int>): LoadResult<Int, T> {
         return try {
-            // Esta lógica pega sempre a mesma lista de itens da primeira página.
             val items = pagingObject.items
-
             LoadResult.Page(
                 data = items,
-                prevKey = null, // Lógica de chave anterior/próxima precisa ser revista
+                prevKey = null,
                 nextKey = null
             )
         } catch (exception: Exception) {

@@ -9,6 +9,7 @@ import dagger.Provides
 import dagger.hilt.InstallIn
 import dagger.hilt.components.SingletonComponent
 import javax.inject.Singleton
+import com.adamratzman.spotify.SpotifyMarket // <-- CORREÇÃO: Import adicionado
 
 @Module
 @InstallIn(SingletonComponent::class)
@@ -16,23 +17,17 @@ object SpotifyApiRequests {
 
     private var api: SpotifyClientApi? = null
 
-    /**
-     * Provides a Spotify API instance.
-     * - If an instance exists, it's checked for validity with a lightweight call.
-     * - Otherwise, a new client is built using the robust anonymous token from SpotDL.
-     */
     @Provides
     @Singleton
     suspend fun provideSpotifyApi(): SpotifyClientApi {
         if (api != null) {
             try {
-                // A lightweight, inexpensive API call to check if the token is still active.
                 api!!.browse.getAvailableGenreSeeds()
                 return api!!
             } catch (e: SpotifyException.AuthenticationException) {
-                Log.w("SpotifyApiRequests", "Token expired or invalid. Rebuilding API.")
+                Log.w("SpotifyApiRequests", "Token expirado ou inválido. Reconstruindo API.")
             } catch (e: Exception) {
-                Log.w("SpotifyApiRequests", "API check failed, rebuilding. Reason: ${e.message}")
+                Log.w("SpotifyApiRequests", "Verificação da API falhou, reconstruindo. Motivo: ${e.message}")
             }
         }
 
@@ -40,42 +35,31 @@ object SpotifyApiRequests {
         return api!!
     }
 
-    /**
-     * Builds the API client using the anonymous token retrieved from SpotDL.
-     * This approach uses the correct `spotifyClientApi` builder, which is designed
-     * for client-side applications with a pre-existing token.
-     */
     private suspend fun buildApiUsingAnonymousToken() {
         try {
-            Log.d("SpotifyApiRequests", "Attempting to get anonymous token from SpotDL...")
+            Log.d("SpotifyApiRequests", "Tentando obter token anônimo do SpotDL...")
             val anonymousToken = SpotDL.getInstance().getAnonymousToken()
-            val token = Token(anonymousToken, "Bearer", 3600) // 3600 seconds = 1 hour validity
+            val token = Token(anonymousToken, "Bearer", 3600)
 
-            Log.d("SpotifyApiRequests", "Building client API with fetched token.")
-            
-            // THE FINAL FIX: Use the correct, simplest builder for a client with an existing token.
-            // This syntax is directly derived from the library's source code (SpotifyApiBuilder.kt).
+            Log.d("SpotifyApiRequests", "Construindo API cliente com o token obtido.")
+
             api = spotifyClientApi(
-                clientId = null, // Not needed for this builder
-                clientSecret = null, // Not needed
-                redirectUri = null, // Not needed
+                clientId = null,
+                clientSecret = null,
+                redirectUri = null,
                 token = token
             ) {
-                // This is the configuration block for SpotifyApiOptions
-                automaticRefresh = false // Anonymous tokens cannot be refreshed.
-                // CORREÇÃO 1: O nome correto do parâmetro é 'userAgent'
-                userAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/108.0.0.0 Safari/537.36"
+                automaticRefresh = false
+                // CORREÇÃO: A propriedade 'userAgent' foi removida pois não existe em SpotifyApiOptions,
+                // causando o erro "Unresolved reference". A biblioteca usará seu valor padrão.
             }.build()
 
-            Log.d("SpotifyApiRequests", "API built successfully with anonymous token.")
+            Log.d("SpotifyApiRequests", "API construída com sucesso com token anônimo.")
         } catch (e: Exception) {
-            Log.e("SpotifyApiRequests", "FATAL: Failed to build API using anonymous token.", e)
-            throw e // Re-throw so the app knows initialization failed.
+            Log.e("SpotifyApiRequests", "FATAL: Falha ao construir API usando token anônimo.", e)
+            throw e
         }
     }
-    
-    // --- ALL ORIGINAL HELPER METHODS ARE PRESERVED BELOW ---
-    // They now use the correctly built `api` instance via `provideSpotifyApi()`.
 
     private suspend fun userSearch(userQuery: String): SpotifyPublicUser? {
         return provideSpotifyApi().users.getProfile(userQuery)
@@ -93,11 +77,10 @@ object SpotifyApiRequests {
                 searchQuery,
                 limit = 50,
                 offset = 0,
-                // CORREÇÃO 2: A classe correta é 'SpotifyMarket'
                 market = SpotifyMarket.US
             )
         }.getOrElse {
-            Log.d("SpotifyApiRequests", "Error searching all types: ${it.message}")
+            Log.d("SpotifyApiRequests", "Erro ao buscar todos os tipos: ${it.message}")
             SpotifySearchResult()
         }
     }
@@ -112,7 +95,7 @@ object SpotifyApiRequests {
         return kotlin.runCatching {
             provideSpotifyApi().search.searchTrack(searchQuery, limit = 50).items
         }.getOrElse {
-            Log.d("SpotifyApiRequests", "Error searching tracks: ${it.message}")
+            Log.d("SpotifyApiRequests", "Erro ao buscar faixas: ${it.message}")
             listOf()
         }
     }
@@ -127,99 +110,47 @@ object SpotifyApiRequests {
         return kotlin.runCatching {
             provideSpotifyApi().playlists.getPlaylist(id)
         }.onFailure {
-            Log.d("SpotifyApiRequests", "Error getting playlist by ID: ${it.message}")
+            Log.d("SpotifyApiRequests", "Erro ao obter playlist por ID: ${it.message}")
         }.getOrNull()
-    }
-
-    @Provides
-    @Singleton
-    suspend fun provideGetPlaylistById(id: String): Playlist? {
-        return getPlaylistById(id)
     }
 
     suspend fun getTrackById(id: String): Track? {
         return kotlin.runCatching {
             provideSpotifyApi().tracks.getTrack(id)
         }.onFailure {
-            Log.d("SpotifyApiRequests", "Error getting track by ID: ${it.message}")
+            Log.d("SpotifyApiRequests", "Erro ao obter faixa por ID: ${it.message}")
         }.getOrNull()
-    }
-
-    @Provides
-    @Singleton
-    suspend fun provideGetTrackById(id: String): Track? {
-        return getTrackById(id)
     }
 
     private suspend fun getArtistById(id: String): Artist? {
         return kotlin.runCatching {
             provideSpotifyApi().artists.getArtist(id)
         }.onFailure {
-            Log.d("SpotifyApiRequests", "Error getting artist by ID: ${it.message}")
+            Log.d("SpotifyApiRequests", "Erro ao obter artista por ID: ${it.message}")
         }.getOrNull()
-    }
-
-    @Provides
-    @Singleton
-    suspend fun provideGetArtistById(id: String): Artist? {
-        return getArtistById(id)
     }
 
     suspend fun getAlbumById(id: String): Album? {
         return kotlin.runCatching {
             provideSpotifyApi().albums.getAlbum(id)
         }.onFailure {
-            Log.d("SpotifyApiRequests", "Error getting album by ID: ${it.message}")
+            Log.d("SpotifyApiRequests", "Erro ao obter álbum por ID: ${it.message}")
         }.getOrNull()
-    }
-
-    @Provides
-    @Singleton
-    suspend fun providesGetAlbumById(id: String): Album? {
-        return getAlbumById(id)
-    }
-
-    private suspend fun getAudioFeatures(id: String): AudioFeatures? {
-        return kotlin.runCatching {
-            provideSpotifyApi().tracks.getAudioFeatures(id)
-        }.onFailure {
-            Log.d("SpotifyApiRequests", "Error getting audio features: ${it.message}")
-        }.getOrNull()
-    }
-
-    @Provides
-    @Singleton
-    suspend fun providesGetAudioFeatures(id: String): AudioFeatures? {
-        return getAudioFeatures(id)
     }
 
     private suspend fun getArtistTopTracks(artistId: String): List<Track>? {
         return kotlin.runCatching {
-            // CORREÇÃO 2: A classe correta é 'SpotifyMarket'
             provideSpotifyApi().artists.getArtistTopTracks(artistId, SpotifyMarket.US)
         }.onFailure {
-            Log.d("SpotifyApiRequests", "Error getting artist top tracks: ${it.message}")
+            Log.d("SpotifyApiRequests", "Erro ao obter faixas mais populares do artista: ${it.message}")
         }.getOrNull()
-    }
-
-    @Provides
-    @Singleton
-    suspend fun providesGetArtistTopTracks(id: String): List<Track>? {
-        return getArtistTopTracks(id)
     }
 
     private suspend fun getArtistAlbums(artistId: String): PagingObject<SimpleAlbum>? {
         return kotlin.runCatching {
-            // CORREÇÃO 2: A classe correta é 'SpotifyMarket'
             provideSpotifyApi().artists.getArtistAlbums(artist = artistId, market = SpotifyMarket.US, limit = 20)
         }.onFailure {
-            Log.d("SpotifyApiRequests", "Error getting artist albums: ${it.message}")
+            Log.d("SpotifyApiRequests", "Erro ao obter álbuns do artista: ${it.message}")
         }.getOrNull()
-    }
-
-    @Provides
-    @Singleton
-    suspend fun providesGetArtistAlbums(id: String): PagingObject<SimpleAlbum>? {
-        return getArtistAlbums(id)
     }
 }
