@@ -3,7 +3,6 @@ package com.bobbyesp.spowlo.features.spotify_api.data.remote
 import android.util.Log
 import com.adamratzman.spotify.*
 import com.adamratzman.spotify.models.*
-import com.adamratzman.spotify.utils.Market // THE FIX: Added missing import
 import com.bobbyesp.library.SpotDL
 import dagger.Module
 import dagger.Provides
@@ -62,11 +61,9 @@ object SpotifyApiRequests {
                 redirectUri = null, // Not needed
                 token = token
             ) {
-                // Configuration block for the SpotifyApiOptions
-                options {
-                    automaticRefresh = false // Anonymous tokens cannot be refreshed.
-                    defaultUserAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/108.0.0.0 Safari/537.36"
-                }
+                // This is the configuration block for SpotifyApiOptions
+                automaticRefresh = false // Anonymous tokens cannot be refreshed.
+                defaultUserAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/108.0.0.0 Safari/537.36"
             }.build()
 
             Log.d("SpotifyApiRequests", "API built successfully with anonymous token.")
