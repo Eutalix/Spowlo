@@ -2,25 +2,22 @@ package com.bobbyesp.spowlo.features.spotify_api.data.paging
 
 import androidx.paging.PagingSource
 import androidx.paging.PagingState
-import com.adamratzman.spotify.SpotifyClientApi // THE FIX: Import the correct API type
+import com.adamratzman.spotify.SpotifyClientApi
 import com.adamratzman.spotify.models.*
-import com.bobbyesp.spowlo.features.spotify_api.data.remote.SpotifyApiRequests
 
+// MUDANÇA: A API agora é um parâmetro obrigatório e não-nulo (val em vez de var).
 class TrackPagingSource(
-    private var spotifyApi: SpotifyClientApi? = null, // THE FIX: Use the correct API type
-    private var query: String,
+    private val spotifyApi: SpotifyClientApi,
+    private val query: String,
     private val filters: List<SearchFilter> = emptyList(),
 ) : PagingSource<Int, Track>() {
 
     override suspend fun load(params: LoadParams<Int>): LoadResult<Int, Track> {
         val offset = params.key ?: 0
 
-        if (spotifyApi == null) {
-            spotifyApi = SpotifyApiRequests.provideSpotifyApi()
-        }
-
+        // MUDANÇA: A verificação "if (spotifyApi == null)" foi removida.
         return try {
-            val response = spotifyApi!!.search.searchTrack(
+            val response = spotifyApi.search.searchTrack(
                 query = query,
                 limit = params.loadSize,
                 offset = offset,
@@ -28,18 +25,12 @@ class TrackPagingSource(
                 filters = filters,
             )
 
-
-            if (response.isNotEmpty()) {
-                val tracks = response.items
-
-                LoadResult.Page(
-                    data = tracks,
-                    prevKey = if (offset > 0) offset - params.loadSize else null,
-                    nextKey = if (tracks.isNotEmpty()) offset + params.loadSize else null
-                )
-            } else {
-                LoadResult.Error(IllegalStateException("No tracks found"))
-            }
+            val tracks = response.items
+            LoadResult.Page(
+                data = tracks,
+                prevKey = if (offset > 0) offset - params.loadSize else null,
+                nextKey = if (tracks.isNotEmpty()) offset + params.loadSize else null
+            )
         } catch (exception: Exception) {
             LoadResult.Error(exception)
         }
@@ -51,20 +42,16 @@ class TrackPagingSource(
 }
 
 class SimpleAlbumPagingSource(
-    private var spotifyApi: SpotifyClientApi? = null, // THE FIX
-    private var query: String,
+    private val spotifyApi: SpotifyClientApi,
+    private val query: String,
     private val filters: List<SearchFilter> = emptyList(),
 ) : PagingSource<Int, SimpleAlbum>() {
 
     override suspend fun load(params: LoadParams<Int>): LoadResult<Int, SimpleAlbum> {
         val offset = params.key ?: 0
 
-        if (spotifyApi == null) {
-            spotifyApi = SpotifyApiRequests.provideSpotifyApi()
-        }
-
         return try {
-            val response = spotifyApi!!.search.searchAlbum(
+            val response = spotifyApi.search.searchAlbum(
                 query = query,
                 limit = params.loadSize,
                 offset = offset,
@@ -72,17 +59,12 @@ class SimpleAlbumPagingSource(
                 filters = filters,
             )
 
-            if (response.isNotEmpty()) {
-                val albums = response.items
-
-                LoadResult.Page(
-                    data = albums,
-                    prevKey = if (offset > 0) offset - params.loadSize else null,
-                    nextKey = if (albums.isNotEmpty()) offset + params.loadSize else null
-                )
-            } else {
-                LoadResult.Error(IllegalStateException("No albums found"))
-            }
+            val albums = response.items
+            LoadResult.Page(
+                data = albums,
+                prevKey = if (offset > 0) offset - params.loadSize else null,
+                nextKey = if (albums.isNotEmpty()) offset + params.loadSize else null
+            )
         } catch (exception: Exception) {
             LoadResult.Error(exception)
         }
@@ -94,36 +76,27 @@ class SimpleAlbumPagingSource(
 }
 
 class AlbumTracksPagingSource(
-    private var spotifyApi: SpotifyClientApi? = null, // THE FIX
-    private var albumId: String,
+    private val spotifyApi: SpotifyClientApi,
+    private val albumId: String,
 ) : PagingSource<Int, SimpleTrack>() {
 
     override suspend fun load(params: LoadParams<Int>): LoadResult<Int, SimpleTrack> {
         val offset = params.key ?: 0
 
-        if (spotifyApi == null) {
-            spotifyApi = SpotifyApiRequests.provideSpotifyApi()
-        }
-
         return try {
-            val response = spotifyApi!!.albums.getAlbumTracks(
+            val response = spotifyApi.albums.getAlbumTracks(
                 limit = params.loadSize,
                 offset = offset,
                 album = albumId,
                 market = null,
             )
 
-            if (response.isNotEmpty()) {
-                val albums = response.items
-
-                LoadResult.Page(
-                    data = albums,
-                    prevKey = if (offset > 0) offset - params.loadSize else null,
-                    nextKey = if (albums.isNotEmpty()) offset + params.loadSize else null
-                )
-            } else {
-                LoadResult.Error(IllegalStateException("No album tracks found"))
-            }
+            val tracks = response.items
+            LoadResult.Page(
+                data = tracks,
+                prevKey = if (offset > 0) offset - params.loadSize else null,
+                nextKey = if (tracks.isNotEmpty()) offset + params.loadSize else null
+            )
         } catch (exception: Exception) {
             LoadResult.Error(exception)
         }
@@ -135,8 +108,8 @@ class AlbumTracksPagingSource(
 }
 
 class ArtistsPagingSource(
-    private var spotifyApi: SpotifyClientApi? = null, // THE FIX
-    private var query: String,
+    private val spotifyApi: SpotifyClientApi,
+    private val query: String,
     private val filters: List<SearchFilter> = emptyList(),
 ) : PagingSource<Int, Artist>() {
     override fun getRefreshKey(state: PagingState<Int, Artist>): Int? {
@@ -146,12 +119,8 @@ class ArtistsPagingSource(
     override suspend fun load(params: LoadParams<Int>): LoadResult<Int, Artist> {
         val offset = params.key ?: 0
 
-        if (spotifyApi == null) {
-            spotifyApi = SpotifyApiRequests.provideSpotifyApi()
-        }
-
         return try {
-            val response = spotifyApi!!.search.searchArtist(
+            val response = spotifyApi.search.searchArtist(
                 query = query,
                 limit = params.loadSize,
                 offset = offset,
@@ -159,17 +128,12 @@ class ArtistsPagingSource(
                 filters = filters,
             )
 
-            if (response.isNotEmpty()) {
-                val artists = response.items
-
-                LoadResult.Page(
-                    data = artists,
-                    prevKey = if (offset > 0) offset - params.loadSize else null,
-                    nextKey = if (artists.isNotEmpty()) offset + params.loadSize else null
-                )
-            } else {
-                LoadResult.Error(IllegalStateException("No artists found"))
-            }
+            val artists = response.items
+            LoadResult.Page(
+                data = artists,
+                prevKey = if (offset > 0) offset - params.loadSize else null,
+                nextKey = if (artists.isNotEmpty()) offset + params.loadSize else null
+            )
         } catch (exception: Exception) {
             LoadResult.Error(exception)
         }
@@ -177,8 +141,8 @@ class ArtistsPagingSource(
 }
 
 class SimplePlaylistPagingSource(
-    private var spotifyApi: SpotifyClientApi? = null, // THE FIX
-    private var query: String,
+    private val spotifyApi: SpotifyClientApi,
+    private val query: String,
     private val filters: List<SearchFilter> = emptyList(),
 ) : PagingSource<Int, SimplePlaylist>() {
     override fun getRefreshKey(state: PagingState<Int, SimplePlaylist>): Int? {
@@ -188,12 +152,8 @@ class SimplePlaylistPagingSource(
     override suspend fun load(params: LoadParams<Int>): LoadResult<Int, SimplePlaylist> {
         val offset = params.key ?: 0
 
-        if (spotifyApi == null) {
-            spotifyApi = SpotifyApiRequests.provideSpotifyApi()
-        }
-
         return try {
-            val response = spotifyApi!!.search.searchPlaylist(
+            val response = spotifyApi.search.searchPlaylist(
                 query = query,
                 limit = params.loadSize,
                 offset = offset,
@@ -201,55 +161,40 @@ class SimplePlaylistPagingSource(
                 filters = filters,
             )
 
-            if (response.isNotEmpty()) {
-                val playlists = response.items
-
-                LoadResult.Page(
-                    data = playlists,
-                    prevKey = if (offset > 0) offset - params.loadSize else null,
-                    nextKey = if (playlists.isNotEmpty()) offset + params.loadSize else null
-                )
-            } else {
-                LoadResult.Error(IllegalStateException("No playlists found"))
-            }
+            val playlists = response.items
+            LoadResult.Page(
+                data = playlists,
+                prevKey = if (offset > 0) offset - params.loadSize else null,
+                nextKey = if (playlists.isNotEmpty()) offset + params.loadSize else null
+            )
         } catch (exception: Exception) {
             LoadResult.Error(exception)
         }
     }
-
 }
 
 class PlaylistTracksPagingSource(
-    private var spotifyApi: SpotifyClientApi? = null, // THE FIX
-    private var playlistId: String,
+    private val spotifyApi: SpotifyClientApi,
+    private val playlistId: String,
 ) : PagingSource<Int, PlaylistTrack>() {
 
     override suspend fun load(params: LoadParams<Int>): LoadResult<Int, PlaylistTrack> {
         val offset = params.key ?: 0
 
-        if (spotifyApi == null) {
-            spotifyApi = SpotifyApiRequests.provideSpotifyApi()
-        }
-
         return try {
-            val response = spotifyApi!!.playlists.getPlaylistTracks(
+            val response = spotifyApi.playlists.getPlaylistTracks(
                 limit = params.loadSize,
                 offset = offset,
                 playlist = playlistId,
                 market = null,
             )
 
-            if (response.isNotEmpty()) {
-                val tracks = response.items
-
-                LoadResult.Page(
-                    data = tracks,
-                    prevKey = if (offset > 0) offset - params.loadSize else null,
-                    nextKey = if (tracks.isNotEmpty()) offset + params.loadSize else null
-                )
-            } else {
-                LoadResult.Error(IllegalStateException("No album tracks found"))
-            }
+            val tracks = response.items
+            LoadResult.Page(
+                data = tracks,
+                prevKey = if (offset > 0) offset - params.loadSize else null,
+                nextKey = if (tracks.isNotEmpty()) offset + params.loadSize else null
+            )
         } catch (exception: Exception) {
             LoadResult.Error(exception)
         }
@@ -261,36 +206,27 @@ class PlaylistTracksPagingSource(
 }
 
 class PlaylistTracksAsTracksPagingSource(
-    private var spotifyApi: SpotifyClientApi? = null, // THE FIX
-    private var playlistId: String,
+    private val spotifyApi: SpotifyClientApi,
+    private val playlistId: String,
 ) : PagingSource<Int, Track>() {
 
     override suspend fun load(params: LoadParams<Int>): LoadResult<Int, Track> {
         val offset = params.key ?: 0
 
-        if (spotifyApi == null) {
-            spotifyApi = SpotifyApiRequests.provideSpotifyApi()
-        }
-
         return try {
-            val response = spotifyApi!!.playlists.getPlaylistTracks(
+            val response = spotifyApi.playlists.getPlaylistTracks(
                 limit = params.loadSize,
                 offset = offset,
                 playlist = playlistId,
                 market = null,
             )
 
-            if (response.isNotEmpty()) {
-                val tracks = response.items.mapNotNull { it.track?.asTrack }
-
-                LoadResult.Page(
-                    data = tracks,
-                    prevKey = if (offset > 0) offset - params.loadSize else null,
-                    nextKey = if (tracks.isNotEmpty()) offset + params.loadSize else null
-                )
-            } else {
-                LoadResult.Error(IllegalStateException("No album tracks found"))
-            }
+            val tracks = response.items.mapNotNull { it.track?.asTrack }
+            LoadResult.Page(
+                data = tracks,
+                prevKey = if (offset > 0) offset - params.loadSize else null,
+                nextKey = if (tracks.isNotEmpty()) offset + params.loadSize else null
+            )
         } catch (exception: Exception) {
             LoadResult.Error(exception)
         }
@@ -301,23 +237,28 @@ class PlaylistTracksAsTracksPagingSource(
     }
 }
 
+/*
+ * ATENÇÃO: A lógica desta classe parece incorreta.
+ * Ela sempre retorna a primeira página de 'pagingObject.items' e não implementa a paginação
+ * para buscar as páginas seguintes. A implementação correta exigiria chamar o método `next()`
+ * do PagingObject para carregar os próximos itens.
+ */
 class CustomPagingSource<T : Any>(
-    private var pagingObject: PagingObject<T>,
+    private val pagingObject: PagingObject<T>,
 ) : PagingSource<Int, T>() {
     override fun getRefreshKey(state: PagingState<Int, T>): Int? {
         return state.anchorPosition
     }
 
     override suspend fun load(params: LoadParams<Int>): LoadResult<Int, T> {
-        val offset = params.key ?: 0
-
         return try {
+            // Esta lógica pega sempre a mesma lista de itens da primeira página.
             val items = pagingObject.items
 
             LoadResult.Page(
                 data = items,
-                prevKey = if (offset > 0) offset - params.loadSize else null,
-                nextKey = if (items.isNotEmpty()) offset + params.loadSize else null
+                prevKey = null, // Lógica de chave anterior/próxima precisa ser revista
+                nextKey = null
             )
         } catch (exception: Exception) {
             LoadResult.Error(exception)
