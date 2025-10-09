@@ -1,15 +1,16 @@
-package com.bobbyesp.spowlo.features.spotify_api.data.paging
+package com.bobbyesp.spowlo.features.spotify_api.data
 
 import androidx.paging.PagingSource
 import androidx.paging.PagingState
 import com.adamratzman.spotify.SpotifyClientApi
 import com.adamratzman.spotify.models.*
 
-// MUDANÇA: A API agora é um parâmetro de construtor obrigatório e não-nulo.
+// PagingSources adapted to SpotifyClientApi. Each source receives a non-null SpotifyClientApi instance.
+
 class TrackPagingSource(
     private val spotifyApi: SpotifyClientApi,
     private val query: String,
-    private val filters: List<SearchFilter> = emptyList(),
+    private val filters: List<SearchFilter> = emptyList()
 ) : PagingSource<Int, Track>() {
 
     override suspend fun load(params: LoadParams<Int>): LoadResult<Int, Track> {
@@ -20,7 +21,7 @@ class TrackPagingSource(
                 limit = params.loadSize,
                 offset = offset,
                 market = null,
-                filters = filters,
+                filters = filters
             )
             val tracks = response.items
             LoadResult.Page(
@@ -28,8 +29,8 @@ class TrackPagingSource(
                 prevKey = if (offset > 0) offset - params.loadSize else null,
                 nextKey = if (tracks.isNotEmpty()) offset + params.loadSize else null
             )
-        } catch (exception: Exception) {
-            LoadResult.Error(exception)
+        } catch (ex: Exception) {
+            LoadResult.Error(ex)
         }
     }
 
@@ -39,7 +40,7 @@ class TrackPagingSource(
 class SimpleAlbumPagingSource(
     private val spotifyApi: SpotifyClientApi,
     private val query: String,
-    private val filters: List<SearchFilter> = emptyList(),
+    private val filters: List<SearchFilter> = emptyList()
 ) : PagingSource<Int, SimpleAlbum>() {
 
     override suspend fun load(params: LoadParams<Int>): LoadResult<Int, SimpleAlbum> {
@@ -50,7 +51,7 @@ class SimpleAlbumPagingSource(
                 limit = params.loadSize,
                 offset = offset,
                 market = null,
-                filters = filters,
+                filters = filters
             )
             val albums = response.items
             LoadResult.Page(
@@ -58,8 +59,8 @@ class SimpleAlbumPagingSource(
                 prevKey = if (offset > 0) offset - params.loadSize else null,
                 nextKey = if (albums.isNotEmpty()) offset + params.loadSize else null
             )
-        } catch (exception: Exception) {
-            LoadResult.Error(exception)
+        } catch (ex: Exception) {
+            LoadResult.Error(ex)
         }
     }
 
@@ -68,7 +69,7 @@ class SimpleAlbumPagingSource(
 
 class AlbumTracksPagingSource(
     private val spotifyApi: SpotifyClientApi,
-    private val albumId: String,
+    private val albumId: String
 ) : PagingSource<Int, SimpleTrack>() {
 
     override suspend fun load(params: LoadParams<Int>): LoadResult<Int, SimpleTrack> {
@@ -78,16 +79,16 @@ class AlbumTracksPagingSource(
                 album = albumId,
                 limit = params.loadSize,
                 offset = offset,
-                market = null,
+                market = null
             )
-            val tracks = response.items
+            val items = response.items
             LoadResult.Page(
-                data = tracks,
+                data = items,
                 prevKey = if (offset > 0) offset - params.loadSize else null,
-                nextKey = if (tracks.isNotEmpty()) offset + params.loadSize else null
+                nextKey = if (items.isNotEmpty()) offset + params.loadSize else null
             )
-        } catch (exception: Exception) {
-            LoadResult.Error(exception)
+        } catch (ex: Exception) {
+            LoadResult.Error(ex)
         }
     }
 
@@ -97,7 +98,7 @@ class AlbumTracksPagingSource(
 class ArtistsPagingSource(
     private val spotifyApi: SpotifyClientApi,
     private val query: String,
-    private val filters: List<SearchFilter> = emptyList(),
+    private val filters: List<SearchFilter> = emptyList()
 ) : PagingSource<Int, Artist>() {
 
     override suspend fun load(params: LoadParams<Int>): LoadResult<Int, Artist> {
@@ -108,16 +109,16 @@ class ArtistsPagingSource(
                 limit = params.loadSize,
                 offset = offset,
                 market = null,
-                filters = filters,
+                filters = filters
             )
-            val artists = response.items
+            val items = response.items
             LoadResult.Page(
-                data = artists,
+                data = items,
                 prevKey = if (offset > 0) offset - params.loadSize else null,
-                nextKey = if (artists.isNotEmpty()) offset + params.loadSize else null
+                nextKey = if (items.isNotEmpty()) offset + params.loadSize else null
             )
-        } catch (exception: Exception) {
-            LoadResult.Error(exception)
+        } catch (ex: Exception) {
+            LoadResult.Error(ex)
         }
     }
 
@@ -127,7 +128,7 @@ class ArtistsPagingSource(
 class SimplePlaylistPagingSource(
     private val spotifyApi: SpotifyClientApi,
     private val query: String,
-    private val filters: List<SearchFilter> = emptyList(),
+    private val filters: List<SearchFilter> = emptyList()
 ) : PagingSource<Int, SimplePlaylist>() {
 
     override suspend fun load(params: LoadParams<Int>): LoadResult<Int, SimplePlaylist> {
@@ -138,16 +139,16 @@ class SimplePlaylistPagingSource(
                 limit = params.loadSize,
                 offset = offset,
                 market = null,
-                filters = filters,
+                filters = filters
             )
-            val playlists = response.items
+            val items = response.items
             LoadResult.Page(
-                data = playlists,
+                data = items,
                 prevKey = if (offset > 0) offset - params.loadSize else null,
-                nextKey = if (playlists.isNotEmpty()) offset + params.loadSize else null
+                nextKey = if (items.isNotEmpty()) offset + params.loadSize else null
             )
-        } catch (exception: Exception) {
-            LoadResult.Error(exception)
+        } catch (ex: Exception) {
+            LoadResult.Error(ex)
         }
     }
 
@@ -156,7 +157,7 @@ class SimplePlaylistPagingSource(
 
 class PlaylistTracksPagingSource(
     private val spotifyApi: SpotifyClientApi,
-    private val playlistId: String,
+    private val playlistId: String
 ) : PagingSource<Int, PlaylistTrack>() {
 
     override suspend fun load(params: LoadParams<Int>): LoadResult<Int, PlaylistTrack> {
@@ -166,16 +167,16 @@ class PlaylistTracksPagingSource(
                 playlist = playlistId,
                 limit = params.loadSize,
                 offset = offset,
-                market = null,
+                market = null
             )
-            val tracks = response.items
+            val items = response.items
             LoadResult.Page(
-                data = tracks,
+                data = items,
                 prevKey = if (offset > 0) offset - params.loadSize else null,
-                nextKey = if (tracks.isNotEmpty()) offset + params.loadSize else null
+                nextKey = if (items.isNotEmpty()) offset + params.loadSize else null
             )
-        } catch (exception: Exception) {
-            LoadResult.Error(exception)
+        } catch (ex: Exception) {
+            LoadResult.Error(ex)
         }
     }
 
@@ -184,7 +185,7 @@ class PlaylistTracksPagingSource(
 
 class PlaylistTracksAsTracksPagingSource(
     private val spotifyApi: SpotifyClientApi,
-    private val playlistId: String,
+    private val playlistId: String
 ) : PagingSource<Int, Track>() {
 
     override suspend fun load(params: LoadParams<Int>): LoadResult<Int, Track> {
@@ -194,7 +195,7 @@ class PlaylistTracksAsTracksPagingSource(
                 playlist = playlistId,
                 limit = params.loadSize,
                 offset = offset,
-                market = null,
+                market = null
             )
             val tracks = response.items.mapNotNull { it.track?.asTrack }
             LoadResult.Page(
@@ -202,23 +203,21 @@ class PlaylistTracksAsTracksPagingSource(
                 prevKey = if (offset > 0) offset - params.loadSize else null,
                 nextKey = if (tracks.isNotEmpty()) offset + params.loadSize else null
             )
-        } catch (exception: Exception) {
-            LoadResult.Error(exception)
+        } catch (ex: Exception) {
+            LoadResult.Error(ex)
         }
     }
 
     override fun getRefreshKey(state: PagingState<Int, Track>): Int? = state.anchorPosition
 }
 
-/*
- * ATENÇÃO: A lógica desta classe parece incorreta.
- * Ela sempre retorna a primeira página de 'pagingObject.items' e não implementa a paginação
- * para buscar as páginas seguintes.
+/**
+ * NOTE: CustomPagingSource keeps the original simple behavior but documents that it does not implement full pagination.
+ * If you want proper continuation, you'll need to call the pagingObject.next() or re-request with offsets.
  */
 class CustomPagingSource<T : Any>(
-    private val pagingObject: PagingObject<T>,
+    private val pagingObject: PagingObject<T>
 ) : PagingSource<Int, T>() {
-    override fun getRefreshKey(state: PagingState<Int, T>): Int? = state.anchorPosition
 
     override suspend fun load(params: LoadParams<Int>): LoadResult<Int, T> {
         return try {
@@ -228,8 +227,10 @@ class CustomPagingSource<T : Any>(
                 prevKey = null,
                 nextKey = null
             )
-        } catch (exception: Exception) {
-            LoadResult.Error(exception)
+        } catch (ex: Exception) {
+            LoadResult.Error(ex)
         }
     }
+
+    override fun getRefreshKey(state: PagingState<Int, T>): Int? = state.anchorPosition
 }
