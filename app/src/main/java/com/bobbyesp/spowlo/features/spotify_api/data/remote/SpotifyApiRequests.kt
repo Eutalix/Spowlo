@@ -63,7 +63,8 @@ object SpotifyApiRequests {
             ) {
                 // This is the configuration block for SpotifyApiOptions
                 automaticRefresh = false // Anonymous tokens cannot be refreshed.
-                defaultUserAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/108.0.0.0 Safari/537.36"
+                // CORREÇÃO 1: O nome correto do parâmetro é 'userAgent'
+                userAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/108.0.0.0 Safari/537.36"
             }.build()
 
             Log.d("SpotifyApiRequests", "API built successfully with anonymous token.")
@@ -92,7 +93,8 @@ object SpotifyApiRequests {
                 searchQuery,
                 limit = 50,
                 offset = 0,
-                market = Market.US
+                // CORREÇÃO 2: A classe correta é 'SpotifyMarket'
+                market = SpotifyMarket.US
             )
         }.getOrElse {
             Log.d("SpotifyApiRequests", "Error searching all types: ${it.message}")
@@ -193,7 +195,8 @@ object SpotifyApiRequests {
 
     private suspend fun getArtistTopTracks(artistId: String): List<Track>? {
         return kotlin.runCatching {
-            provideSpotifyApi().artists.getArtistTopTracks(artistId, Market.US)
+            // CORREÇÃO 2: A classe correta é 'SpotifyMarket'
+            provideSpotifyApi().artists.getArtistTopTracks(artistId, SpotifyMarket.US)
         }.onFailure {
             Log.d("SpotifyApiRequests", "Error getting artist top tracks: ${it.message}")
         }.getOrNull()
@@ -207,7 +210,8 @@ object SpotifyApiRequests {
 
     private suspend fun getArtistAlbums(artistId: String): PagingObject<SimpleAlbum>? {
         return kotlin.runCatching {
-            provideSpotifyApi().artists.getArtistAlbums(artist = artistId, market = Market.US, limit = 20)
+            // CORREÇÃO 2: A classe correta é 'SpotifyMarket'
+            provideSpotifyApi().artists.getArtistAlbums(artist = artistId, market = SpotifyMarket.US, limit = 20)
         }.onFailure {
             Log.d("SpotifyApiRequests", "Error getting artist albums: ${it.message}")
         }.getOrNull()
