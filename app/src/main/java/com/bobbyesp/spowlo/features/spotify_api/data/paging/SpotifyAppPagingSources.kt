@@ -1,14 +1,17 @@
-package com.bobbyesp.spowlo.features.spotify_api.data
+package com.bobbyesp.spowlo.features.spotify_api.data.paging
 
+import android.util.Log
 import androidx.paging.PagingSource
 import androidx.paging.PagingState
-import com.adamratzman.spotify.SpotifyClientApi
 import com.adamratzman.spotify.models.*
+import com.bobbyesp.spowlo.features.spotify_api.data.remote.SpotifyApiRequests
 
-// PagingSources adapted to SpotifyClientApi. Each source receives a non-null SpotifyClientApi instance.
+/**
+ * Paging sources that lazily obtain a SpotifyClientApi via SpotifyApiRequests.provideSpotifyApi().
+ * This allows anonymous token usage by default and swapping credentials later.
+ */
 
 class TrackPagingSource(
-    private val spotifyApi: SpotifyClientApi,
     private val query: String,
     private val filters: List<SearchFilter> = emptyList()
 ) : PagingSource<Int, Track>() {
@@ -16,7 +19,8 @@ class TrackPagingSource(
     override suspend fun load(params: LoadParams<Int>): LoadResult<Int, Track> {
         val offset = params.key ?: 0
         return try {
-            val response = spotifyApi.search.searchTrack(
+            val api = SpotifyApiRequests.provideSpotifyApi()
+            val response = api.search.searchTrack(
                 query = query,
                 limit = params.loadSize,
                 offset = offset,
@@ -30,6 +34,7 @@ class TrackPagingSource(
                 nextKey = if (tracks.isNotEmpty()) offset + params.loadSize else null
             )
         } catch (ex: Exception) {
+            Log.w("TrackPagingSource", "Failed to load tracks: ${ex.message}")
             LoadResult.Error(ex)
         }
     }
@@ -38,7 +43,6 @@ class TrackPagingSource(
 }
 
 class SimpleAlbumPagingSource(
-    private val spotifyApi: SpotifyClientApi,
     private val query: String,
     private val filters: List<SearchFilter> = emptyList()
 ) : PagingSource<Int, SimpleAlbum>() {
@@ -46,7 +50,8 @@ class SimpleAlbumPagingSource(
     override suspend fun load(params: LoadParams<Int>): LoadResult<Int, SimpleAlbum> {
         val offset = params.key ?: 0
         return try {
-            val response = spotifyApi.search.searchAlbum(
+            val api = SpotifyApiRequests.provideSpotifyApi()
+            val response = api.search.searchAlbum(
                 query = query,
                 limit = params.loadSize,
                 offset = offset,
@@ -60,6 +65,7 @@ class SimpleAlbumPagingSource(
                 nextKey = if (albums.isNotEmpty()) offset + params.loadSize else null
             )
         } catch (ex: Exception) {
+            Log.w("SimpleAlbumPagingSource", "Failed to load albums: ${ex.message}")
             LoadResult.Error(ex)
         }
     }
@@ -68,14 +74,14 @@ class SimpleAlbumPagingSource(
 }
 
 class AlbumTracksPagingSource(
-    private val spotifyApi: SpotifyClientApi,
     private val albumId: String
 ) : PagingSource<Int, SimpleTrack>() {
 
     override suspend fun load(params: LoadParams<Int>): LoadResult<Int, SimpleTrack> {
         val offset = params.key ?: 0
         return try {
-            val response = spotifyApi.albums.getAlbumTracks(
+            val api = SpotifyApiRequests.provideSpotifyApi()
+            val response = api.albums.getAlbumTracks(
                 album = albumId,
                 limit = params.loadSize,
                 offset = offset,
@@ -88,6 +94,7 @@ class AlbumTracksPagingSource(
                 nextKey = if (items.isNotEmpty()) offset + params.loadSize else null
             )
         } catch (ex: Exception) {
+            Log.w("AlbumTracksPagingSource", "Failed to load album tracks: ${ex.message}")
             LoadResult.Error(ex)
         }
     }
@@ -96,7 +103,6 @@ class AlbumTracksPagingSource(
 }
 
 class ArtistsPagingSource(
-    private val spotifyApi: SpotifyClientApi,
     private val query: String,
     private val filters: List<SearchFilter> = emptyList()
 ) : PagingSource<Int, Artist>() {
@@ -104,7 +110,8 @@ class ArtistsPagingSource(
     override suspend fun load(params: LoadParams<Int>): LoadResult<Int, Artist> {
         val offset = params.key ?: 0
         return try {
-            val response = spotifyApi.search.searchArtist(
+            val api = SpotifyApiRequests.provideSpotifyApi()
+            val response = api.search.searchArtist(
                 query = query,
                 limit = params.loadSize,
                 offset = offset,
@@ -118,6 +125,7 @@ class ArtistsPagingSource(
                 nextKey = if (items.isNotEmpty()) offset + params.loadSize else null
             )
         } catch (ex: Exception) {
+            Log.w("ArtistsPagingSource", "Failed to load artists: ${ex.message}")
             LoadResult.Error(ex)
         }
     }
@@ -126,7 +134,6 @@ class ArtistsPagingSource(
 }
 
 class SimplePlaylistPagingSource(
-    private val spotifyApi: SpotifyClientApi,
     private val query: String,
     private val filters: List<SearchFilter> = emptyList()
 ) : PagingSource<Int, SimplePlaylist>() {
@@ -134,7 +141,8 @@ class SimplePlaylistPagingSource(
     override suspend fun load(params: LoadParams<Int>): LoadResult<Int, SimplePlaylist> {
         val offset = params.key ?: 0
         return try {
-            val response = spotifyApi.search.searchPlaylist(
+            val api = SpotifyApiRequests.provideSpotifyApi()
+            val response = api.search.searchPlaylist(
                 query = query,
                 limit = params.loadSize,
                 offset = offset,
@@ -148,6 +156,7 @@ class SimplePlaylistPagingSource(
                 nextKey = if (items.isNotEmpty()) offset + params.loadSize else null
             )
         } catch (ex: Exception) {
+            Log.w("SimplePlaylistPagingSource", "Failed to load playlists: ${ex.message}")
             LoadResult.Error(ex)
         }
     }
@@ -156,14 +165,14 @@ class SimplePlaylistPagingSource(
 }
 
 class PlaylistTracksPagingSource(
-    private val spotifyApi: SpotifyClientApi,
     private val playlistId: String
 ) : PagingSource<Int, PlaylistTrack>() {
 
     override suspend fun load(params: LoadParams<Int>): LoadResult<Int, PlaylistTrack> {
         val offset = params.key ?: 0
         return try {
-            val response = spotifyApi.playlists.getPlaylistTracks(
+            val api = SpotifyApiRequests.provideSpotifyApi()
+            val response = api.playlists.getPlaylistTracks(
                 playlist = playlistId,
                 limit = params.loadSize,
                 offset = offset,
@@ -176,6 +185,7 @@ class PlaylistTracksPagingSource(
                 nextKey = if (items.isNotEmpty()) offset + params.loadSize else null
             )
         } catch (ex: Exception) {
+            Log.w("PlaylistTracksPagingSource", "Failed to load playlist tracks: ${ex.message}")
             LoadResult.Error(ex)
         }
     }
@@ -184,14 +194,14 @@ class PlaylistTracksPagingSource(
 }
 
 class PlaylistTracksAsTracksPagingSource(
-    private val spotifyApi: SpotifyClientApi,
     private val playlistId: String
 ) : PagingSource<Int, Track>() {
 
     override suspend fun load(params: LoadParams<Int>): LoadResult<Int, Track> {
         val offset = params.key ?: 0
         return try {
-            val response = spotifyApi.playlists.getPlaylistTracks(
+            val api = SpotifyApiRequests.provideSpotifyApi()
+            val response = api.playlists.getPlaylistTracks(
                 playlist = playlistId,
                 limit = params.loadSize,
                 offset = offset,
@@ -204,6 +214,7 @@ class PlaylistTracksAsTracksPagingSource(
                 nextKey = if (tracks.isNotEmpty()) offset + params.loadSize else null
             )
         } catch (ex: Exception) {
+            Log.w("PlaylistTracksAsTracks", "Failed to load playlist tracks as tracks: ${ex.message}")
             LoadResult.Error(ex)
         }
     }
@@ -212,8 +223,8 @@ class PlaylistTracksAsTracksPagingSource(
 }
 
 /**
- * NOTE: CustomPagingSource keeps the original simple behavior but documents that it does not implement full pagination.
- * If you want proper continuation, you'll need to call the pagingObject.next() or re-request with offsets.
+ * CustomPagingSource keeps a simple behavior: returns the provided PagingObject items.
+ * Note: does not auto-fetch next pages via pagingObject.next() — keep or improve later.
  */
 class CustomPagingSource<T : Any>(
     private val pagingObject: PagingObject<T>
@@ -228,6 +239,7 @@ class CustomPagingSource<T : Any>(
                 nextKey = null
             )
         } catch (ex: Exception) {
+            Log.w("CustomPagingSource", "Failed to load custom paging object: ${ex.message}")
             LoadResult.Error(ex)
         }
     }
