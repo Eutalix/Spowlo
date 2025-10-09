@@ -2,19 +2,12 @@ package com.bobbyesp.spowlo.features.spotify_api.data.paging
 
 import androidx.paging.PagingSource
 import androidx.paging.PagingState
-import com.adamratzman.spotify.SpotifyAppApi
-import com.adamratzman.spotify.models.Artist
-import com.adamratzman.spotify.models.PagingObject
-import com.adamratzman.spotify.models.PlaylistTrack
-import com.adamratzman.spotify.models.SearchFilter
-import com.adamratzman.spotify.models.SimpleAlbum
-import com.adamratzman.spotify.models.SimplePlaylist
-import com.adamratzman.spotify.models.SimpleTrack
-import com.adamratzman.spotify.models.Track
+import com.adamratzman.spotify.SpotifyClientApi // THE FIX: Import the correct API type
+import com.adamratzman.spotify.models.*
 import com.bobbyesp.spowlo.features.spotify_api.data.remote.SpotifyApiRequests
 
 class TrackPagingSource(
-    private var spotifyApi: SpotifyAppApi? = null,
+    private var spotifyApi: SpotifyClientApi? = null, // THE FIX: Use the correct API type
     private var query: String,
     private val filters: List<SearchFilter> = emptyList(),
 ) : PagingSource<Int, Track>() {
@@ -23,8 +16,7 @@ class TrackPagingSource(
         val offset = params.key ?: 0
 
         if (spotifyApi == null) {
-            val api = SpotifyApiRequests
-            spotifyApi = api.provideSpotifyApi()
+            spotifyApi = SpotifyApiRequests.provideSpotifyApi()
         }
 
         return try {
@@ -59,7 +51,7 @@ class TrackPagingSource(
 }
 
 class SimpleAlbumPagingSource(
-    private var spotifyApi: SpotifyAppApi? = null,
+    private var spotifyApi: SpotifyClientApi? = null, // THE FIX
     private var query: String,
     private val filters: List<SearchFilter> = emptyList(),
 ) : PagingSource<Int, SimpleAlbum>() {
@@ -68,8 +60,7 @@ class SimpleAlbumPagingSource(
         val offset = params.key ?: 0
 
         if (spotifyApi == null) {
-            val api = SpotifyApiRequests
-            spotifyApi = api.provideSpotifyApi()
+            spotifyApi = SpotifyApiRequests.provideSpotifyApi()
         }
 
         return try {
@@ -103,7 +94,7 @@ class SimpleAlbumPagingSource(
 }
 
 class AlbumTracksPagingSource(
-    private var spotifyApi: SpotifyAppApi? = null,
+    private var spotifyApi: SpotifyClientApi? = null, // THE FIX
     private var albumId: String,
 ) : PagingSource<Int, SimpleTrack>() {
 
@@ -111,8 +102,7 @@ class AlbumTracksPagingSource(
         val offset = params.key ?: 0
 
         if (spotifyApi == null) {
-            val api = SpotifyApiRequests
-            spotifyApi = api.provideSpotifyApi()
+            spotifyApi = SpotifyApiRequests.provideSpotifyApi()
         }
 
         return try {
@@ -145,7 +135,7 @@ class AlbumTracksPagingSource(
 }
 
 class ArtistsPagingSource(
-    private var spotifyApi: SpotifyAppApi? = null,
+    private var spotifyApi: SpotifyClientApi? = null, // THE FIX
     private var query: String,
     private val filters: List<SearchFilter> = emptyList(),
 ) : PagingSource<Int, Artist>() {
@@ -157,8 +147,7 @@ class ArtistsPagingSource(
         val offset = params.key ?: 0
 
         if (spotifyApi == null) {
-            val api = SpotifyApiRequests
-            spotifyApi = api.provideSpotifyApi()
+            spotifyApi = SpotifyApiRequests.provideSpotifyApi()
         }
 
         return try {
@@ -188,7 +177,7 @@ class ArtistsPagingSource(
 }
 
 class SimplePlaylistPagingSource(
-    private var spotifyApi: SpotifyAppApi? = null,
+    private var spotifyApi: SpotifyClientApi? = null, // THE FIX
     private var query: String,
     private val filters: List<SearchFilter> = emptyList(),
 ) : PagingSource<Int, SimplePlaylist>() {
@@ -200,8 +189,7 @@ class SimplePlaylistPagingSource(
         val offset = params.key ?: 0
 
         if (spotifyApi == null) {
-            val api = SpotifyApiRequests
-            spotifyApi = api.provideSpotifyApi()
+            spotifyApi = SpotifyApiRequests.provideSpotifyApi()
         }
 
         return try {
@@ -232,7 +220,7 @@ class SimplePlaylistPagingSource(
 }
 
 class PlaylistTracksPagingSource(
-    private var spotifyApi: SpotifyAppApi? = null,
+    private var spotifyApi: SpotifyClientApi? = null, // THE FIX
     private var playlistId: String,
 ) : PagingSource<Int, PlaylistTrack>() {
 
@@ -240,8 +228,7 @@ class PlaylistTracksPagingSource(
         val offset = params.key ?: 0
 
         if (spotifyApi == null) {
-            val api = SpotifyApiRequests
-            spotifyApi = api.provideSpotifyApi()
+            spotifyApi = SpotifyApiRequests.provideSpotifyApi()
         }
 
         return try {
@@ -274,7 +261,7 @@ class PlaylistTracksPagingSource(
 }
 
 class PlaylistTracksAsTracksPagingSource(
-    private var spotifyApi: SpotifyAppApi? = null,
+    private var spotifyApi: SpotifyClientApi? = null, // THE FIX
     private var playlistId: String,
 ) : PagingSource<Int, Track>() {
 
@@ -282,8 +269,7 @@ class PlaylistTracksAsTracksPagingSource(
         val offset = params.key ?: 0
 
         if (spotifyApi == null) {
-            val api = SpotifyApiRequests
-            spotifyApi = api.provideSpotifyApi()
+            spotifyApi = SpotifyApiRequests.provideSpotifyApi()
         }
 
         return try {

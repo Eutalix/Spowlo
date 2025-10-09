@@ -54,9 +54,9 @@ object SpotifyApiRequests {
             Log.d("SpotifyApiRequests", "Building client API with fetched token.")
             
             // THE FINAL FIX: Use the correct, simplest builder for a client with an existing token.
-            // This syntax is directly derived from SpotifyApiBuilder.kt
+            // This syntax is directly derived from the library's source code (SpotifyApiBuilder.kt).
             api = spotifyClientApi(
-                clientId = null, // Not needed
+                clientId = null, // Not needed for this builder
                 clientSecret = null, // Not needed
                 redirectUri = null, // Not needed
                 token = token
