@@ -7,6 +7,8 @@ pluginManagement {
         google()
         mavenCentral()
         maven ("https://jitpack.io")
+        // NEW: Add Sonatype snapshots repository for alpha/beta library versions
+        maven("https://oss.sonatype.org/content/repositories/snapshots/")
     }
 }
 dependencyResolutionManagement {
@@ -18,11 +20,13 @@ dependencyResolutionManagement {
         google()
         mavenCentral()
         maven ("https://jitpack.io")
+        // NEW: Add Sonatype snapshots repository for alpha/beta library versions
+        maven("https://oss.sonatype.org/content/repositories/snapshots/")
     }
 }
 rootProject.name = "Spowlo"
 
-// UPDATED: Includes all migrated modules.
+// Includes all migrated modules.
 include (":app")
 include(":color")
 include(":library")
