@@ -1,30 +1,13 @@
 package com.bobbyesp.spowlo.ui.pages.metadata_viewer.pages
 
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.aspectRatio
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.text.selection.SelectionContainer
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.saveable.Saver
-import androidx.compose.runtime.saveable.SaverScope
-import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.setValue
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -46,181 +29,146 @@ import com.bobbyesp.spowlo.ui.components.text.MarqueeText
 import com.bobbyesp.spowlo.ui.pages.metadata_viewer.binders.dataStringToString
 import com.bobbyesp.spowlo.utils.GeneralTextUtils
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.async
 import kotlinx.coroutines.withContext
-import kotlinx.serialization.ExperimentalSerializationApi
-import kotlinx.serialization.encodeToString
-import kotlinx.serialization.json.Json
 
-@OptIn(ExperimentalSerializationApi::class)
+/**
+ * A Composable that displays a detailed view of a single Spotify Track,
+ * including its artwork, metadata, and audio features.
+ */
 @Composable
 fun TrackPage(
     data: Track,
     modifier: Modifier,
-    trackDownloadCallback: (String, String) -> Unit,
+    onDownloadTrack: (Track) -> Unit,
 ) {
     val localConfig = LocalConfiguration.current
-    var audioFeatures by rememberSaveable(stateSaver = AudioFeaturesSaver) {
-        mutableStateOf(null)
-    }
-    var trackData by rememberSaveable(stateSaver = TrackSaver) {
-        mutableStateOf(data)
-    }
+    var audioFeatures by remember { mutableStateOf<AudioFeatures?>(null) }
+    var isLoadingFeatures by remember { mutableStateOf(true) }
 
-    LaunchedEffect(Unit) {
-        val featsAsync = withContext(Dispatchers.IO) {
-            async {
-                SpotifyApiRequests.providesGetAudioFeatures(data.id)
-            }
+    // Fetch the track's audio features when the composable enters the composition.
+    LaunchedEffect(data.id) {
+        isLoadingFeatures = true
+        audioFeatures = withContext(Dispatchers.IO) {
+            SpotifyApiRequests.getAudioFeatures(data.id)
         }
-        if (audioFeatures == null) {
-            audioFeatures = featsAsync.await()
-        }
-        if (trackData != data) {
-            trackData = data
-        }
+        isLoadingFeatures = false
     }
 
     LazyColumn(
         modifier = modifier.fillMaxSize(),
-        contentPadding = PaddingValues(vertical = 8.dp, horizontal = 12.dp),
+        contentPadding = PaddingValues(bottom = 16.dp),
     ) {
+        // --- Track Header ---
         item {
-            Box(
-                modifier = Modifier
-                    .clip(MaterialTheme.shapes.extraSmall)
-                    .fillMaxWidth()
-                    .padding(bottom = 6.dp), contentAlignment = Alignment.Center
-            ) {
-                //calculate the image size based on the screen size and the aspect ratio as 1:1 (square) based on the height
-                val size = (localConfig.screenHeightDp / 3)
-                AsyncImageImpl(
-                    modifier = Modifier
-                        .size(size.dp)
-                        .aspectRatio(
-                            1f, matchHeightConstraintsFirst = true
+            Column {
+                Box(
+                    modifier = Modifier.fillMaxWidth().padding(16.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    val imageSize = (localConfig.screenWidthDp * 0.7f).dp
+                    AsyncImageImpl(
+                        modifier = Modifier
+                            .size(imageSize)
+                            .aspectRatio(1f)
+                            .clip(MaterialTheme.shapes.medium),
+                        model = data.album.images.firstOrNull()?.url ?: "",
+                        contentDescription = stringResource(R.string.track_artwork),
+                        contentScale = ContentScale.Crop,
+                    )
+                }
+                Column(
+                    modifier = Modifier.padding(horizontal = 16.dp),
+                ) {
+                    SelectionContainer {
+                        MarqueeText(
+                            text = data.name,
+                            fontWeight = FontWeight.Bold,
+                            style = MaterialTheme.typography.headlineMedium
                         )
-                        .clip(MaterialTheme.shapes.small),
-                    model = trackData.album.images[0].url,
-                    contentDescription = stringResource(id = R.string.track_artwork),
-                    contentScale = ContentScale.Crop,
-                )
+                    }
+                    Spacer(modifier = Modifier.height(6.dp))
+                    SelectionContainer {
+                        Text(
+                            text = data.artists.joinToString(", ") { it.name },
+                            style = MaterialTheme.typography.titleMedium,
+                            modifier = Modifier.alpha(alpha = 0.8f)
+                        )
+                    }
+                    Spacer(modifier = Modifier.height(6.dp))
+                    SelectionContainer {
+                        Text(
+                            text = dataStringToString(
+                                data = data.type,
+                                additional = data.album.releaseDate?.year?.toString() ?: ""
+                            ),
+                            style = MaterialTheme.typography.bodyMedium,
+                            modifier = Modifier.alpha(alpha = 0.8f)
+                        )
+                    }
+                }
+                HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp, vertical = 16.dp))
             }
         }
+
+        // --- Download Action ---
+        item {
+            TrackComponent(
+                modifier = Modifier.padding(horizontal = 16.dp),
+                songName = data.name,
+                artists = data.artists.joinToString(", ") { it.name },
+                spotifyUrl = data.externalUrls.spotify ?: "",
+                isExplicit = data.explicit,
+                onClick = { onDownloadTrack(data) } // UPDATED: Calls the correct download callback.
+            )
+        }
+
+        // --- Audio Features Section ---
         item {
             Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 8.dp),
-                ) {
-                SelectionContainer {
-                    MarqueeText(
-                        text = trackData.name,
-                        fontWeight = FontWeight.Bold,
-                        style = MaterialTheme.typography.headlineMedium
-                    )
-                }
-                Spacer(modifier = Modifier.height(6.dp))
-                SelectionContainer {
-                    Text(
-                        text = trackData.artists.joinToString(", ") { it.name },
-                        style = MaterialTheme.typography.bodyMedium.copy(
-                            fontWeight = FontWeight.Bold
-                        ),
-                        modifier = Modifier.alpha(alpha = 0.8f)
-                    )
-                }
-                Spacer(modifier = Modifier.height(6.dp))
-                SelectionContainer {
-                    Text(
-                        text = dataStringToString(
-                            data = trackData.type,
-                            additional = trackData.album.releaseDate?.year.toString()
-                        ),
-                        style = MaterialTheme.typography.bodySmall,
-                        modifier = Modifier.alpha(alpha = 0.8f)
-                    )
-                }
-            }
-            HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp))
-        }
-
-        item {
-            val songData = trackData
-            val taskName = StringBuilder().append(songData.name).append(" - ")
-                .append(songData.artists.joinToString(", ") { it.name }).toString()
-
-            TrackComponent(
-                contentModifier = Modifier,
-                songName = songData.name,
-                artists = songData.artists.joinToString(", ") { it.name },
-                spotifyUrl = songData.externalUrls.spotify!!,
-                isExplicit = songData.explicit,
-                onClick = { trackDownloadCallback(songData.externalUrls.spotify!!, taskName) })
-        }
-
-        item {
-            Column(modifier = Modifier.fillMaxWidth()) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp)
-                ) {
-                    ExtraInfoCard(
-                        headlineText = stringResource(id = R.string.track_popularity),
-                        bodyText = trackData.popularity.toString(),
-                        modifier = Modifier.weight(1f)
-                    )
-                    Spacer(modifier = Modifier.width(16.dp))
-                    ExtraInfoCard(
-                        headlineText = stringResource(id = R.string.track_duration),
-                        bodyText = GeneralTextUtils.convertDuration(trackData.durationMs.toDouble()),
-                        modifier = Modifier.weight(1f)
-                    )
-                }
-                AnimatedVisibility(visible = audioFeatures != null) {
+                modifier = Modifier.fillMaxWidth().padding(top = 16.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                if (isLoadingFeatures) {
+                    CircularProgressIndicator(modifier = Modifier.padding(vertical = 24.dp))
+                } else {
                     Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 16.dp, vertical = 8.dp)
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)
                     ) {
                         ExtraInfoCard(
-                            headlineText = stringResource(id = R.string.loudness),
-                            bodyText = audioFeatures!!.loudness.toString(),
+                            headlineText = stringResource(R.string.track_popularity),
+                            bodyText = data.popularity?.toString() ?: "N/A",
                             modifier = Modifier.weight(1f)
                         )
                         Spacer(modifier = Modifier.width(16.dp))
                         ExtraInfoCard(
-                            headlineText = stringResource(id = R.string.tempo),
-                            bodyText = audioFeatures!!.tempo.toString() + " BPM",
+                            headlineText = stringResource(R.string.track_duration),
+                            bodyText = GeneralTextUtils.convertDuration(data.durationMs.toDouble()),
                             modifier = Modifier.weight(1f)
                         )
                     }
                 }
+                
+                // Show additional audio features once they are loaded.
+                AnimatedVisibility(visible = audioFeatures != null) {
+                    audioFeatures?.let { features ->
+                        Row(
+                            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)
+                        ) {
+                            ExtraInfoCard(
+                                headlineText = stringResource(R.string.loudness),
+                                bodyText = "${features.loudness} dB",
+                                modifier = Modifier.weight(1f)
+                            )
+                            Spacer(modifier = Modifier.width(16.dp))
+                            ExtraInfoCard(
+                                headlineText = stringResource(R.string.tempo),
+                                bodyText = "${features.tempo.toInt()} BPM",
+                                modifier = Modifier.weight(1f)
+                            )
+                        }
+                    }
+                }
             }
         }
-    }
-}
-
-//create a saver for the audio features
-@ExperimentalSerializationApi
-object AudioFeaturesSaver : Saver<AudioFeatures?, String> {
-    override fun restore(value: String): AudioFeatures? {
-        return Json.decodeFromString(value)
-    }
-
-    override fun SaverScope.save(value: AudioFeatures?): String {
-        return Json.encodeToString(value)
-    }
-}
-
-@ExperimentalSerializationApi
-object TrackSaver : Saver<Track, String> {
-    override fun restore(value: String): Track {
-        return Json.decodeFromString(value)
-    }
-
-    override fun SaverScope.save(value: Track): String {
-        return Json.encodeToString(value)
     }
 }

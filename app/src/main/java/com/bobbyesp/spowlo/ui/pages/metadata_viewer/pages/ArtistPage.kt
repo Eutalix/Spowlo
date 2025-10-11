@@ -1,27 +1,11 @@
 package com.bobbyesp.spowlo.ui.pages.metadata_viewer.pages
 
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.aspectRatio
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.text.selection.SelectionContainer
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.FilledTonalButton
-import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -45,140 +29,131 @@ import com.bobbyesp.spowlo.ui.components.text.MarqueeText
 import com.bobbyesp.spowlo.ui.theme.harmonizeWithPrimary
 import com.bobbyesp.spowlo.utils.ChromeCustomTabsUtil
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.async
 import kotlinx.coroutines.withContext
 
+/**
+ * A Composable that displays the detailed view of a Spotify Artist,
+ * including their artwork, metadata, and a list of their top tracks.
+ */
 @Composable
 fun ArtistPage(
     data: Artist,
     modifier: Modifier,
-    trackDownloadCallback: (String, String) -> Unit
+    onDownloadTrack: (Track) -> Unit
 ) {
     val localConfig = LocalConfiguration.current
-    val topTracks = remember { mutableStateOf<List<Track>?>(null) }
+    var topTracks by remember { mutableStateOf<List<Track>?>(null) }
+    var isLoading by remember { mutableStateOf(true) }
 
-    LaunchedEffect(Unit) {
-        // topTracks.value = geArtistTopTracks(data.id)
-        val featsAsync = withContext(Dispatchers.IO) {
-            async {
-                SpotifyApiRequests.providesGetArtistTopTracks(data.id)
-            }
+    // Fetch the artist's top tracks when the composable enters the composition.
+    LaunchedEffect(data.id) {
+        isLoading = true
+        topTracks = withContext(Dispatchers.IO) {
+            SpotifyApiRequests.getArtistTopTracks(data.id)
         }
-        if (topTracks.value == null) {
-            topTracks.value = featsAsync.await()
-        }
+        isLoading = false
     }
 
     LazyColumn(
         modifier = modifier.fillMaxSize(),
-        contentPadding = PaddingValues(vertical = 8.dp, horizontal = 12.dp),
+        contentPadding = PaddingValues(bottom = 16.dp),
     ) {
+        // --- Artist Header ---
         item {
-            data.images.getOrNull(0)?.url?.let { imageUrl ->
-                Box(
-                    modifier = Modifier
-                        .clip(MaterialTheme.shapes.extraSmall)
-                        .fillMaxWidth()
-                        .padding(bottom = 6.dp),
-                    contentAlignment = Alignment.Center
+            Column {
+                data.images.firstOrNull()?.url?.let { imageUrl ->
+                    Box(
+                        modifier = Modifier.fillMaxWidth().padding(16.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        val imageSize = (localConfig.screenWidthDp * 0.7f).dp
+                        AsyncImageImpl(
+                            modifier = Modifier
+                                .size(imageSize)
+                                .aspectRatio(1f)
+                                .clip(MaterialTheme.shapes.medium),
+                            model = imageUrl,
+                            contentDescription = stringResource(R.string.artist_artwork),
+                            contentScale = ContentScale.Crop,
+                        )
+                    }
+                }
+
+                Column(
+                    verticalArrangement = Arrangement.Center,
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)
                 ) {
-                    //calculate the image size based on the screen size and the aspect ratio as 1:1 (square) based on the height
-                    val size = (localConfig.screenHeightDp / 3)
-                    AsyncImageImpl(
-                        modifier = Modifier
-                            .size(size.dp)
-                            .aspectRatio(1f, matchHeightConstraintsFirst = true)
-                            .clip(MaterialTheme.shapes.small),
-                        model = imageUrl,
-                        contentDescription = stringResource(id = R.string.track_artwork),
-                        contentScale = ContentScale.Crop,
-                    )
+                    SelectionContainer {
+                        MarqueeText(
+                            text = data.name,
+                            fontWeight = FontWeight.Bold,
+                            style = MaterialTheme.typography.headlineMedium
+                        )
+                    }
+                    Spacer(modifier = Modifier.height(6.dp))
+                    SelectionContainer {
+                        Text(
+                            text = "${stringResource(R.string.artist_followers)}: ${data.followers.total}",
+                            style = MaterialTheme.typography.bodyMedium,
+                            modifier = Modifier.alpha(alpha = 0.8f)
+                        )
+                    }
+                    Spacer(modifier = Modifier.height(6.dp))
+                    SelectionContainer {
+                        Text(
+                            text = "${stringResource(R.string.artist_popularity)}: ${data.popularity}",
+                            style = MaterialTheme.typography.bodyMedium,
+                            modifier = Modifier.alpha(alpha = 0.8f)
+                        )
+                    }
+                    
+                    data.externalUrls.spotify?.let { url ->
+                        FilledTonalButton(
+                            modifier = Modifier.padding(top = 12.dp),
+                            onClick = { ChromeCustomTabsUtil.openUrl(url) },
+                            colors = ButtonDefaults.filledTonalButtonColors(
+                                containerColor = Color(red = 30, green = 215, blue = 96).harmonizeWithPrimary(),
+                            ),
+                        ) {
+                            Icon(
+                                modifier = Modifier.size(24.dp),
+                                imageVector = ImageVector.vectorResource(id = R.drawable.spotify_logo),
+                                contentDescription = "Open artist in Spotify"
+                            )
+                        }
+                    }
                 }
             }
         }
 
-        item {
-            Column(
-                verticalArrangement = Arrangement.Center,
-                horizontalAlignment = Alignment.CenterHorizontally,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(start = 16.dp, end = 16.dp, top = 8.dp)
-            ) {
-                SelectionContainer {
-                    MarqueeText(
-                        text = data.name,
-                        fontWeight = FontWeight.Bold,
-                        style = MaterialTheme.typography.headlineMedium
-                    )
-                }
-                Spacer(modifier = Modifier.height(6.dp))
-                SelectionContainer {
-                    Text(
-                        text = "${stringResource(id = R.string.artist_followers)}: ${data.followers.total}",
-                        style = MaterialTheme.typography.bodyMedium.copy(
-                            fontWeight = FontWeight.Bold
-                        ),
-                        modifier = Modifier.alpha(alpha = 0.8f)
-                    )
-                }
-                Spacer(modifier = Modifier.height(6.dp))
-                SelectionContainer {
-                    Text(
-                        text = "${stringResource(id = R.string.artist_popularity)}: ${data.popularity}",
-                        style = MaterialTheme.typography.bodyMedium.copy(
-                            fontWeight = FontWeight.Bold
-                        ),
-                        modifier = Modifier.alpha(alpha = 0.8f)
-                    )
-                }
-                FilledTonalButton(
-                    modifier = Modifier.padding(start = 8.dp),
-                    onClick = { ChromeCustomTabsUtil.openUrl(data.externalUrls.spotify!!) },
-                    colors = ButtonDefaults.filledTonalButtonColors(
-                        containerColor = Color(
-                            red = 30,
-                            green = 215,
-                            blue = 96
-                        ).harmonizeWithPrimary(),
-                    ),
-                )
-                {
-                    Icon(
-                        modifier = Modifier.size(24.dp),
-                        imageVector = ImageVector.vectorResource(id = R.drawable.spotify_logo),
-                        contentDescription = null
-                    )
-                }
-            }
-        }
-
+        // --- Top Tracks Section ---
         item {
             Text(
-                text = stringResource(id = R.string.artist_top_tracks),
-                style = MaterialTheme.typography.bodyLarge.copy(
-                    fontWeight = FontWeight.Bold
-                ),
-                modifier = Modifier.alpha(alpha = 0.8f)
+                text = stringResource(R.string.artist_top_tracks),
+                style = MaterialTheme.typography.titleLarge,
+                modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 24.dp, bottom = 8.dp)
             )
-            HorizontalDivider(modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp))
+            HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
         }
 
-        if (topTracks.value != null) {
-            items(topTracks.value!!.size) { index ->
-                val track = topTracks.value!![index]
-                val taskName =
-                    "${track.name} - ${track.artists.joinToString(", ") { it.name }}"
-                TrackComponent(
-                    contentModifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
-                    songName = track.name,
-                    artists = track.artists.joinToString(", ") { it.name },
-                    spotifyUrl = track.externalUrls.spotify ?: "",
-                    isExplicit = track.explicit,
-                    onClick = {
-                        trackDownloadCallback(track.externalUrls.spotify ?: "", taskName)
-                    }
-                )
+        if (isLoading) {
+            item {
+                Box(modifier = Modifier.fillMaxWidth().padding(32.dp), contentAlignment = Alignment.Center) {
+                    CircularProgressIndicator()
+                }
+            }
+        } else {
+            topTracks?.let { tracks ->
+                items(tracks, key = { it.id }) { track ->
+                    TrackComponent(
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+                        songName = track.name,
+                        artists = track.artists.joinToString(", ") { it.name },
+                        isExplicit = track.explicit,
+                        onClick = { onDownloadTrack(track) } // UPDATED: Calls the new track download callback.
+                    )
+                }
             }
         }
     }

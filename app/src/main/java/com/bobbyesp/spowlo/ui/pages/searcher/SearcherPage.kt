@@ -1,55 +1,25 @@
 package com.bobbyesp.spowlo.ui.pages.searcher
 
 import androidx.compose.animation.Crossfade
-import androidx.compose.animation.animateContentSize
-import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.aspectRatio
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilterChip
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.derivedStateOf
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.setValue
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.layout.onGloballyPositioned
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.lifecycle.viewModelScope
-import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import androidx.paging.compose.LazyPagingItems
 import androidx.paging.compose.collectAsLazyPagingItems
@@ -62,401 +32,197 @@ import com.bobbyesp.spowlo.ui.components.BackButton
 import com.bobbyesp.spowlo.ui.components.HorizontalDivider
 import com.bobbyesp.spowlo.ui.components.QueryTextBox
 import com.bobbyesp.spowlo.ui.components.others.shimmer.cards.HorizontalSongCardShimmer
-import com.bobbyesp.spowlo.ui.components.text.AnimatedCounter
-import com.bobbyesp.spowlo.ui.components.text.MarqueeText
 import com.bobbyesp.spowlo.ui.ext.loadStateContent
-import com.bobbyesp.spowlo.utils.secondOrNull
-import kotlinx.coroutines.launch
 
 @Composable
 fun SearcherPage(
-    viewModel: SearcherPageViewModel = viewModel(), navController: NavController
+    navController: NavController,
+    viewModel: SearcherPageViewModel = hiltViewModel(),
 ) {
-    val viewState = viewModel.viewStateFlow.collectAsStateWithLifecycle().value
-
-    val (query, onValueChange) = rememberSaveable(key = "searchQuery_searchPage") {
-        mutableStateOf("")
-    }
-
-    LaunchedEffect(query) {
-        viewModel.updateSearchText(query)
-    }
+    val viewState by viewModel.viewState.collectAsStateWithLifecycle()
 
     val onItemClick: (String, String) -> Unit = { type, id ->
-        navController.navigate(Route.PLAYLIST_PAGE + "/" + type + "/" + id)
+        navController.navigate(Route.PLAYLIST_PAGE + "/$type/$id")
     }
 
-    val types = listOf(
-        SearchType(searchType = SpotifySearchType.TRACK, onClick = {
-            viewModel.chooseSearchTypeAndSearch(SpotifySearchType.TRACK)
-        }),
-        SearchType(searchType = SpotifySearchType.ALBUM, onClick = {
-            viewModel.chooseSearchTypeAndSearch(SpotifySearchType.ALBUM)
-        }),
-        SearchType(searchType = SpotifySearchType.PLAYLIST, onClick = {
-            viewModel.chooseSearchTypeAndSearch(SpotifySearchType.PLAYLIST)
-        }),
-        SearchType(searchType = SpotifySearchType.ARTIST, onClick = {
-            viewModel.chooseSearchTypeAndSearch(SpotifySearchType.ARTIST)
-        }),
-    )
+    val searchTypes = SpotifySearchType.values()
 
-    val paginatedTracks = viewState.searchedTracks.collectAsLazyPagingItems()
-    val paginatedAlbums = viewState.searchedAlbums.collectAsLazyPagingItems()
-    val paginatedPlaylists = viewState.searchedPlaylists.collectAsLazyPagingItems()
-    val paginatedArtists = viewState.searchedArtists.collectAsLazyPagingItems()
-
-    Scaffold(
-        modifier = Modifier.fillMaxSize(),
-    ) {
-        Column(
-            modifier = Modifier.fillMaxSize().padding(it),
-        ) {
+    Scaffold(modifier = Modifier.fillMaxSize()) { paddingValues ->
+        Column(modifier = Modifier.fillMaxSize().padding(paddingValues)) {
             Row(
                 modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
+                verticalAlignment = Alignment.CenterVertically
             ) {
                 BackButton { navController.popBackStack() }
                 QueryTextBox(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp),
-                    query = query,
-                    onValueChange = onValueChange,
-                    onSearchCallback = {
-                        viewModel.viewModelScope.launch {
-                            viewModel.search()
-                        }
-                    })
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+                    query = viewState.query,
+                    onValueChange = viewModel::onQueryChange,
+                    onSearchCallback = viewModel::search
+                )
             }
             LazyRow(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .animateContentSize(),
-                horizontalArrangement = Arrangement.spacedBy(6.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                contentPadding = PaddingValues(horizontal = 16.dp)
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp)
             ) {
-                items(types) {
+                items(searchTypes) { type ->
                     SearchTypeChip(
-                        modifier = Modifier,
-                        searchType = it.searchType,
-                        isActive = viewState.activeSearchType == it.searchType,
-                        onClick = it.onClick
+                        searchType = type,
+                        isActive = viewState.activeSearchType == type,
+                        onClick = { viewModel.onSearchTypeChange(type) }
                     )
                 }
             }
-            HorizontalDivider(modifier = Modifier.padding(8.dp))
-            Column(
+            HorizontalDivider()
+            
+            Box(
                 modifier = Modifier.fillMaxSize(),
-                verticalArrangement = Arrangement.Center,
-                horizontalAlignment = Alignment.CenterHorizontally
+                contentAlignment = Alignment.Center
             ) {
-                with(viewState) {
-                    when (this.viewState) {
-                        is ViewSearchState.Idle -> {
-                            Text(
-                                text = stringResource(id = R.string.search),
-                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f),
-                                textAlign = TextAlign.Center,
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(horizontal = 16.dp)
-                            )
-                        }
-
-                        is ViewSearchState.Loading -> {
-                            CircularProgressIndicator()
-                        }
-
-                        is ViewSearchState.Success -> {
-                            Crossfade(
-                                modifier = Modifier.fillMaxSize(),
-                                targetState = activeSearchType,
-                                label = ""
-                            ) { searchType ->
-                                when (searchType) {
-                                    SpotifySearchType.TRACK -> {
-                                        ResultsList(
-                                            modifier = Modifier.fillMaxSize(),
-                                            paginatedItems = paginatedTracks,
-                                            itemName = { item -> item.name },
-                                            itemArtists = { item -> item.artists.joinToString(", ") { it.name } },
-                                            itemArtworkUrl = { item ->
-                                                item.album.images.secondOrNull()?.url ?: ""
-                                            },
-                                            itemType = SpotifySearchType.TRACK,
-                                            onItemClick = { track ->
-                                                onItemClick(
-                                                    SpotifySearchType.TRACK.asString(), track.id
-                                                )
-                                            })
-                                    }
-
-                                    SpotifySearchType.ALBUM -> {
-                                        ResultsList(
-                                            modifier = Modifier.fillMaxSize(),
-                                            paginatedItems = paginatedAlbums,
-                                            itemName = { item -> item.name },
-                                            itemArtists = { item -> item.artists.joinToString(", ") { it.name } },
-                                            itemArtworkUrl = { item ->
-                                                item.images.secondOrNull()?.url ?: ""
-                                            },
-                                            itemType = SpotifySearchType.ALBUM,
-                                            onItemClick = { album ->
-                                                onItemClick(
-                                                    SpotifySearchType.ALBUM.asString(), album.id
-                                                )
-                                            })
-                                    }
-
-                                    SpotifySearchType.PLAYLIST -> {
-                                        ResultsList(
-                                            modifier = Modifier.fillMaxSize(),
-                                            paginatedItems = paginatedPlaylists,
-                                            itemName = { item -> item.name },
-                                            itemArtists = { item -> item.owner.displayName ?: "" },
-                                            itemArtworkUrl = { item ->
-                                                item.images.firstOrNull()?.url ?: ""
-                                            },
-                                            itemType = SpotifySearchType.PLAYLIST,
-                                            onItemClick = { playlist ->
-                                                onItemClick(
-                                                    SpotifySearchType.PLAYLIST.asString(), playlist.id
-                                                )
-                                            })
-                                    }
-
-                                    SpotifySearchType.ARTIST -> {
-                                        ResultsList(
-                                            modifier = Modifier.fillMaxSize(),
-                                            paginatedItems = paginatedArtists,
-                                            itemName = { item -> item.name },
-                                            itemArtists = { item -> item.name },
-                                            itemArtworkUrl = { item ->
-                                                item.images.secondOrNull()?.url ?: ""
-                                            },
-                                            itemType = SpotifySearchType.ARTIST,
-                                            onItemClick = { artist ->
-                                                onItemClick(
-                                                    SpotifySearchType.ARTIST.asString(), artist.id
-                                                )
-                                            })
-                                    }
-                                }
+                when (viewState.searchStatus) {
+                    is ViewSearchState.Idle -> {
+                        Text(
+                            text = stringResource(R.string.search_for_music),
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                        )
+                    }
+                    is ViewSearchState.Loading -> {
+                        CircularProgressIndicator()
+                    }
+                    is ViewSearchState.Success -> {
+                        val paginatedTracks = viewState.searchedTracks.collectAsLazyPagingItems()
+                        val paginatedAlbums = viewState.searchedAlbums.collectAsLazyPagingItems()
+                        val paginatedPlaylists = viewState.searchedPlaylists.collectAsLazyPagingItems()
+                        val paginatedArtists = viewState.searchedArtists.collectAsLazyPagingItems()
+                        
+                        Crossfade(targetState = viewState.activeSearchType, label = "SearchTypeCrossfade") { searchType ->
+                            when (searchType) {
+                                SpotifySearchType.TRACK -> ResultsList(
+                                    paginatedItems = paginatedTracks,
+                                    itemName = { it.name },
+                                    itemSubtext = { it.artists.joinToString { artist -> artist.name } },
+                                    itemArtworkUrl = { it.album.images.firstOrNull()?.url ?: "" },
+                                    onItemClick = { onItemClick(searchType.asString(), it.id) }
+                                )
+                                SpotifySearchType.ALBUM -> ResultsList(
+                                    paginatedItems = paginatedAlbums,
+                                    itemName = { it.name },
+                                    itemSubtext = { it.artists.joinToString { artist -> artist.name } },
+                                    itemArtworkUrl = { it.images.firstOrNull()?.url ?: "" },
+                                    onItemClick = { onItemClick(searchType.asString(), it.id) }
+                                )
+                                SpotifySearchType.PLAYLIST -> ResultsList(
+                                    paginatedItems = paginatedPlaylists,
+                                    itemName = { it.name },
+                                    itemSubtext = { it.owner.displayName ?: "N/A" },
+                                    itemArtworkUrl = { it.images.firstOrNull()?.url ?: "" },
+                                    onItemClick = { onItemClick(searchType.asString(), it.id) }
+                                )
+                                SpotifySearchType.ARTIST -> ResultsList(
+                                    paginatedItems = paginatedArtists,
+                                    itemName = { it.name },
+                                    itemSubtext = { "${it.followers.total} followers" },
+                                    itemArtworkUrl = { it.images.firstOrNull()?.url ?: "" },
+                                    onItemClick = { onItemClick(searchType.asString(), it.id) }
+                                )
                             }
                         }
-
-                        is ViewSearchState.Error -> {
-                            Text(text = "Error")
-                        }
+                    }
+                    is ViewSearchState.Error -> {
+                        Text((viewState.searchStatus as ViewSearchState.Error).message, color = MaterialTheme.colorScheme.error)
                     }
                 }
             }
         }
     }
-
 }
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-fun <T : Any> ResultsList(
-    modifier: Modifier,
+private fun <T : Any> ResultsList(
     paginatedItems: LazyPagingItems<T>,
     itemName: (T) -> String,
-    itemArtists: (T) -> String,
+    itemSubtext: (T) -> String,
     itemArtworkUrl: (T) -> String,
-    itemType: SpotifySearchType,
     onItemClick: (T) -> Unit
 ) {
-    // Get local density from composable
-    val localDensity = LocalDensity.current
-
-    // Create element height in dp state
-    var columnHeightDp: Dp by remember {
-        mutableStateOf(0.dp)
-    }
-
-    val shimmerItemsCount = remember {
-        derivedStateOf {
-            (columnHeightDp / 60.dp).toInt()
-        }
-    }
-
-    LazyColumn(
-        modifier = modifier
-            .fillMaxSize()
-            .onGloballyPositioned { coordinates ->
-                columnHeightDp = with(localDensity) { coordinates.size.height.toDp() }
-            }
-    ) {
-        stickyHeader {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(
-                        brush = Brush.verticalGradient(
-                            colors = listOf(
-                                MaterialTheme.colorScheme.surface,
-                                Color.Transparent
-                            ),
-                            startY = 30f,
-                        )
-                    )
-            ) {
-
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 12.dp, horizontal = 16.dp)
-                        .background(Color.Transparent)
-                        .align(Alignment.CenterStart),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.Start
-                ) {
-                    AnimatedCounter(
-                        count = paginatedItems.itemCount,
-                        style = MaterialTheme.typography.labelLarge.copy(
-                            color = MaterialTheme.colorScheme.primary
-                        )
-                    )
-                    Text(
-                        modifier = Modifier,
-                        text = " " + stringResource(id = R.string.results),
-                        color = MaterialTheme.colorScheme.primary,
-                        style = MaterialTheme.typography.labelLarge
-                    )
-                }
-            }
-        }
+    LazyColumn(modifier = Modifier.fillMaxSize()) {
         items(
             count = paginatedItems.itemCount,
             key = paginatedItems.itemKey(),
             contentType = paginatedItems.itemContentType()
         ) { index ->
-            val item = paginatedItems[index] as T
-            SearchingResult(
-                modifier = Modifier.fillMaxWidth(),
-                insideModifier = Modifier.padding(vertical = 4.dp),
-                name = itemName(item),
-                artists = itemArtists(item),
-                artworkUrl = itemArtworkUrl(item),
-                onClick = {
-                    onItemClick(item)
-                },
-                type = itemType.asLocalizedString()
-            )
+            paginatedItems[index]?.let { item ->
+                SearchResultItem(
+                    name = itemName(item),
+                    subtext = itemSubtext(item),
+                    artworkUrl = itemArtworkUrl(item),
+                    onClick = { onItemClick(item) }
+                )
+            }
         }
-        loadStateContent(paginatedItems, itemCount = shimmerItemsCount.value) {
-            HorizontalSongCardShimmer(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 6.dp)
-            )
+        loadStateContent(paginatedItems, itemCount = 10) {
+            HorizontalSongCardShimmer(modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp))
         }
     }
 }
 
-
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun SearchTypeChip(
-    modifier: Modifier, searchType: SpotifySearchType, isActive: Boolean, onClick: () -> Unit
+private fun SearchTypeChip(
+    searchType: SpotifySearchType,
+    isActive: Boolean,
+    onClick: () -> Unit
 ) {
     FilterChip(
-        modifier = modifier,
         selected = isActive,
         onClick = onClick,
-        label = {
-            Text(text = searchType.asLocalizedString())
-        },
+        label = { Text(text = searchType.asLocalizedString()) },
     )
 }
 
 @Composable
-fun SearchingResult(
-    modifier: Modifier = Modifier,
-    artworkUrl: String,
+private fun SearchResultItem(
     name: String,
-    artists: String,
-    type: String = stringResource(id = R.string.track),
-    insideModifier: Modifier = Modifier,
+    subtext: String,
+    artworkUrl: String,
     onClick: () -> Unit
 ) {
-    Column(modifier.clickable { onClick() }) {
-        Row(
-            modifier = insideModifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically, //This makes all go to the center
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { onClick() }
+            .padding(horizontal = 16.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        AsyncImageImpl(
+            modifier = Modifier
+                .size(48.dp)
+                .aspectRatio(1f)
+                .clip(MaterialTheme.shapes.small),
+            model = artworkUrl,
+            contentDescription = "Artwork for $name",
+            contentScale = ContentScale.Crop,
+        )
+        Column(
+            modifier = Modifier.padding(start = 12.dp).weight(1f),
         ) {
-            AsyncImageImpl(
-                modifier = Modifier
-                    .padding(horizontal = 12.dp)
-                    .size(48.dp)
-                    .aspectRatio(1f, matchHeightConstraintsFirst = true)
-                    .clip(MaterialTheme.shapes.extraSmall),
-                model = artworkUrl,
-                contentDescription = "Song cover",
-                contentScale = ContentScale.Crop,
-                isPreview = false
+            Text(
+                text = name,
+                style = MaterialTheme.typography.bodyLarge,
+                fontWeight = FontWeight.Bold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
             )
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.Center
-            ) {
-                Column(
-                    modifier = Modifier
-                        .padding(6.dp)
-                        .weight(1f),
-                    verticalArrangement = Arrangement.Center,
-                    horizontalAlignment = Alignment.Start
-                ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.Center
-                    ) {
-                        MarqueeText(
-                            text = name,
-                            color = MaterialTheme.colorScheme.onSurface,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                            fontSize = 16.sp,
-                            fontWeight = FontWeight.Bold,
-                            basicGradientColor = MaterialTheme.colorScheme.surface.copy(
-                                alpha = 0.8f
-                            ),
-                        )
-                    }
-                    if (artists.isNotEmpty()) {
-                        MarqueeText(
-                            text = "$type • $artists",
-                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                            fontSize = 12.sp,
-                            basicGradientColor = MaterialTheme.colorScheme.surface.copy(
-                                alpha = 0.8f
-                            ),
-                        )
-                    } else {
-                        MarqueeText(
-                            text = type,
-                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                            fontSize = 12.sp,
-                            basicGradientColor = MaterialTheme.colorScheme.surface.copy(
-                                alpha = 0.8f
-                            ),
-                        )
-                    }
-                }
-            }
+            Text(
+                text = subtext,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
         }
     }
 }
-
-private data class SearchType(
-    val searchType: SpotifySearchType, val onClick: () -> Unit
-)
