@@ -99,8 +99,10 @@ dependencies {
     // Utility library for file operations.
     implementation("commons-io:commons-io:2.11.0")
 
-    // UPDATED: Replaced the unavailable alpha version with the latest stable version
-    // of the Spotify API library. The artifact name is also corrected to '-core'.
-    // This stable version is available on Maven Central.
-    implementation("com.adamratzman:spotify-api-kotlin-core:4.1.3")
+    // --- THE FIX ---
+    // Use `api` instead of `implementation`.
+    // This exposes the spotify-api-kotlin library to any module that depends on this :library module
+    // (like the :app module). This resolves all the 'Unresolved reference' errors for classes
+    // like `Track`, `SpotifyAppApi`, etc., in the :app module.
+    api("com.adamratzman:spotify-api-kotlin-core:4.1.3")
 }
