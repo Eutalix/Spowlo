@@ -1,5 +1,3 @@
-// library/build.gradle.kts
-
 plugins {
     id("com.android.library")
     id("org.jetbrains.kotlin.android")
@@ -24,15 +22,11 @@ android {
 
         // Securely pass Spotify credentials from the project's 'local.properties' file
         // into the BuildConfig class, making them accessible in Kotlin code.
-        // This avoids hardcoding secrets in the source code.
-        // The `findProperty` call will return null if the property doesn't exist,
-        // resulting in an empty string, which the library handles gracefully.
         buildConfigField("String", "SPOTIFY_CLIENT_ID", "\"${findProperty("CLIENT_ID") ?: ""}\"")
         buildConfigField("String", "SPOTIFY_CLIENT_SECRET", "\"${findProperty("CLIENT_SECRET") ?: ""}\"")
     }
 
     // Define product flavors to handle different library distributions.
-    // 'bundled' includes the Python environment, while 'nonbundled' does not.
     flavorDimensions.add("bundling")
     productFlavors {
         create("bundled") {
@@ -43,8 +37,7 @@ android {
         }
     }
 
-    // Configure source sets for each flavor, ensuring that the correct
-    // Java code and native libraries (.so files) are included.
+    // Configure source sets for each flavor.
     sourceSets {
         getByName("nonbundled") {
             java.srcDir("src/nonbundled/java")
@@ -58,7 +51,7 @@ android {
 
     buildTypes {
         release {
-            isMinifyEnabled = false // Minification is typically handled by the main app module.
+            isMinifyEnabled = false
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
@@ -81,7 +74,6 @@ android {
     }
 
     // Configuration for publishing the library to a Maven repository.
-    // Can be removed if not needed.
     publishing {
         singleVariant("bundledRelease") {
             withSourcesJar()
@@ -98,19 +90,17 @@ dependencies {
     // Declare a dependency on the ':common' module for shared utility code.
     implementation(project(":common"))
     
-    // Core Android & Kotlin libraries for modern development.
+    // Core Android & Kotlin libraries.
     implementation("androidx.core:core-ktx:1.13.1")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.8.0")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.0")
-    
-    // Serialization library for handling JSON data.
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.3")
     
-    // Utility library for file operations, used for unzipping Python environment.
+    // Utility library for file operations.
     implementation("commons-io:commons-io:2.11.0")
 
-    // NEW: The official Spotify Web API library for Kotlin.
-    // This replaces the old method of getting song metadata via Python/spotdl,
-    // making the process faster, more reliable, and native.
-    implementation("com.adamratzman:spotify-api-kotlin-common:6.0.0-alpha.1")
+    // UPDATED: Replaced the unavailable alpha version with the latest stable version
+    // of the Spotify API library. The artifact name is also corrected to '-core'.
+    // This stable version is available on Maven Central.
+    implementation("com.adamratzman:spotify-api-kotlin-core:4.1.3")
 }
