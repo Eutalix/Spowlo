@@ -1,14 +1,14 @@
-// UPDATED: Replaced aliases with standard plugin IDs.
 plugins {
     id("com.android.library")
     id("org.jetbrains.kotlin.android")
     id("org.jetbrains.kotlin.plugin.serialization")
-    // REMOVED: "maven-publish" is not needed for an internal module.
 }
 
-// NEW: Aligns the Kotlin toolchain with the main app module.
+// --- THE FIX ---
+// Specifies that all Kotlin compilation tasks in this module must use JDK 17.
+// This ensures consistency across the project and resolves JVM target compatibility errors.
 kotlin {
-    jvmToolchain(21)
+    jvmToolchain(17)
 }
 
 android {
@@ -17,7 +17,6 @@ android {
 
     defaultConfig {
         minSdk = 24
-        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         consumerProguardFiles("consumer-rules.pro")
     }
 
@@ -31,7 +30,7 @@ android {
         }
     }
     
-    // UPDATED: Standardized Java and Kotlin target versions for library compatibility.
+    // Standardized Java and Kotlin target versions for library compatibility.
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_1_8
         targetCompatibility = JavaVersion.VERSION_1_8
@@ -46,19 +45,14 @@ android {
 }
 
 dependencies {
-    implementation(fileTree(mapOf("dir" to "libs", "include" to listOf("*.jar"))))
-
-    // Using explicit versions for clarity, matching what Spowlo likely uses.
-    implementation("commons-io:commons-io:2.11.0")
-    implementation("org.apache.commons:commons-compress:1.26.2")
-    
-    // Ktor bundle (client, content-negotiation, serialization)
-    val ktorVersion = "2.3.12"
+    // Ktor for networking
+    val ktorVersion = "2.3.8" // Using the version from your TOML for consistency
     implementation("io.ktor:ktor-client-android:$ktorVersion")
     implementation("io.ktor:ktor-client-content-negotiation:$ktorVersion")
     implementation("io.ktor:ktor-serialization-kotlinx-json:$ktorVersion")
     
+    // Other utilities
+    implementation("commons-io:commons-io:2.11.0")
+    implementation("org.apache.commons:commons-compress:1.26.1") // Consistent version
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.3")
 }
-
-// REMOVED: The entire 'afterEvaluate' publishing block is not needed.

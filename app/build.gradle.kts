@@ -25,6 +25,7 @@ val currentVersion: Version = Version.Stable(versionMajor = 1, versionMinor = 5,
 val keystorePropertiesFile = rootProject.file("keystore.properties")
 val splitApks = !project.hasProperty("noSplits")
 
+
 android {
     // ... (signingConfigs block remains the same)
 
@@ -64,6 +65,13 @@ android {
     }
 }
 
+// --- THE FIX ---
+// Specifies that all Kotlin compilation tasks in this module should use JDK 17.
+// This resolves the JVM target compatibility error with KSP.
+kotlin {
+    jvmToolchain(17)
+}
+
 dependencies {
     // Local Project Modules
     implementation(project(":library"))
@@ -71,7 +79,7 @@ dependencies {
     implementation(project(":color"))
     implementation(project(":common"))
 
-    // AndroidX & Core KTX
+    // ... (the rest of the dependencies block remains the same) ...
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.appcompat)
     implementation(libs.androidx.activity.compose)
@@ -79,7 +87,6 @@ dependencies {
     implementation(libs.androidx.lifecycle.viewModelCompose)
     implementation(libs.androidx.navigation.compose)
 
-    // Compose
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.compose.ui)
     implementation(libs.androidx.compose.ui.tooling.preview)
@@ -89,45 +96,34 @@ dependencies {
     implementation(libs.androidx.compose.material3.windowSizeClass)
     debugImplementation(libs.androidx.compose.ui.tooling)
 
-    // Hilt for Dependency Injection
     implementation(libs.hilt.android)
     ksp(libs.hilt.compiler)
     implementation(libs.androidx.hilt.navigation.compose)
     ksp(libs.hilt.ext.compiler)
 
-// Room for Database
     implementation(libs.room.runtime)
     implementation(libs.room.ktx)
     ksp(libs.room.compiler)
 
-    // Paging 3
     implementation(libs.paging.runtime.ktx)
     implementation(libs.paging.compose)
 
-    // Coil for Image Loading
     implementation(libs.coil.compose)
 
-    // Network (Ktor)
     implementation(libs.bundles.ktor)
-
-    // Key-Value Storage
     implementation(libs.mmkv)
 
-    // Accompanist
     implementation(libs.accompanist.systemuicontroller)
     implementation(libs.accompanist.permissions)
     implementation(libs.accompanist.navigation.animation)
 
-    // Spotify API
     implementation(libs.spotify.api.android)
 
-    // Other Utilities
     implementation(libs.android.material)
     implementation(libs.markdown)
     implementation(libs.customtabs)
     debugImplementation(libs.crash.handler)
 
-    // Testing
     testImplementation(libs.junit4)
     androidTestImplementation(libs.androidx.test.ext)
     androidTestImplementation(libs.androidx.test.espresso.core)
