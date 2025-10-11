@@ -1,42 +1,31 @@
 [versions]
-# UPDATED: Accompanist is now on a more stable version, but many components are deprecated.
 accompanist = "0.32.0" 
-androidGradlePlugin = "8.2.2" # Standard AGP version
-# UPDATED: Use a stable Compose BOM version
+androidGradlePlugin = "8.2.2"
 androidxComposeBom = "2024.06.00" 
 androidxCore = "1.13.1"
 androidMaterial = "1.12.0"
 androidxAppCompat = "1.7.0"
 androidxActivity = "1.9.0"
 markdownDependency = "0.3.1"
-# UPDATED: Paging 3 versions
 androidxPaging = "3.3.0"
 paginationCompose = "3.3.0"
-ksp = "1.9.22-1.0.17" # Updated KSP
+ksp = "1.9.22-1.0.17"
 commonsIo = "2.11.0"
-
 androidxLifecycle = "2.8.1"
 androidxNavigation = "2.7.7"
-androidxComposeMaterial3 = "1.2.1"
-
 androidxEspresso = "3.5.1"
 androidxHiltNavigationCompose = "1.2.0"
 androidxTestExt = "1.1.5"
-
-# UPDATED: Correct version for the stable Spotify API library
 spotifyApiKotlinVersion = "4.1.3"
-
 crashHandlerVersion = "3.1.0"
 coil = "2.6.0"
-hilt = "2.48" # Common stable Hilt version
+hilt = "2.48"
 hiltExt = "1.2.0"
-
 junit4 = "4.13.2"
-kotlin = "1.9.22" # Aligned with Compose Compiler
+kotlin = "1.9.22"
 kotlinxCoroutines = "1.8.0"
 kotlinxSerializationJson = "1.6.3"
 ktor = "2.3.8"
-
 room = "2.6.1"
 mmkv = "1.3.0"
 customTabs = "1.8.0"
@@ -50,76 +39,57 @@ androidx-activity-compose = { group = "androidx.activity", name = "activity-comp
 androidx-lifecycle-runtimeCompose = { group = "androidx.lifecycle", name = "lifecycle-runtime-compose", version.ref = "androidxLifecycle" }
 androidx-lifecycle-viewModelCompose = { group = "androidx.lifecycle", name = "lifecycle-viewmodel-compose", version.ref = "androidxLifecycle" }
 
-# Accompanist dependencies (many are now part of official compose)
 accompanist-navigation-animation = { group = "com.google.accompanist", name = "accompanist-navigation-animation", version.ref = "accompanist" }
 accompanist-permissions = { group = "com.google.accompanist", name = "accompanist-permissions", version.ref = "accompanist" }
 accompanist-systemuicontroller = { group = "com.google.accompanist", name = "accompanist-systemuicontroller", version.ref = "accompanist" }
-# REMOVED: Obsolete Accompanist libraries that have been integrated into Compose Material 3
-# accompanist-webview = ...
-# accompanist-pager-indicators = ...
-# accompanist-flowlayout = ...
-# accompanist-material = ...
 
-# Paging3
-paging-runtime = { group = "androidx.paging", name = "paging-runtime-ktx", version.ref = "androidxPaging" } # Corrected artifact name to include -ktx
+paging-runtime = { group = "androidx.paging", name = "paging-runtime-ktx", version.ref = "androidxPaging" }
 paging-compose = { group = "androidx.paging", name = "paging-compose", version.ref = "paginationCompose" }
 
-# Markdown parser
-markdown = { group = "dev.jeziellago.compose:markdowntext", version.ref = "markdownDependency" }
+markdown = { group = "dev.jeziellago.compose", name = "markdowntext", version.ref = "markdownDependency" }
 
-# Compose
 androidx-compose-bom = { group = "androidx.compose", name = "compose-bom", version.ref = "androidxComposeBom" }
 androidx-compose-foundation = { group = "androidx.compose.foundation", name = "foundation" }
 androidx-compose-material-iconsExtended = { group = "androidx.compose.material", name = "material-icons-extended" }
 androidx-compose-ui = { group = "androidx.compose.ui", name = "ui" }
-androidx-compose-material = { group = "androidx.compose.material", name = "material" } # For Material 2 components if any
-androidx-compose-material3 = { group = "androidx.compose.material3", name = "material3" } # Use BOM for version
-androidx-compose-material3-windowSizeClass = { group = "androidx.compose.material3", name = "material3-window-size-class" } # Use BOM for version
+androidx-compose-material = { group = "androidx.compose.material", name = "material" }
+androidx-compose-material3 = { group = "androidx.compose.material3", name = "material3" }
+androidx-compose-material3-windowSizeClass = { group = "androidx.compose.material3", name = "material3-window-size-class" }
 
 androidx-compose-ui-tooling = { group = "androidx.compose.ui", name = "ui-tooling" }
 androidx-compose-ui-tooling-preview = { group = "androidx.compose.ui", name = "ui-tooling-preview" }
 androidx-hilt-navigation-compose = { group = "androidx.hilt", name = "hilt-navigation-compose", version.ref = "androidxHiltNavigationCompose" }
 androidx-navigation-compose = { group = "androidx.navigation", name = "navigation-compose", version.ref = "androidxNavigation" }
 
-# Testing
 androidx-test-ext = { group = "androidx.test.ext", name = "junit", version.ref = "androidxTestExt" }
 androidx-test-espresso-core = { group = "androidx.test.espresso", name = "espresso-core", version.ref = "androidxEspresso" }
 junit4 = { group = "junit", name = "junit", version.ref = "junit4" }
 
-# Coil
 coil-kt-compose = { group = "io.coil-kt", name = "coil-compose", version.ref = "coil" }
 
-# Hilt
 hilt-android = { group = "com.google.dagger", name = "hilt-android", version.ref = "hilt" }
-hilt-compiler = { group = "com.google.dagger", name = "hilt-compiler", version.ref = "hilt" } # Corrected name
+hilt-compiler = { group = "com.google.dagger", name = "hilt-compiler", version.ref = "hilt" }
 hilt-ext-compiler = { group = "androidx.hilt", name = "hilt-compiler", version.ref = "hiltExt" }
 
-# Utils
-commons-io = { module = "commons-io:commons-io", version.ref = "commonsIo" }
+# --- THE FIX ---
+# Corrected the format for these aliases from 'module' to the standard 'group' and 'name' keys.
+commons-io = { group = "commons-io", name = "commons-io", version.ref = "commonsIo" }
 kotlinx-coroutines-android = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-android", version.ref = "kotlinxCoroutines" }
 kotlinx-serialization-json = { group = "org.jetbrains.kotlinx", name = "kotlinx-serialization-json", version.ref = "kotlinxSerializationJson" }
-
-# Spotify API - This is already correct in your old file
 spotify-api-android = { group = "com.adamratzman", name = "spotify-api-kotlin-core", version.ref = "spotifyApiKotlinVersion" }
-
-# Room
 room-runtime = { group = "androidx.room", name = "room-runtime", version.ref = "room" }
 room-ktx = { group = "androidx.room", name = "room-ktx", version.ref = "room" }
 room-compiler = { group = "androidx.room", name = "room-compiler", version.ref = "room" }
+mmkv = { group = "com.tencent", name = "mmkv-static", version.ref = "mmkv" }
+crash-handler = { group = "com.github.Pannav-de", name = "Crash-Handler", version.ref = "crashHandlerVersion" }
+customtabs = { group = "androidx.browser", name = "browser", version.ref = "customTabs" }
+# --- END OF FIX ---
 
-# Other
-mmkv = { group = "com.tencent:mmkv-static", version.ref = "mmkv" } # Changed to mmkv-static for simplicity
-crash-handler = { group = "com.github.Pannav-de:Crash-Handler", version.ref = "crashHandlerVersion" } # Corrected path
-
-# Ktor
 ktor-android = { group = "io.ktor", name = "ktor-client-android", version.ref = "ktor" }
 ktor-core = { group = "io.ktor", name = "ktor-client-core", version.ref = "ktor" }
 ktor-serialization = { group = "io.ktor", name = "ktor-serialization-kotlinx-json", version.ref = "ktor" }
 ktor-logging = { group = "io.ktor", name = "ktor-client-logging", version.ref = "ktor" }
 ktor-contentnegotiation = { group = "io.ktor", name = "ktor-client-content-negotiation", version.ref = "ktor" }
-
-# Chrome Custom Tabs
-customtabs = { group = "androidx.browser", name = "browser", version.ref = "customTabs" }
 
 [plugins]
 android-application = { id = "com.android.application", version = "8.2.2" }
