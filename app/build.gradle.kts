@@ -25,7 +25,6 @@ val currentVersion: Version = Version.Stable(versionMajor = 1, versionMinor = 5,
 val keystorePropertiesFile = rootProject.file("keystore.properties")
 val splitApks = !project.hasProperty("noSplits")
 
-
 android {
     // ... (signingConfigs block remains the same)
 
@@ -86,7 +85,6 @@ dependencies {
     implementation(libs.androidx.compose.ui.tooling.preview)
     implementation(libs.androidx.compose.material)
     implementation(libs.androidx.compose.material3)
-    // Corrected alias
     implementation(libs.androidx.compose.iconsExtended)
     implementation(libs.androidx.compose.material3.windowSizeClass)
     debugImplementation(libs.androidx.compose.ui.tooling)
@@ -97,7 +95,7 @@ dependencies {
     implementation(libs.androidx.hilt.navigation.compose)
     ksp(libs.hilt.ext.compiler)
 
-    // Room for Database
+// Room for Database
     implementation(libs.room.runtime)
     implementation(libs.room.ktx)
     ksp(libs.room.compiler)
@@ -106,7 +104,7 @@ dependencies {
     implementation(libs.paging.runtime.ktx)
     implementation(libs.paging.compose)
 
-    // Coil for Image Loading - Corrected alias
+    // Coil for Image Loading
     implementation(libs.coil.compose)
 
     // Network (Ktor)

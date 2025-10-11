@@ -40,9 +40,11 @@ coil = "2.6.0"
 # Accompanist (Supplementary Compose Utils)
 accompanist = "0.32.0"
 
+# --- THE FIX ---
+# Updated to the latest stable version and corrected coordinates.
+markdown = "0.5.7"
 # Other Libraries
 mmkv = "1.3.0"
-markdown = "0.3.1"
 crashHandler = "3.1.0"
 commonsIo = "2.11.0"
 spotifyApiKotlinVersion = "4.1.3"
@@ -72,7 +74,6 @@ androidx-compose-ui-tooling = { group = "androidx.compose.ui", name = "ui-toolin
 androidx-compose-ui-tooling-preview = { group = "androidx.compose.ui", name = "ui-tooling-preview" }
 androidx-compose-material = { group = "androidx.compose.material", name = "material" }
 androidx-compose-material3 = { group = "androidx.compose.material3", name = "material3" }
-# Corrected alias
 androidx-compose-iconsExtended = { group = "androidx.compose.material", name = "material-icons-extended" }
 androidx-compose-material3-windowSizeClass = { group = "androidx.compose.material3", name = "material3-window-size-class" }
 
@@ -91,7 +92,7 @@ room-compiler = { group = "androidx.room", name = "room-compiler", version.ref =
 paging-runtime-ktx = { group = "androidx.paging", name = "paging-runtime-ktx", version.ref = "paging" }
 paging-compose = { group = "androidx.paging", name = "paging-compose", version.ref = "paging" }
 
-# Coil (Image Loading) - Corrected alias
+# Coil (Image Loading)
 coil-compose = { group = "io.coil-kt", name = "coil-compose", version.ref = "coil" }
 
 # Ktor (Networking)
@@ -111,7 +112,9 @@ spotify-api-android = { group = "com.adamratzman", name = "spotify-api-kotlin-co
 
 # Other Libraries
 mmkv = { group = "com.tencent", name = "mmkv-static", version.ref = "mmkv" }
-markdown = { group = "dev.jeziellago.compose", name = "markdowntext", version.ref = "markdown" }
+# --- THE FIX ---
+# Corrected groupId, artifact name, and version for the markdown library.
+markdown = { group = "com.github.jeziellago", name = "compose-markdown", version.ref = "markdown" }
 crash-handler = { group = "com.github.Pannav-de", name = "Crash-Handler", version.ref = "crashHandler" }
 commons-io = { group = "commons-io", name = "commons-io", version.ref = "commonsIo" }
 kotlinx-serialization-json = { group = "org.jetbrains.kotlinx", name = "kotlinx-serialization-json", version.ref = "kotlinxSerializationJson" }
