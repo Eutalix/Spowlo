@@ -7,25 +7,24 @@ androidxActivity = "1.9.0"
 androidMaterial = "1.12.0"
 customTabs = "1.8.0"
 
-# --- THE FIX ---
-# Updated Kotlin to a version that supports the modern Compose Compiler plugin.
-kotlin = "2.0.0"
+# Kotlin
+kotlin = "2.0.0" 
 kotlinxCoroutines = "1.8.0"
 kotlinxSerializationJson = "1.6.3"
 
-# Compose - Aligned with Kotlin 2.0.0
+# Compose
 androidxComposeBom = "2024.06.00"
 
 # Lifecycle & Navigation
 androidxLifecycle = "2.8.1"
 androidxNavigation = "2.7.7"
 
-# Hilt (Dependency Injection) - Updated for better compatibility
+# Hilt (Dependency Injection)
 hilt = "2.51.1" 
 androidxHiltNavigationCompose = "1.2.0"
 hiltExt = "1.2.0"
 
-# KSP (Kotlin Symbol Processing) - Updated for Kotlin 2.0.0
+# KSP (Kotlin Symbol Processing)
 ksp = "2.0.0-1.0.21"
 
 # Room (Database)
@@ -66,14 +65,15 @@ androidx-lifecycle-runtimeCompose = { group = "androidx.lifecycle", name = "life
 androidx-lifecycle-viewModelCompose = { group = "androidx.lifecycle", name = "lifecycle-viewmodel-compose", version.ref = "androidxLifecycle" }
 androidx-navigation-compose = { group = "androidx.navigation", name = "navigation-compose", version.ref = "androidxNavigation" }
 
-# Compose BOM (Bill of Materials) - manages versions of Compose libraries
+# Compose BOM (Bill of Materials)
 androidx-compose-bom = { group = "androidx.compose", name = "compose-bom", version.ref = "androidxComposeBom" }
 androidx-compose-ui = { group = "androidx.compose.ui", name = "ui" }
 androidx-compose-ui-tooling = { group = "androidx.compose.ui", name = "ui-tooling" }
 androidx-compose-ui-tooling-preview = { group = "androidx.compose.ui", name = "ui-tooling-preview" }
 androidx-compose-material = { group = "androidx.compose.material", name = "material" }
 androidx-compose-material3 = { group = "androidx.compose.material3", name = "material3" }
-androidx-compose-material-icons-extended = { group = "androidx.compose.material", name = "material-icons-extended" }
+# Corrected alias
+androidx-compose-iconsExtended = { group = "androidx.compose.material", name = "material-icons-extended" }
 androidx-compose-material3-windowSizeClass = { group = "androidx.compose.material3", name = "material3-window-size-class" }
 
 # Hilt (Dependency Injection)
@@ -91,7 +91,7 @@ room-compiler = { group = "androidx.room", name = "room-compiler", version.ref =
 paging-runtime-ktx = { group = "androidx.paging", name = "paging-runtime-ktx", version.ref = "paging" }
 paging-compose = { group = "androidx.paging", name = "paging-compose", version.ref = "paging" }
 
-# Coil (Image Loading)
+# Coil (Image Loading) - Corrected alias
 coil-compose = { group = "io.coil-kt", name = "coil-compose", version.ref = "coil" }
 
 # Ktor (Networking)
