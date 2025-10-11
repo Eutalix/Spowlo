@@ -1,28 +1,27 @@
+// settings.gradle.kts
 pluginManagement {
     repositories {
-        maven {
-            url = uri("app/libs/maven-repo")
-        }
-        gradlePluginPortal()
+        // This is where Gradle looks for PLUGINS.
+        // It's crucial that all necessary repositories are listed here.
         google()
         mavenCentral()
-        maven ("https://jitpack.io")
+        gradlePluginPortal()
+        maven("https://jitpack.io")
     }
 }
+
 dependencyResolutionManagement {
     repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
     repositories {
-        maven {
-            url = uri("app/libs/maven-repo")
-        }
+        // This is where Gradle looks for LIBRARIES (dependencies).
         google()
         mavenCentral()
-        maven ("https://jitpack.io")
+        maven("https://jitpack.io")
     }
 }
+
 rootProject.name = "Spowlo"
 
-// Includes all migrated modules.
 include (":app")
 include(":color")
 include(":library")

@@ -7,26 +7,26 @@ androidxActivity = "1.9.0"
 androidMaterial = "1.12.0"
 customTabs = "1.8.0"
 
-# Kotlin
-kotlin = "1.9.22"
+# --- THE FIX ---
+# Updated Kotlin to a version that supports the modern Compose Compiler plugin.
+kotlin = "2.0.0"
 kotlinxCoroutines = "1.8.0"
 kotlinxSerializationJson = "1.6.3"
 
-# Compose
+# Compose - Aligned with Kotlin 2.0.0
 androidxComposeBom = "2024.06.00"
-composeCompiler = "1.5.8" # Version compatible with Kotlin 1.9.22
 
 # Lifecycle & Navigation
 androidxLifecycle = "2.8.1"
 androidxNavigation = "2.7.7"
 
-# Hilt (Dependency Injection)
-hilt = "2.48"
+# Hilt (Dependency Injection) - Updated for better compatibility
+hilt = "2.51.1" 
 androidxHiltNavigationCompose = "1.2.0"
-hiltExt = "1.1.0" # Common version for hilt-compiler extension
+hiltExt = "1.2.0"
 
-# KSP (Kotlin Symbol Processing)
-ksp = "1.9.22-1.0.17"
+# KSP (Kotlin Symbol Processing) - Updated for Kotlin 2.0.0
+ksp = "2.0.0-1.0.21"
 
 # Room (Database)
 room = "2.6.1"
