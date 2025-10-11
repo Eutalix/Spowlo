@@ -110,7 +110,7 @@ fun DownloaderPage(
             // Once a track is successfully fetched, display its information in a SongCard.
             uiState.spotifyTrack?.let { track ->
                 Text("Track Found:", style = MaterialTheme.typography.titleMedium)
-                // The SongCard is now adapted to accept a `Track` object.
+                // The SongCard is adapted to accept a `Track` object.
                 // Clicking it will trigger the download via the ViewModel.
                 SongCard(
                     track = track,
