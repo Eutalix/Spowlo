@@ -12,6 +12,7 @@ plugins {
 }
 apply(plugin = "dagger.hilt.android.plugin")
 
+// A sealed class to manage app versioning in a structured and type-safe way.
 sealed class Version(
     open val versionMajor: Int,
     val versionMinor: Int,
@@ -23,27 +24,10 @@ sealed class Version(
     fun toVersionCode(): Int =
         versionMajor * 1000000 + versionMinor * 10000 + versionPatch * 100 + versionBuild
 
-    class Beta(versionMajor: Int, versionMinor: Int, versionPatch: Int, versionBuild: Int) :
-        Version(versionMajor, versionMinor, versionPatch, versionBuild) {
-        override fun toVersionName(): String =
-            "${versionMajor}.${versionMinor}.${versionPatch}-beta.$versionBuild"
-    }
-
     class Stable(versionMajor: Int, versionMinor: Int, versionPatch: Int) :
         Version(versionMajor, versionMinor, versionPatch) {
         override fun toVersionName(): String =
             "${versionMajor}.${versionMinor}.${versionPatch}"
-    }
-
-    class ReleaseCandidate(
-        versionMajor: Int,
-        versionMinor: Int,
-        versionPatch: Int,
-        versionBuild: Int
-    ) :
-        Version(versionMajor, versionMinor, versionPatch, versionBuild) {
-        override fun toVersionName(): String =
-            "${versionMajor}.${versionMinor}.${versionPatch}-rc.$versionBuild"
     }
 }
 
@@ -54,10 +38,10 @@ val currentVersion: Version = Version.Stable(
 )
 
 val keystorePropertiesFile = rootProject.file("keystore.properties")
-
 val splitApks = !project.hasProperty("noSplits")
 
 android {
+    // Configuration for release signing, loaded from keystore.properties if it exists.
     if (keystorePropertiesFile.exists()) {
         val keystoreProperties = Properties()
         keystoreProperties.load(FileInputStream(keystorePropertiesFile))
@@ -84,11 +68,19 @@ android {
             else this
         }
 
-        // --- THE FINAL FIX ---
-        // This tells Gradle that when it encounters the "bundling" flavor dimension
-        // from the :library and :ffmpeg modules, it should automatically choose
-        // the "bundled" flavor. This resolves the build ambiguity.
+        // This tells Gradle how to resolve a missing dimension strategy. When a library
+        // (like :library or :ffmpeg) has product flavors ('bundled', 'nonbundled'),
+        // this tells the app to default to the 'bundled' version.
         missingDimensionStrategy("bundling", "bundled")
+
+        // --- FIX ---
+        // Provides values for placeholders required by a dependency's manifest during the
+        // manifest merge process. This is typically needed for features like OAuth callbacks
+        // which require a custom URL scheme to redirect back to the app.
+        manifestPlaceholders += mapOf(
+            "redirectSchemeName" to "spowlo-auth",
+            "redirectHostName" to "callback"
+        )
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
@@ -104,6 +96,8 @@ android {
                 }
             }
     }
+
+    // Configuration for creating split APKs for different ABIs.
     if (splitApks)
         splits {
             abi {
@@ -125,19 +119,10 @@ android {
             }
             if (keystorePropertiesFile.exists())
                 signingConfig = signingConfigs.getByName("debug")
-            
-            matchingFallbacks.add(0, "debug")
-            matchingFallbacks.add(1, "release")
         }
         debug {
             if (keystorePropertiesFile.exists())
                 signingConfig = signingConfigs.getByName("debug")
-            packaging {
-                resources.excludes.add("META-INF/*.kotlin_module")
-            }
-            
-            matchingFallbacks.add(0, "debug")
-            matchingFallbacks.add(1, "release")
             applicationIdSuffix = ".debug"
             resValue("string", "app_name", "Spowlo (Debug)")
             isMinifyEnabled = false
@@ -153,6 +138,7 @@ android {
         disable.addAll(listOf("MissingTranslation", "ExtraTranslation"))
     }
 
+    // Customizes the output APK file name to include version and build type.
     applicationVariants.all {
         outputs.all {
             (this as com.android.build.gradle.internal.api.BaseVariantOutputImpl).outputFileName =
@@ -163,12 +149,12 @@ android {
     kotlinOptions {
         freeCompilerArgs = freeCompilerArgs + "-opt-in=kotlin.RequiresOptIn"
     }
+
     packaging {
         resources {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
             excludes += "META-INF/*.kotlin_module"
         }
-        jniLibs.useLegacyPackaging = true
     }
     namespace = "com.bobbyesp.spowlo"
 }
@@ -178,76 +164,71 @@ kotlin {
 }
 
 dependencies {
-
+    // Local module dependencies
+    implementation(project(":library"))
+    implementation(project(":ffmpeg"))
     implementation(project(":color"))
+
+    // AndroidX & Core libraries
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.appcompat)
     implementation(libs.android.material)
     implementation(libs.androidx.activity.compose)
-
     implementation(libs.androidx.lifecycle.runtimeCompose)
     implementation(libs.androidx.lifecycle.viewModelCompose)
-
-    implementation(platform(libs.androidx.compose.bom))
-
-    implementation(libs.androidx.compose.ui)
-    implementation(libs.androidx.compose.ui.tooling.preview)
-    implementation(libs.androidx.compose.material)
-    implementation(libs.androidx.compose.material.iconsExtended)
-    implementation(libs.androidx.compose.material3)
-    implementation(libs.androidx.compose.material3.windowSizeClass)
-    implementation(libs.androidx.compose.foundation)
-
     implementation(libs.androidx.navigation.compose)
 
+    // Compose
+    implementation(platform(libs.androidx.compose.bom))
+    implementation(libs.androidx.compose.ui)
+    implementation(libs.androidx.compose.ui.tooling.preview)
+    implementation(libs.androidx.compose.material3)
+    implementation(libs.androidx.compose.material.iconsExtended)
+    debugImplementation(libs.androidx.compose.ui.tooling)
+
+    // Accompanist (for supplementary Compose utilities)
     implementation(libs.accompanist.systemuicontroller)
     implementation(libs.accompanist.permissions)
     implementation(libs.accompanist.navigation.animation)
-    implementation(libs.accompanist.webview)
-    implementation(libs.accompanist.flowlayout)
-    implementation(libs.accompanist.material)
-    implementation(libs.accompanist.pager.indicators)
+    
+    // Paging 3 for paginated lists
     implementation(libs.paging.compose)
     implementation(libs.paging.runtime)
 
+    // Coil for image loading
     implementation(libs.coil.kt.compose)
 
+    // Kotlinx Serialization for JSON parsing
     implementation(libs.kotlinx.serialization.json)
 
+    // Hilt for Dependency Injection
     implementation(libs.androidx.hilt.navigation.compose)
-    ksp(libs.hilt.ext.compiler)
     implementation(libs.hilt.android)
     ksp(libs.hilt.compiler)
 
+    // Room for local database
     implementation(libs.room.runtime)
     implementation(libs.room.ktx)
     ksp(libs.room.compiler)
 
-    // Using local project modules
-    implementation(project(":library"))
-    implementation(project(":ffmpeg"))
-
-    // Kept for the rich search UI
-    implementation(libs.spotify.api.android)
-
-    // okhttp
-    implementation(libs.okhttp)
+    // Network
     implementation(libs.bundles.ktor)
-    //MMKV
+
+    // Key-value storage
     implementation(libs.mmkv)
 
+    // Other utilities
     implementation(libs.markdown)
     implementation(libs.customtabs)
-
     debugImplementation(libs.crash.handler)
 
+    // Testing
     testImplementation(libs.junit4)
     androidTestImplementation(libs.androidx.test.ext)
     androidTestImplementation(libs.androidx.test.espresso.core)
-
-    debugImplementation(libs.androidx.compose.ui.tooling)
 }
 
+// Helper functions and providers for build logic.
 fun String.capitalizeWord(): String {
     return this.replaceFirstChar {
         if (it.isLowerCase()) it.titlecase(
