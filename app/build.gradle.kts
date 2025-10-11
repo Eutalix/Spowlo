@@ -1,53 +1,35 @@
 import java.io.FileInputStream
-import java.util.Locale
 import java.util.Properties
 
 plugins {
     id("com.android.application")
     id("kotlin-android")
     id("com.google.devtools.ksp")
-    id("org.jetbrains.kotlin.android")
-    kotlin("plugin.serialization")
+    id("dagger.hilt.android.plugin")
+    id("org.jetbrains.kotlin.plugin.serialization")
     alias(libs.plugins.compose.compiler)
 }
-apply(plugin = "dagger.hilt.android.plugin")
 
-// A sealed class to manage app versioning in a structured and type-safe way.
+// Versioning class remains the same.
 sealed class Version(
-    open val versionMajor: Int,
-    val versionMinor: Int,
-    val versionPatch: Int,
-    val versionBuild: Int = 0
+    open val versionMajor: Int, val versionMinor: Int, val versionPatch: Int, val versionBuild: Int = 0
 ) {
     abstract fun toVersionName(): String
-
-    fun toVersionCode(): Int =
-        versionMajor * 1000000 + versionMinor * 10000 + versionPatch * 100 + versionBuild
-
-    class Stable(versionMajor: Int, versionMinor: Int, versionPatch: Int) :
-        Version(versionMajor, versionMinor, versionPatch) {
-        override fun toVersionName(): String =
-            "${versionMajor}.${versionMinor}.${versionPatch}"
+    fun toVersionCode(): Int = versionMajor * 1000000 + versionMinor * 10000 + versionPatch * 100 + versionBuild
+    class Stable(versionMajor: Int, versionMinor: Int, versionPatch: Int) : Version(versionMajor, versionMinor, versionPatch) {
+        override fun toVersionName(): String = "${versionMajor}.${versionMinor}.${versionPatch}"
     }
 }
-
-val currentVersion: Version = Version.Stable(
-    versionMajor = 1,
-    versionMinor = 5,
-    versionPatch = 3,
-)
-
+val currentVersion: Version = Version.Stable(versionMajor = 1, versionMinor = 5, versionPatch = 3)
 val keystorePropertiesFile = rootProject.file("keystore.properties")
 val splitApks = !project.hasProperty("noSplits")
 
 android {
-    // Configuration for release signing, loaded from keystore.properties if it exists.
     if (keystorePropertiesFile.exists()) {
         val keystoreProperties = Properties()
         keystoreProperties.load(FileInputStream(keystorePropertiesFile))
         signingConfigs {
-            getByName("debug")
-            {
+            create("release") {
                 keyAlias = keystoreProperties["keyAlias"].toString()
                 keyPassword = keystoreProperties["keyPassword"].toString()
                 storeFile = file(keystoreProperties["storeFile"]!!)
@@ -56,77 +38,50 @@ android {
         }
     }
 
-    compileSdk = 35
+    namespace = "com.bobbyesp.spowlo"
+    compileSdk = 34 // Keep this consistent with :library module
+
     defaultConfig {
         applicationId = "com.bobbyesp.spowlo"
         minSdk = 26
-        targetSdk = 35
+        targetSdk = 34
         versionCode = currentVersion.toVersionCode()
+        versionName = currentVersion.toVersionName().let { if (!splitApks) "$it-full" else it }
 
-        versionName = currentVersion.toVersionName().run {
-            if (!splitApks) "$this-(F-Droid)"
-            else this
-        }
-
-        // This tells Gradle how to resolve a missing dimension strategy. When a library
-        // (like :library or :ffmpeg) has product flavors ('bundled', 'nonbundled'),
-        // this tells the app to default to the 'bundled' version.
+        // Resolves the 'bundling' flavor dimension from the library modules.
         missingDimensionStrategy("bundling", "bundled")
 
-        // --- FIX ---
-        // Provides values for placeholders required by a dependency's manifest during the
-        // manifest merge process. This is typically needed for features like OAuth callbacks
-        // which require a custom URL scheme to redirect back to the app.
+        // Resolves the manifest merger failure.
         manifestPlaceholders += mapOf(
             "redirectSchemeName" to "spowlo-auth",
             "redirectHostName" to "callback"
         )
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
-        vectorDrawables {
-            useSupportLibrary = true
-        }
-        ksp {
-            arg("room.schemaLocation", "$projectDir/schemas")
-        }
-        if (!splitApks)
-            ndk {
-                (properties["ABI_FILTERS"] as String).split(';').forEach {
-                    abiFilters.add(it)
-                }
-            }
+        vectorDrawables { useSupportLibrary = true }
+        ksp { arg("room.schemaLocation", "$projectDir/schemas") }
     }
-
-    // Configuration for creating split APKs for different ABIs.
-    if (splitApks)
-        splits {
-            abi {
-                isEnable = !project.hasProperty("noSplits")
-                reset()
-                include("arm64-v8a", "armeabi-v7a")
-                isUniversalApk = false
-            }
-        }
 
     buildTypes {
         release {
             isMinifyEnabled = false
-            proguardFiles(
-                getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro"
-            )
-            packaging {
-                resources.excludes.add("META-INF/*.kotlin_module")
+            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+            if (keystorePropertiesFile.exists()) {
+                signingConfig = signingConfigs.getByName("release")
             }
-            if (keystorePropertiesFile.exists())
-                signingConfig = signingConfigs.getByName("debug")
         }
         debug {
-            if (keystorePropertiesFile.exists())
-                signingConfig = signingConfigs.getByName("debug")
             applicationIdSuffix = ".debug"
-            resValue("string", "app_name", "Spowlo (Debug)")
-            isMinifyEnabled = false
+            versionNameSuffix = "-debug"
         }
+    }
+
+    compileOptions {
+        sourceCompatibility = JavaVersion.VERSION_1_8
+        targetCompatibility = JavaVersion.VERSION_1_8
+    }
+    kotlinOptions {
+        jvmTarget = "1.8"
     }
 
     buildFeatures {
@@ -134,90 +89,72 @@ android {
         buildConfig = true
     }
 
-    lint {
-        disable.addAll(listOf("MissingTranslation", "ExtraTranslation"))
-    }
-
-    // Customizes the output APK file name to include version and build type.
-    applicationVariants.all {
-        outputs.all {
-            (this as com.android.build.gradle.internal.api.BaseVariantOutputImpl).outputFileName =
-                "Spowlo-${defaultConfig.versionName}-${name}.apk"
-        }
-    }
-
-    kotlinOptions {
-        freeCompilerArgs = freeCompilerArgs + "-opt-in=kotlin.RequiresOptIn"
-    }
-
     packaging {
         resources {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
-            excludes += "META-INF/*.kotlin_module"
         }
     }
-    namespace = "com.bobbyesp.spowlo"
-}
-
-kotlin {
-    jvmToolchain(21)
 }
 
 dependencies {
-    // Local module dependencies
-    implementation(project(":library"))
+    // Local Project Modules
+    implementation(project(":library")) // This will expose spotify-api-kotlin via `api` configuration
     implementation(project(":ffmpeg"))
     implementation(project(":color"))
+    implementation(project(":common"))
 
-    // AndroidX & Core libraries
+    // AndroidX & Core KTX
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.appcompat)
-    implementation(libs.android.material)
     implementation(libs.androidx.activity.compose)
-    implementation(libs.androidx.lifecycle.runtimeCompose)
-    implementation(libs.androidx.lifecycle.viewModelCompose)
-    implementation(libs.androidx.navigation.compose)
 
     // Compose
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.compose.ui)
     implementation(libs.androidx.compose.ui.tooling.preview)
     implementation(libs.androidx.compose.material3)
-    implementation(libs.androidx.compose.material.iconsExtended)
+    implementation(libs.androidx.compose.material.icons.extended)
     debugImplementation(libs.androidx.compose.ui.tooling)
 
-    // Accompanist (for supplementary Compose utilities)
-    implementation(libs.accompanist.systemuicontroller)
-    implementation(libs.accompanist.permissions)
-    implementation(libs.accompanist.navigation.animation)
+    // Window Size Class - Fixes 'windowsizeclass' unresolved reference
+    implementation(libs.androidx.compose.material3.windowSizeClass)
     
-    // Paging 3 for paginated lists
-    implementation(libs.paging.compose)
-    implementation(libs.paging.runtime)
+    // Lifecycle & ViewModel for Compose
+    implementation(libs.androidx.lifecycle.runtimeCompose)
+    implementation(libs.androidx.lifecycle.viewModelCompose)
 
-    // Coil for image loading
-    implementation(libs.coil.kt.compose)
-
-    // Kotlinx Serialization for JSON parsing
-    implementation(libs.kotlinx.serialization.json)
+    // Navigation for Compose
+    implementation(libs.androidx.navigation.compose)
 
     // Hilt for Dependency Injection
-    implementation(libs.androidx.hilt.navigation.compose)
     implementation(libs.hilt.android)
     ksp(libs.hilt.compiler)
+    implementation(libs.androidx.hilt.navigation.compose)
 
-    // Room for local database
+    // Room for Database
     implementation(libs.room.runtime)
     implementation(libs.room.ktx)
     ksp(libs.room.compiler)
 
-    // Network
+    // Paging 3 for paginated lists
+    implementation(libs.paging.runtime.ktx)
+    implementation(libs.paging.compose)
+
+    // Coil for Image Loading
+    implementation(libs.coil.compose)
+
+    // Network (Ktor)
     implementation(libs.bundles.ktor)
 
-    // Key-value storage
+    // Key-Value Storage
     implementation(libs.mmkv)
 
-    // Other utilities
+    // Accompanist - Only keep the ones that are still needed and updated.
+    // System UI Controller is still useful.
+    implementation(libs.accompanist.systemuicontroller)
+    implementation(libs.accompanist.permissions)
+    
+    // Other Utilities
     implementation(libs.markdown)
     implementation(libs.customtabs)
     debugImplementation(libs.crash.handler)
@@ -226,21 +163,4 @@ dependencies {
     testImplementation(libs.junit4)
     androidTestImplementation(libs.androidx.test.ext)
     androidTestImplementation(libs.androidx.test.espresso.core)
-}
-
-// Helper functions and providers for build logic.
-fun String.capitalizeWord(): String {
-    return this.replaceFirstChar {
-        if (it.isLowerCase()) it.titlecase(
-            Locale.getDefault()
-        ) else it.toString()
-    }
-}
-
-class RoomSchemaArgProvider(
-    @get:InputDirectory @get:PathSensitive(PathSensitivity.RELATIVE) val schemaDir: File
-) : CommandLineArgumentProvider {
-    override fun asArguments(): Iterable<String> {
-        return listOf("room.schemaLocation=${schemaDir.path}")
-    }
 }
