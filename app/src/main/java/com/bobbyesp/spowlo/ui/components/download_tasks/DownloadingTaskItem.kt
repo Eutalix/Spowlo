@@ -64,10 +64,9 @@ fun DownloadingTaskItem(
     progress: Float = .85f,
     url: String = "https://www.example.com",
     header: String = "Faded - Alan Walker",
-    progressText: String = "[sample] Extracting URL: https://www.example.com\n" +
-            "[sample] sample: Downloading webpage\n" +
-            "[sample] sample: Downloading android player API JSON\n" +
-            "[info] Available automatic captions for sample:" + "[info] Available automatic captions for sample:",
+    progressText: String = "", // Default to empty
+    // --- ADDED: Parameter to receive the error message ---
+    errorText: String? = null,
     artworkUrl: String = "https://www.example.com",
     onCopyLog: () -> Unit = {},
     onCopyError: () -> Unit = {},
@@ -93,14 +92,6 @@ fun DownloadingTaskItem(
             onSurfaceVariant.harmonizeWith(other = accentColor)
         }
 
-        val labelText = stringResource(
-            id = when (status) {
-                TaskState.FINISHED -> R.string.status_completed
-                TaskState.RUNNING -> R.string.downloading
-                TaskState.ERROR -> R.string.error
-                TaskState.CANCELED -> R.string.task_canceled
-            }
-        )
         Surface(
             modifier = modifier,
             color = containerColor,
@@ -115,15 +106,12 @@ fun DownloadingTaskItem(
                     when (status) {
                         TaskState.FINISHED -> {
                             Icon(
-                                modifier = Modifier
-                                    .padding(8.dp)
-                                    .size(24.dp),
+                                modifier = Modifier.padding(8.dp).size(24.dp),
                                 imageVector = Icons.Filled.CheckCircle,
                                 tint = accentColor,
                                 contentDescription = stringResource(id = R.string.status_completed)
                             )
                         }
-
                         TaskState.RUNNING -> {
                             val animatedProgress by animateFloatAsState(
                                 targetValue = progress,
@@ -132,38 +120,28 @@ fun DownloadingTaskItem(
                             )
                             if (progress < 0)
                                 CircularProgressIndicator(
-                                    modifier = Modifier
-                                        .padding(8.dp)
-                                        .size(24.dp),
+                                    modifier = Modifier.padding(8.dp).size(24.dp),
                                     strokeWidth = 5.dp, color = accentColor
                                 )
                             else
                                 CircularProgressIndicator(
-                                    modifier = Modifier
-                                        .padding(8.dp)
-                                        .size(24.dp),
+                                    modifier = Modifier.padding(8.dp).size(24.dp),
                                     strokeWidth = 5.dp,
-                                    progress = animatedProgress,
+                                    progress = { animatedProgress }, // Corrected deprecated API
                                     color = accentColor
                                 )
                         }
-
                         TaskState.ERROR -> {
                             Icon(
-                                modifier = Modifier
-                                    .padding(8.dp)
-                                    .size(24.dp),
+                                modifier = Modifier.padding(8.dp).size(24.dp),
                                 imageVector = Icons.Filled.Error,
                                 tint = accentColor,
                                 contentDescription = stringResource(id = R.string.searching_error)
                             )
                         }
-
                         TaskState.CANCELED -> {
                             Icon(
-                                modifier = Modifier
-                                    .padding(8.dp)
-                                    .size(24.dp),
+                                modifier = Modifier.padding(8.dp).size(24.dp),
                                 imageVector = Icons.Filled.Cancel,
                                 tint = accentColor,
                                 contentDescription = stringResource(id = R.string.task_canceled)
@@ -171,11 +149,7 @@ fun DownloadingTaskItem(
                         }
                     }
 
-                    Column(
-                        Modifier
-                            .padding(horizontal = 8.dp)
-                            .weight(1f)
-                    ) {
+                    Column(Modifier.padding(horizontal = 8.dp).weight(1f)) {
                         MarqueeText(
                             text = header,
                             style = MaterialTheme.typography.titleSmall,
@@ -183,8 +157,7 @@ fun DownloadingTaskItem(
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
                             fontWeight = FontWeight.Bold,
-
-                            )
+                        )
                         Text(
                             text = url,
                             style = MaterialTheme.typography.bodyMedium,
@@ -194,9 +167,7 @@ fun DownloadingTaskItem(
                         )
                     }
                     IconButton(
-                        modifier = Modifier
-                            .align(Alignment.Top)
-                            .semantics(mergeDescendants = true) { },
+                        modifier = Modifier.align(Alignment.Top).semantics(mergeDescendants = true) { },
                         onClick = { onShowLog() },
                         colors = IconButtonDefaults.iconButtonColors(
                             containerColor = MaterialTheme.colorScheme.surface,
@@ -205,9 +176,7 @@ fun DownloadingTaskItem(
                     ) {
                         Icon(
                             imageVector = Icons.Outlined.Terminal,
-                            contentDescription = stringResource(
-                                id = R.string.open_log
-                            )
+                            contentDescription = stringResource(id = R.string.open_log)
                         )
                     }
                 }
@@ -220,24 +189,18 @@ fun DownloadingTaskItem(
                         .background(Color.Black.copy(alpha = 0.8f)),
                 ) {
                     AutoResizableText(
-                        text = progressText,
+                        // --- MODIFIED: Show error text if available, otherwise show progress text ---
+                        text = errorText ?: progressText,
                         modifier = Modifier.padding(8.dp),
                         textStyle = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
-                        // color is going to be like this: if the system color is dark, then the text color is white, otherwise it's black
-                        color = Color.White,
+                        color = if(status == TaskState.ERROR) MaterialTheme.colorScheme.error else Color.White,
                         maxLines = 1
                     )
                 }
 
                 Row(modifier = Modifier.horizontalScroll(rememberScrollState())) {
-                    FlatButtonChip(
-                        icon = Icons.Outlined.ContentCopy,
-                        label = stringResource(id = R.string.copy_log)
-                    ) { onCopyLog() }
-                    FlatButtonChip(
-                        icon = Icons.Outlined.ContentCopy,
-                        label = stringResource(id = R.string.copy_link)
-                    ) { onCopyLink() }
+                    FlatButtonChip(icon = Icons.Outlined.ContentCopy, label = stringResource(id = R.string.copy_log)) { onCopyLog() }
+                    FlatButtonChip(icon = Icons.Outlined.ContentCopy, label = stringResource(id = R.string.copy_link)) { onCopyLink() }
                     if (status == TaskState.ERROR) {
                         FlatButtonChip(
                             icon = Icons.Outlined.ErrorOutline,

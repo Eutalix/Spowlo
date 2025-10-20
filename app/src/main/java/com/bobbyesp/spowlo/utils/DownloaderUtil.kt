@@ -86,7 +86,7 @@ object DownloaderUtil {
     private fun StringBuilder.buildPathExtensions(downloadPreferences: DownloadPreferences) {
         when {
             downloadPreferences.outputFormat.isNotEmpty() -> {
-                    this.append("/").append(downloadPreferences.outputFormat)
+                this.append("/").append(downloadPreferences.outputFormat)
             }
             else -> return
         }
@@ -131,7 +131,7 @@ object DownloaderUtil {
                     val secure = getLong(getColumnIndexOrThrow(CookieScheme.SECURE)) == 1L
                     val hostKey = getString(getColumnIndexOrThrow(CookieScheme.HOST))
 
-                    val host = if (hostKey[0] != '.') ".$hostKey" else hostKey
+                    val host = if (hostKey.isNotEmpty() && hostKey[0] != '.') ".$hostKey" else hostKey
                     cookieList.add(
                         Cookie(
                             domain = host,
@@ -152,12 +152,10 @@ object DownloaderUtil {
         }
     }
 
-    //Get a random UUID and return it as a string
     private fun getRandomUUID(): String {
         return UUID.randomUUID().toString()
     }
 
-    //Use cookies from the database
     private fun SpotDLRequest.useCookies(): SpotDLRequest = this.apply {
         if (PreferencesUtil.getValue(COOKIES)) {
             addOption(
@@ -190,7 +188,6 @@ object DownloaderUtil {
         }
     }
 
-    //get the audio format
     private fun SpotDLRequest.addAudioFormat(): SpotDLRequest = this.apply {
         when (PreferencesUtil.getAudioFormat()) {
             0 -> addOption("--format", "mp3")
@@ -198,12 +195,11 @@ object DownloaderUtil {
             2 -> addOption("--format", "ogg")
             3 -> addOption("--format", "opus")
             4 -> addOption("--format", "m4a")
-            5 -> addOption("--format", "m4a")
-            6 -> null
+            5 -> addOption("--format", "wav")
+            6 -> Unit
         }
     }
 
-    //get the audio quality
     private fun SpotDLRequest.addAudioQuality(): SpotDLRequest = this.apply {
         when (PreferencesUtil.getAudioQuality()) {
             0 -> addOption("--bitrate", "auto")
@@ -234,38 +230,34 @@ object DownloaderUtil {
                 if (downloadPreferences.audioProviders.contains("YouTube")) {
                     addOption("youtube")
                 }
-
                 if (downloadPreferences.audioProviders.contains("YouTube Music")) {
                     addOption("youtube-music")
                 }
-
                 if (downloadPreferences.audioProviders.contains("Soundcloud")) {
                     addOption("soundcloud")
                 }
-
                 if (downloadPreferences.audioProviders.contains("Bandcamp")) {
                     addOption("bandcamp")
                 }
-
                 if (downloadPreferences.audioProviders.contains("Piped")) {
                     addOption("piped")
                 }
             }
         }
 
-    //HERE GOES ALL THE DOWNLOADER OPTIONS
     private fun commonRequest(
         downloadPreferences: DownloadPreferences,
         url: String,
         request: SpotDLRequest,
-        pathBuilder: StringBuilder
+        pathBuilder: StringBuilder,
+        operation: String
     ): SpotDLRequest {
         with(downloadPreferences) {
             request.apply {
-                addOption("download", url)
+                setOperation(operation)
+                urls = listOf(url)
 
                 pathBuilder.append(audioDownloadDir)
-
                 pathBuilder.buildPathExtensions(downloadPreferences)
 
                 Log.d(TAG, "downloadSong: $pathBuilder")
@@ -274,10 +266,6 @@ object DownloaderUtil {
 
                 if (useCookies) {
                     useCookies()
-                }
-
-                if (!useCaching) {
-                    addOption("--no-cache")
                 }
 
                 if (useYtMetadata) {
@@ -293,15 +281,12 @@ object DownloaderUtil {
                     if (downloadPreferences.lyricProviders.contains("Synced")) {
                         addOption("synced")
                     }
-
                     if (downloadPreferences.lyricProviders.contains("Genius")) {
                         addOption("genius")
                     }
-
                     if (downloadPreferences.lyricProviders.contains("Musixmatch")) {
                         addOption("musixmatch")
                     }
-
                     if (downloadPreferences.lyricProviders.contains("AZLyrics")) {
                         addOption("azlyrics")
                     }
@@ -356,7 +341,7 @@ object DownloaderUtil {
 
             val request = SpotDLRequest()
             val pathBuilder = StringBuilder()
-            commonRequest(downloadPreferences, url, request, pathBuilder)
+            commonRequest(downloadPreferences, url, request, pathBuilder, operation = "download")
                 .apply {
                     if (useSpotifyPreferences) {
                         if (spotifyClientID.isEmpty() || spotifyClientSecret.isEmpty()) return Result.failure(
@@ -377,7 +362,7 @@ object DownloaderUtil {
                             sdcardUri = sdcardUri
                         )
                     } else {
-                        return Result.failure(th)
+                        Result.failure(th)
                     }
                 }.onSuccess { response ->
                     return when {
@@ -458,7 +443,7 @@ object DownloaderUtil {
                     songUrl = songInfo.url,
                     thumbnailUrl = songInfo.cover_url,
                     songPath = filePath,
-                    songDuration = songInfo.duration,
+                    songDuration = songInfo.duration ?: 0.0,
                     extractor = "Youtube Music",
                 )
             )
@@ -480,7 +465,7 @@ object DownloaderUtil {
 
         val pathBuilder = StringBuilder()
         val downloadPreferences = DownloadPreferences()
-        val request = commonRequest(downloadPreferences, url, SpotDLRequest(), pathBuilder).apply {
+        val request = commonRequest(downloadPreferences, url, SpotDLRequest(), pathBuilder, operation = "download").apply {
             addOption("--threads", downloadPreferences.threads.toString())
         }
 
@@ -505,7 +490,6 @@ object DownloaderUtil {
                         url = url, line = text, progress = progress, isPlaylist = isPlaylist
                     )
                 })
-            //clear all the lines that contains a "…" on it
             val finalResponse = removeDuplicateLines(clearLinesWithEllipsis(response.output))
             onTaskEnded(url, finalResponse, name)
         }.onFailure {
@@ -544,8 +528,8 @@ object DownloaderUtil {
         newPath = newPath.replace("\\{title\\}".toRegex(), songInfo.name)
         newPath = newPath.replace("\\{album-artist\\}".toRegex(), songInfo.album_artist)
         newPath = newPath.replace("\\{genre\\}".toRegex(), songInfo.genres?.joinToString() ?: "")
-        newPath = newPath.replace("\\{year\\}".toRegex(), songInfo.year.toString())
-        newPath = newPath.replace("\\{list-name\\}".toRegex(), songInfo.song_list?.toString() ?: "")
+        newPath = newPath.replace("\\{year\\}".toRegex(), songInfo.year?.toString() ?: "0")
+        newPath = newPath.replace("\\{list-name\\}".toRegex(), songInfo.list_name ?: "")
         newPath = newPath.replace("\\{output-ext\\}".toRegex(), getExtension() ?: "")
 
         return newPath

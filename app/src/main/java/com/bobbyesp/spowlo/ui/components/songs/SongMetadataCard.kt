@@ -62,8 +62,10 @@ fun SongMetadataCard(
         stringResource(id = R.string.song_genres) to genres.joinToString(),
         stringResource(id = R.string.song_disc_number) to disc_number.toString(),
         stringResource(id = R.string.song_disc_count) to disc_count.toString(),
-        stringResource(id = R.string.song_duration) to formatDuration(song.duration),
-        stringResource(id = R.string.song_year) to song.year.toString(),
+        // --- CORRECTED: Provide a default value if duration is null to fix build error ---
+        stringResource(id = R.string.song_duration) to formatDuration(song.duration ?: 0.0),
+        // --- BONUS FIX: Handle nullable year as well ---
+        stringResource(id = R.string.song_year) to (song.year?.toString() ?: "Unknown"),
         stringResource(id = R.string.song_date) to song.date,
         stringResource(id = R.string.song_track_number) to track_number.toString(),
         stringResource(id = R.string.song_spotify_id) to song.song_id,
@@ -150,16 +152,6 @@ fun SongMetadataCard(
                 }
             }
         }
-        /*
-        LazyVerticalGrid(columns = GridCells.Adaptive(150.dp),
-            content = {
-                metadataMap.forEach {
-                    item {
-                        MetadataTag(typeOfMetadata = it.key, metadata = it.value)
-                    }
-                }
-            }, userScrollEnabled = false,
-        )*/
     }
 }
 

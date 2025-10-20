@@ -50,30 +50,33 @@ sealed class Version(
 val currentVersion: Version = Version.Stable(
     versionMajor = 1,
     versionMinor = 5,
-    versionPatch = 3,
+    versionPatch = 4,
 )
 
 val keystorePropertiesFile = rootProject.file("keystore.properties")
+val keystoreProperties = Properties()
+if (keystorePropertiesFile.exists()) {
+    keystoreProperties.load(FileInputStream(keystorePropertiesFile))
+}
 
 val splitApks = !project.hasProperty("noSplits")
 
 android {
-    if (keystorePropertiesFile.exists()) {
-        val keystoreProperties = Properties()
-        keystoreProperties.load(FileInputStream(keystorePropertiesFile))
-        signingConfigs {
-            getByName("debug")
-            {
-                keyAlias = keystoreProperties["keyAlias"].toString()
-                keyPassword = keystoreProperties["keyPassword"].toString()
-                storeFile = file(keystoreProperties["storeFile"]!!)
-                storePassword = keystoreProperties["storePassword"].toString()
+    signingConfigs {
+        create("release") {
+            if (keystorePropertiesFile.exists()) {
+                keyAlias = keystoreProperties["keyAlias"] as String
+                keyPassword = keystoreProperties["keyPassword"] as String
+                storeFile = file(keystoreProperties["storeFile"] as String)
+                storePassword = keystoreProperties["storePassword"] as String
             }
         }
     }
 
     val localProperties = Properties()
-    localProperties.load(FileInputStream(rootProject.file("local.properties")))
+    if(rootProject.file("local.properties").exists()){
+        localProperties.load(FileInputStream(rootProject.file("local.properties")))
+    }
 
     compileSdk = 35
     defaultConfig {
@@ -93,22 +96,13 @@ android {
         ksp {
             arg("room.schemaLocation", "$projectDir/schemas")
         }
-        if (!splitApks)
-            ndk {
-                (properties["ABI_FILTERS"] as String).split(';').forEach {
-                    abiFilters.add(it)
-                }
-            }
-    }
-    if (splitApks)
-        splits {
-            abi {
-                isEnable = !project.hasProperty("noSplits")
-                reset()
-                include("arm64-v8a", "armeabi-v7a")
-                isUniversalApk = false
-            }
+        
+        missingDimensionStrategy("bundling", "bundled")
+        
+        ndk {
+            abiFilters.addAll(listOf("arm64-v8a", "armeabi-v7a"))
         }
+    }
 
     buildTypes {
         release {
@@ -116,35 +110,25 @@ android {
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro"
             )
-            packaging {
-                resources.excludes.add("META-INF/*.kotlin_module")
-            }
-            if (keystorePropertiesFile.exists())
-                signingConfig = signingConfigs.getByName("debug")
-            //add client id and secret to build config
-            buildConfigField("String", "CLIENT_ID", "\"${localProperties["CLIENT_ID"]}\"")
-            buildConfigField(
-                "String",
-                "CLIENT_SECRET",
-                "\"${localProperties["CLIENT_SECRET"]}\""
-            )
+            
+            signingConfig = signingConfigs.getByName("release")
+
+            buildConfigField("String", "CLIENT_ID", "\"${localProperties.getProperty("CLIENT_ID", "YOUR_CLIENT_ID_PLACEHOLDER")}\"")
+            buildConfigField("String", "CLIENT_SECRET", "\"${localProperties.getProperty("CLIENT_SECRET", "YOUR_CLIENT_SECRET_PLACEHOLDER")}\"")
+            
             matchingFallbacks.add(0, "debug")
             matchingFallbacks.add(1, "release")
         }
         debug {
             if (keystorePropertiesFile.exists())
                 signingConfig = signingConfigs.getByName("debug")
-            packaging {
-                resources.excludes.add("META-INF/*.kotlin_module")
-            }
-            buildConfigField("String", "CLIENT_ID", "\"${localProperties["CLIENT_ID"]}\"")
-            buildConfigField(
-                "String",
-                "CLIENT_SECRET",
-                "\"${localProperties["CLIENT_SECRET"]}\""
-            )
-            System.setProperty("CLIENT_ID", "\"${localProperties["CLIENT_ID"]}\"")
-            System.setProperty("CLIENT_SECRET", "\"${localProperties["CLIENT_SECRET"]}\"")
+
+            buildConfigField("String", "CLIENT_ID", "\"${localProperties.getProperty("CLIENT_ID", "YOUR_CLIENT_ID_PLACEHOLDER")}\"")
+            buildConfigField("String", "CLIENT_SECRET", "\"${localProperties.getProperty("CLIENT_SECRET", "YOUR_CLIENT_SECRET_PLACEHOLDER")}\"")
+
+            System.setProperty("CLIENT_ID", "\"${localProperties.getProperty("CLIENT_ID")}\"")
+            System.setProperty("CLIENT_SECRET", "\"${localProperties.getProperty("CLIENT_SECRET")}\"")
+            
             matchingFallbacks.add(0, "debug")
             matchingFallbacks.add(1, "release")
             applicationIdSuffix = ".debug"
@@ -162,20 +146,26 @@ android {
         disable.addAll(listOf("MissingTranslation", "ExtraTranslation"))
     }
 
+    @Suppress("DEPRECATION")
     applicationVariants.all {
+        val variant = this
         outputs.all {
-            (this as com.android.build.gradle.internal.api.BaseVariantOutputImpl).outputFileName =
-                "Spowlo-${defaultConfig.versionName}-${name}.apk"
+            val output = this as com.android.build.gradle.internal.api.BaseVariantOutputImpl
+            output.outputFileName = "Spowlo-v${variant.versionName}-${variant.name}.apk"
         }
     }
 
     kotlinOptions {
         freeCompilerArgs = freeCompilerArgs + "-opt-in=kotlin.RequiresOptIn"
     }
+    
+    // --- FINAL AND DEFINITIVE FIX: Consolidated all packaging rules into a single block ---
+    // This ensures the merge strategy is always applied, for all build types.
     packaging {
         resources {
-            excludes += "/META-INF/{AL2.0,LGPL2.1}"
-            excludes += "META-INF/*.kotlin_module"
+            // Using pickFirst is slightly more specific than merge, but for this context it's the strongest strategy.
+            pickFirsts += "META-INF/**" 
+            excludes += "META-INF/*.kotlin_module" 
         }
         jniLibs.useLegacyPackaging = true
     }
@@ -187,18 +177,14 @@ kotlin {
 }
 
 dependencies {
-
     implementation(project(":color"))
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.appcompat)
     implementation(libs.android.material)
     implementation(libs.androidx.activity.compose)
-
     implementation(libs.androidx.lifecycle.runtimeCompose)
     implementation(libs.androidx.lifecycle.viewModelCompose)
-
     implementation(platform(libs.androidx.compose.bom))
-
     implementation(libs.androidx.compose.ui)
     implementation(libs.androidx.compose.ui.tooling.preview)
     implementation(libs.androidx.compose.material)
@@ -206,9 +192,7 @@ dependencies {
     implementation(libs.androidx.compose.material3)
     implementation(libs.androidx.compose.material3.windowSizeClass)
     implementation(libs.androidx.compose.foundation)
-
     implementation(libs.androidx.navigation.compose)
-
     implementation(libs.accompanist.systemuicontroller)
     implementation(libs.accompanist.permissions)
     implementation(libs.accompanist.navigation.animation)
@@ -218,42 +202,28 @@ dependencies {
     implementation(libs.accompanist.pager.indicators)
     implementation(libs.paging.compose)
     implementation(libs.paging.runtime)
-
     implementation(libs.coil.kt.compose)
-
     implementation(libs.kotlinx.serialization.json)
-
     implementation(libs.androidx.hilt.navigation.compose)
     ksp(libs.hilt.ext.compiler)
     implementation(libs.hilt.android)
     ksp(libs.hilt.compiler)
-
     implementation(libs.room.runtime)
     implementation(libs.room.ktx)
     ksp(libs.room.compiler)
-
-    //spotDL library
-    implementation(libs.spotdl.android.library)
-    implementation(libs.spotdl.android.ffmpeg)
-
+    implementation(project(":library"))
+    implementation(project(":ffmpeg"))
+    implementation(project(":common"))
     implementation(libs.spotify.api.android)
-
-    // okhttp
     implementation(libs.okhttp)
     implementation(libs.bundles.ktor)
-    //MMKV
     implementation(libs.mmkv)
-
     implementation(libs.markdown)
     implementation(libs.customtabs)
-
     debugImplementation(libs.crash.handler)
-
     testImplementation(libs.junit4)
     androidTestImplementation(libs.androidx.test.ext)
     androidTestImplementation(libs.androidx.test.espresso.core)
-//    androidTestImplementation(libs.androidx.compose.ui.test)
-
     debugImplementation(libs.androidx.compose.ui.tooling)
 }
 

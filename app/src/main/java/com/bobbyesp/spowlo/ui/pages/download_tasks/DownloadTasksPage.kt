@@ -23,7 +23,6 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.navigation.NavController
 import com.bobbyesp.spowlo.Downloader
 import com.bobbyesp.spowlo.R
 import com.bobbyesp.spowlo.ui.components.BackButton
@@ -63,43 +62,39 @@ fun DownloadTasksPage(
             contentPadding = PaddingValues(24.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            items(Downloader.mutableTaskList.values.toList()) {
-                it.run {
-                    DownloadingTaskItem(
-                        status = state.toStatus(),
-                        progress = if (state is Downloader.DownloadTask.State.Running) state.progress else 0f,
-                        progressText = currentLine,
-                        url = url,
-                        header = it.taskName,
-                        onCopyError = {
-                            onCopyError(clipboardManager)
-                        },
-                        onCancel = {
-                            onCancel()
-                        },
-                        onRestart = {
-                            onRestart()
-                        },
-                        onCopyLog = {
-                            onCopyLog(clipboardManager)
-                        },
-                        onShowLog = {
-                            onNavigateToDetail(hashCode())
-                        },
-                        onCopyLink = {
-                            onCopyUrl(clipboardManager)
-                        })
-                }
+            items(Downloader.mutableTaskList.values.toList()) { task ->
+                DownloadingTaskItem(
+                    status = task.state.toStatus(),
+                    progress = if (task.state is Downloader.DownloadTask.State.Running) (task.state as Downloader.DownloadTask.State.Running).progress else 0f,
+                    progressText = task.currentLine,
+                    // --- ADDED: Pass the error report to the Composable ---
+                    errorText = if (task.state is Downloader.DownloadTask.State.Error) (task.state as Downloader.DownloadTask.State.Error).errorReport else null,
+                    url = task.url,
+                    header = task.taskName,
+                    onCopyError = {
+                        task.onCopyError(clipboardManager)
+                    },
+                    onCancel = {
+                        task.onCancel()
+                    },
+                    onRestart = {
+                        task.onRestart()
+                    },
+                    onCopyLog = {
+                        task.onCopyLog(clipboardManager)
+                    },
+                    onShowLog = {
+                        onNavigateToDetail(task.hashCode())
+                    },
+                    onCopyLink = {
+                        task.onCopyUrl(clipboardManager)
+                    })
             }
         }
         if (Downloader.mutableTaskList.isEmpty()) {
-            Box(
-                modifier = Modifier.fillMaxSize(),
-            ) {
+            Box(modifier = Modifier.fillMaxSize()) {
                 Column(
-                    modifier = Modifier
-                        .align(Alignment.Center)
-                        .padding(horizontal = 24.dp),
+                    modifier = Modifier.align(Alignment.Center).padding(horizontal = 24.dp),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
                     Text(
@@ -107,11 +102,7 @@ fun DownloadTasksPage(
                         style = MaterialTheme.typography.labelLarge,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
-                    HorizontalDivider(
-                        modifier = Modifier.padding(
-                            vertical = 24.dp, horizontal = 4.dp
-                        )
-                    )
+                    HorizontalDivider(modifier = Modifier.padding(vertical = 24.dp, horizontal = 4.dp))
                     Text(
                         text = stringResource(R.string.no_running_downloads_description),
                         style = MaterialTheme.typography.labelLarge,
@@ -120,7 +111,6 @@ fun DownloadTasksPage(
                     )
                 }
             }
-
         }
     }
 }
@@ -129,7 +119,5 @@ private fun Downloader.DownloadTask.State.toStatus(): TaskState = when (this) {
     Downloader.DownloadTask.State.Completed -> TaskState.FINISHED
     is Downloader.DownloadTask.State.Error -> TaskState.ERROR
     is Downloader.DownloadTask.State.Running -> TaskState.RUNNING
-    else -> {
-        TaskState.ERROR
-    }
+    Downloader.DownloadTask.State.Canceled -> TaskState.CANCELED
 }

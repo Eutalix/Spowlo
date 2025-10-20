@@ -5,9 +5,11 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.SheetState
 import androidx.lifecycle.ViewModel
 import com.bobbyesp.library.domain.model.SpotifySong
+import com.bobbyesp.spowlo.App
 import com.bobbyesp.spowlo.Downloader
 import com.bobbyesp.spowlo.Downloader.showErrorMessage
 import com.bobbyesp.spowlo.R
+import com.bobbyesp.spowlo.utils.ToastUtil
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -52,6 +54,12 @@ class DownloaderViewModel : ViewModel() {
     }
 
     fun requestMetadata() {
+        // --- ADDED: Check if the app is initialized before proceeding ---
+        if (!App.isInitialized.value) {
+            ToastUtil.makeToast(R.string.app_is_initializing)
+            return
+        }
+
         val url = viewStateFlow.value.url
         Downloader.clearErrorState()
         if (!Downloader.isDownloaderAvailable())
@@ -64,6 +72,11 @@ class DownloaderViewModel : ViewModel() {
     }
 
     fun startDownloadSong(skipInfoFetch: Boolean = false) {
+        // --- ADDED: Check if the app is initialized before proceeding ---
+        if (!App.isInitialized.value) {
+            ToastUtil.makeToast(R.string.app_is_initializing)
+            return
+        }
 
         val url = viewStateFlow.value.url
         Downloader.clearErrorState()
@@ -83,5 +96,4 @@ class DownloaderViewModel : ViewModel() {
     fun onShareIntentConsumed() {
         mutableViewStateFlow.update { it.copy(isUrlSharingTriggered = false) }
     }
-
 }

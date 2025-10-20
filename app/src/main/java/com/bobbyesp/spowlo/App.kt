@@ -15,10 +15,11 @@ import android.os.Build
 import android.os.Environment
 import android.os.IBinder
 import android.os.Looper
-import android.widget.Toast
 import androidx.core.content.getSystemService
+import androidx.room.Room
 import com.bobbyesp.ffmpeg.FFmpeg
 import com.bobbyesp.library.SpotDL
+import com.bobbyesp.spowlo.database.AppDatabase
 import com.bobbyesp.spowlo.utils.AUDIO_DIRECTORY
 import com.bobbyesp.spowlo.utils.DownloaderUtil
 import com.bobbyesp.spowlo.utils.EXTRA_DIRECTORY
@@ -31,13 +32,17 @@ import com.bobbyesp.spowlo.utils.PreferencesUtil.getString
 import com.bobbyesp.spowlo.utils.ToastUtil
 import com.google.android.material.color.DynamicColors
 import com.tencent.mmkv.MMKV
+import dagger.hilt.android.HiltAndroidApp
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import java.io.File
 import java.util.Calendar
 
+@HiltAndroidApp
 class App : Application() {
     override fun onCreate() {
         super.onCreate()
@@ -47,7 +52,7 @@ class App : Application() {
             if (Build.VERSION.SDK_INT >= 33) getPackageInfo(
                 packageName, PackageManager.PackageInfoFlags.of(0)
             ) else
-                getPackageInfo(packageName, 0)
+                @Suppress("DEPRECATION") getPackageInfo(packageName, 0)
         }
         applicationScope = CoroutineScope(SupervisorJob())
         DynamicColors.applyToActivitiesIfAvailable(this)
@@ -57,16 +62,36 @@ class App : Application() {
 
         applicationScope.launch((Dispatchers.IO)) {
             try {
+                // Build the Room database instance.
+                val database = Room.databaseBuilder(
+                    applicationContext,
+                    AppDatabase::class.java, "spowlo-database"
+                ).fallbackToDestructiveMigration().build()
+                
+                // Get the DAO for song information.
+                val songsDao = database.songsInfoDao()
+
+                // Initialize the SpotDL library.
                 SpotDL.getInstance().init(this@App)
+                
+                // Initialize FFmpeg.
                 FFmpeg.init(this@App)
+                
+                // Initialize our Downloader singleton with the DAO.
+                Downloader.initialize(songsDao)
+                
                 DownloaderUtil.getCookiesContentFromDatabase().getOrNull()?.let {
                     FilesUtil.writeContentToFile(it, getCookiesFile())
                 }
+
+                // --- ADDED: Signal that all initializations are finished ---
+                _isInitialized.value = true
+
             } catch (e: Exception) {
                 Looper.prepare()
                 ToastUtil.makeToast(text = e.message ?: "Unknown error")
                 e.printStackTrace()
-                clipboard.setPrimaryClip(ClipData.newPlainText(null, e.message))
+                clipboard.setPrimaryClip(ClipData.newPlainText(null, e.stackTraceToString()))
             }
         }
         audioDownloadDir = AUDIO_DIRECTORY.getString(
@@ -96,6 +121,11 @@ class App : Application() {
     }
 
     companion object {
+        // --- ADDED: A state flow to signal when initialization is complete ---
+        private val _isInitialized = MutableStateFlow(false)
+        val isInitialized = _isInitialized.asStateFlow()
+        // ---------------------------------------------------------------------
+
         private const val PRIVATE_DIRECTORY_SUFFIX = ".Spowlo"
         lateinit var clipboard: ClipboardManager
         lateinit var audioDownloadDir: String
@@ -160,6 +190,7 @@ class App : Application() {
             val versionCode = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
                 packageInfo.longVersionCode
             } else {
+                @Suppress("DEPRECATION")
                 packageInfo.versionCode.toLong()
             }
             val release = if (Build.VERSION.SDK_INT >= 30) {

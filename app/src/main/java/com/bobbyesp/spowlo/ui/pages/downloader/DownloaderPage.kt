@@ -179,7 +179,6 @@ fun DownloaderPage(
                 }
             }
         }
-        //downloadCallback()
         downloaderViewModel.onShareIntentConsumed()
     }
 
@@ -205,22 +204,19 @@ fun DownloaderPage(
         showSongCard = true,
         showDownloadProgress = taskState.taskId.isNotEmpty(),
         pasteCallback = {
-            matchUrlFromClipboard(
-                string = clipboardManager.getText().toString(),
-            ).let { url ->
-                downloaderViewModel.updateUrl(url)
-                if (url.isNotEmpty()) {
-                    if (CONFIGURE.getBoolean()) {
-                        navigateToDownloaderSheet()
-                    } else {
-                        if (url.contains("track")) {
-                            ToastUtil.makeToast(R.string.fetching_metadata)
-                            downloaderViewModel.requestMetadata()
-                        } else if (url.contains("album") || url.contains("artist") || url.contains(
-                                "playlist"
-                            )
-                        ) {
+            clipboardManager.getText()?.toString()?.let {
+                matchUrlFromClipboard(it).let { url ->
+                    downloaderViewModel.updateUrl(url)
+                    if (url.isNotEmpty()) {
+                        if (CONFIGURE.getBoolean()) {
                             navigateToDownloaderSheet()
+                        } else {
+                            if (url.contains("track")) {
+                                ToastUtil.makeToast(R.string.fetching_metadata)
+                                downloaderViewModel.requestMetadata()
+                            } else if (url.contains("album") || url.contains("artist") || url.contains("playlist")) {
+                                navigateToDownloaderSheet()
+                            }
                         }
                     }
                 }
@@ -256,6 +252,9 @@ fun DownloaderPageImplementation(
     onUrlChanged: (String) -> Unit = {},
     content: @Composable () -> Unit
 ) {
+    // --- ADDED: State to track if the app core is initialized ---
+    val isAppInitialized by App.isInitialized.collectAsStateWithLifecycle()
+
     Scaffold(modifier = Modifier.fillMaxSize(), topBar = {
         TopAppBar(
             title = {},
@@ -333,7 +332,9 @@ fun DownloaderPageImplementation(
                         )
                     }
                     AnimatedVisibility(
-                        visible = downloaderState !is Downloader.State.Idle, modifier = Modifier
+                        // --- MODIFIED: Show indicator if downloading OR if app is not yet initialized ---
+                        visible = !isAppInitialized || downloaderState !is Downloader.State.Idle,
+                        modifier = Modifier
                     ) {
                         CircularProgressIndicator(
                             modifier = Modifier.size(24.dp),
@@ -495,7 +496,7 @@ fun InputUrl(
                     .clip(MaterialTheme.shapes.large),
             )
             else LinearProgressIndicator(
-                progress = progressAnimationValue,
+                progress = { progressAnimationValue },
                 modifier = Modifier
                     .weight(0.75f)
                     .clip(MaterialTheme.shapes.large),

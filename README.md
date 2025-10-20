@@ -7,23 +7,27 @@
 A Spotify songs downloader powered by [spotDL](https://github.com/spotDL/spotify-downloader/) made with Jetpack Compose and Material You
 
 [![Telegram Channel](https://img.shields.io/badge/Telegram-Spowlo-green?style=flat&logo=telegram)](https://t.me/spowlo_chatroom)
-![GitHub all releases](https://img.shields.io/github/downloads/BobbyESP/Spowlo/total?label=Downloads&logo=github)
-![GitHub Repo stars](https://img.shields.io/github/stars/BobbyESP/Spowlo?color=informational&label=Stars)
+![GitHub all releases](https://img.shields.io/github/downloads/Eutalix/Spowlo/total?label=Downloads&logo=github)
+![GitHub Repo stars](https://img.shields.io/github/stars/Eutalix/Spowlo?color=informational&label=Stars)
  
-   ![GitHub code size in bytes](https://img.shields.io/github/languages/code-size/BobbyESP/Spowlo?logo=github&logoColor=%23fff&style=for-the-badge)
-  ![GitHub top language](https://img.shields.io/github/languages/top/BobbyESP/Spowlo?style=for-the-badge)
+   ![GitHub code size in bytes](https://img.shields.io/github/languages/code-size/Eutalix/Spowlo?logo=github&logoColor=%23fff&style=for-the-badge)
+  ![GitHub top language](https://img.shields.io/github/languages/top/Eutalix/Spowlo?style=for-the-badge)
 </div>
 
-## ⚠️📖 Important notice
-Hello everyone,
+## ✨ Community Revitalization! ✨
+Hello Spowlo enthusiasts!
 
-I want to share a quick update regarding the future of Spowlo. Due to ongoing challenges, including instability with SpotDL and increased personal commitments, I’m currently taking a break from maintaining the app. The changes from Spotify have also made it harder to keep things running smoothly.
+This project was left in an unmaintained state, and its core functionality was broken due to outdated dependencies. As a fan of the app, I've taken the initiative to update and stabilize it to ensure it remains usable for the community.
 
-While this isn't a final goodbye, I will reflect and assess the best way forward.
+The app has been successfully updated to use the latest `spotdl` engine, and the main download feature (via in-app search) is now fully functional again! The project has also been stabilized with a modern CI/CD pipeline for automated releases.
 
-If you have any questions or concerns, feel free to reach out in our [Telegram channel](https://t.me/spowlo_chatroom).
+This is now a community-driven effort. If you're a developer, your contributions are more than welcome to help fix the remaining bugs and add new features.
 
-Thank you for your understanding and support!
+**Current Status:**
+*   ✅ **Downloads via Search:** Working perfectly.
+*   ⚠️ **Pasting Links:** This feature is currently broken and is the main priority. Help is wanted!
+
+Let's work together to keep this great project alive! Feel free to open an issue or a pull request.
 
 ## 📸 Screenshots
 
@@ -56,28 +60,28 @@ Spowlo uses YT Music and YouTube to download the songs. This is because Spotify 
 
 ## ⬇️Download
 
-For most devices, it is recommended to install the **ARM64-v8a** version of the apks
+- Download the latest version from [GitHub releases](https://github.com/Eutalix/Spowlo/releases/latest).
 
-- Download the latest stable version from [GitHub releases](https://github.com/BobbyESP/Spowlo/releases/latest)
-
-## Translation
-
-We are using Hosted Weblate for the translations of the app. if you want to contribute follow [this link](https://hosted.weblate.org/engage/spowlo/) 🖇️ 
-
+**Note:** The current builds are optimized for `arm64-v8a` devices (most modern phones). Support for older `armeabi-v7a` devices is not guaranteed as the required Python environment for it was incomplete in the original project.
 
 ## 📖Credits
-Thanks to [xnetcat](https://github.com/xnetcat) for it's help with some spotDL related things!
 
-Thanks to [Seal](https://github.com/JunkFood02/Seal) and [JunkFood02](https://github.com/JunkFood02) for some of the code of the app and UI ideas. (Without you, this app would not have existed). I learnt a lot about architectures, corroutines, Jetpack Compose...
+A special thanks to the community members and projects that made this app possible. The following are the credits from the original developer, which we gratefully preserve:
 
-[Philipp Lackner](https://www.youtube.com/c/PhilippLackner). Infinite thanks to you, Philipp. You made me learn infinite things with just a few videos. This guy explains literally everything about what is he coding, make apps just to make the community learn, and give us some amazing utilities. Without he, probably I wouldn't started coding for Android. 
+> Thanks to [xnetcat](https://github.com/xnetcat) for it's help with some spotDL related things!
+>
+> Thanks to [Seal](https://github.com/JunkFood02/Seal) and [JunkFood02](https://github.com/JunkFood02) for some of the code of the app and UI ideas. (Without you, this app would not have existed). I learnt a lot about architectures, corroutines, Jetpack Compose...
+>
+> [Philipp Lackner](https://www.youtube.com/c/PhilippLackner). Infinite thanks to you, Philipp. You made me learn infinite things with just a few videos. This guy explains literally everything about what is he coding, make apps just to make the community learn, and give us some amazing utilities. Without he, probably I wouldn't started coding for Android. 
+>
+> [Material color utilities](https://github.com/material-foundation/material-color-utilities) for having Material You coloring support in any device.
+>
+> Katoka, for the app name. (Thank you! Without your moral support I couldn't have done the app hahaha)
+>
+> [MoureDev by Brais Moure](https://www.youtube.com/c/MouredevApps)
+>
+> [Programación Android by AristiDevs](https://www.youtube.com/c/AristiDevs)
+>
+> And also thank you all for the internal tests of the app!
 
-[Material color utilities](https://github.com/material-foundation/material-color-utilities) for having Material You coloring support in any device.
-
-Katoka, for the app name. (Thank you! Without your moral support I couldn't have done the app hahaha)
-
-[MoureDev by Brais Moure](https://www.youtube.com/c/MouredevApps)
-
-[Programación Android by AristiDevs](https://www.youtube.com/c/AristiDevs)
-
-And also thank you all for the internal tests of the app!
+Additionally, I would like to thank the original developer, [**BobbyESP**](https://github.com/BobbyESP), for creating this amazing project and laying the foundation for all of us to build upon.

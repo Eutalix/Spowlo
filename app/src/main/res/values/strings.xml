@@ -213,7 +213,6 @@
     <string name="library_settings">SpotDL library settings</string>
     <string name="translate">Translate the app!</string>
     <string name="translate_desc">Help translating the app to your language in Hosted Weblate!</string>
-
     <string name="la_nb" translatable="false">Bokmål</string>
     <string name="la_cs" translatable="false">Čeština</string>
     <string name="la_de" translatable="false">Deutsch</string>
@@ -248,7 +247,6 @@
     <string name="la_az" translatable="false">Azərbaycanca</string>
     <string name="la_nn" translatable="false">Nynorsk</string>
     <string name="la_pa" translatable="false">ਪੰਜਾਬੀ</string>
-
     <string name="update_available">A new update is available!</string>
     <string name="dont_filter_results">Don\'t filter results</string>
     <string name="dont_filter_results_desc">Do not filter searching results in the available platforms.</string>
@@ -300,7 +298,6 @@
     <string name="restart_task">Restart task</string>
     <string name="download_tasks">Download tasks</string>
     <string name="tasks">Tasks</string>
-    <string name="error">An error occurred</string>
     <string name="font_size">Font size</string>
     <string name="channel_name">Download</string>
     <string name="service_channel_name">Download Starting</string>
@@ -370,4 +367,7 @@
     <string name="artist_top_tracks">Top Tracks</string>
     <string name="artist_top_albums">Top Albums</string>
     <string name="uncomplete_playlist">Right now Spowlo may not show all songs due to the lack of pagination, but when trying to download the full playlist, all the songs will be downloaded. This is already fixed in the upcoming Spowlo 2.0.0</string>
+
+    <!-- ADDED: New string for the initialization toast -->
+    <string name="app_is_initializing">App is initializing, please wait a moment…</string>
 </resources>
