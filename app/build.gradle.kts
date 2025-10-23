@@ -12,6 +12,8 @@ plugins {
 }
 apply(plugin = "dagger.hilt.android.plugin")
 
+// Versioning with build component support (Stable keeps X.Y.Z as versionName)
+// versionCode = major*1_000_000 + minor*10_000 + patch*100 + build
 sealed class Version(
     open val versionMajor: Int,
     val versionMinor: Int,
@@ -29,8 +31,13 @@ sealed class Version(
             "${versionMajor}.${versionMinor}.${versionPatch}-beta.$versionBuild"
     }
 
-    class Stable(versionMajor: Int, versionMinor: Int, versionPatch: Int) :
-        Version(versionMajor, versionMinor, versionPatch) {
+    // UPDATED: Stable accepts versionBuild but keeps plain X.Y.Z as versionName
+    class Stable(
+        versionMajor: Int,
+        versionMinor: Int,
+        versionPatch: Int,
+        versionBuild: Int = 0
+    ) : Version(versionMajor, versionMinor, versionPatch, versionBuild) {
         override fun toVersionName(): String =
             "${versionMajor}.${versionMinor}.${versionPatch}"
     }
@@ -47,10 +54,12 @@ sealed class Version(
     }
 }
 
+// Keep 1.5.4 as versionName, bump only versionCode via versionBuild
 val currentVersion: Version = Version.Stable(
     versionMajor = 1,
     versionMinor = 5,
     versionPatch = 4,
+    versionBuild = 1
 )
 
 val keystorePropertiesFile = rootProject.file("keystore.properties")
@@ -96,9 +105,10 @@ android {
         ksp {
             arg("room.schemaLocation", "$projectDir/schemas")
         }
-        
+
+        // Keep correct dimension resolution when using the library module flavors
         missingDimensionStrategy("bundling", "bundled")
-        
+
         ndk {
             abiFilters.addAll(listOf("arm64-v8a", "armeabi-v7a"))
         }
@@ -110,12 +120,12 @@ android {
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro"
             )
-            
+
             signingConfig = signingConfigs.getByName("release")
 
             buildConfigField("String", "CLIENT_ID", "\"${localProperties.getProperty("CLIENT_ID", "YOUR_CLIENT_ID_PLACEHOLDER")}\"")
             buildConfigField("String", "CLIENT_SECRET", "\"${localProperties.getProperty("CLIENT_SECRET", "YOUR_CLIENT_SECRET_PLACEHOLDER")}\"")
-            
+
             matchingFallbacks.add(0, "debug")
             matchingFallbacks.add(1, "release")
         }
@@ -128,7 +138,7 @@ android {
 
             System.setProperty("CLIENT_ID", "\"${localProperties.getProperty("CLIENT_ID")}\"")
             System.setProperty("CLIENT_SECRET", "\"${localProperties.getProperty("CLIENT_SECRET")}\"")
-            
+
             matchingFallbacks.add(0, "debug")
             matchingFallbacks.add(1, "release")
             applicationIdSuffix = ".debug"
@@ -158,14 +168,13 @@ android {
     kotlinOptions {
         freeCompilerArgs = freeCompilerArgs + "-opt-in=kotlin.RequiresOptIn"
     }
-    
-    // --- FINAL AND DEFINITIVE FIX: Consolidated all packaging rules into a single block ---
-    // This ensures the merge strategy is always applied, for all build types.
+
+    // Consolidated packaging rules
     packaging {
         resources {
-            // Using pickFirst is slightly more specific than merge, but for this context it's the strongest strategy.
-            pickFirsts += "META-INF/**" 
-            excludes += "META-INF/*.kotlin_module" 
+            // pickFirst to avoid conflicts under META-INF when merging dependencies
+            pickFirsts += "META-INF/**"
+            excludes += "META-INF/*.kotlin_module"
         }
         jniLibs.useLegacyPackaging = true
     }
