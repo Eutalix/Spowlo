@@ -49,7 +49,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.bobbyesp.spowlo.App
@@ -80,6 +79,7 @@ import com.bobbyesp.spowlo.utils.ToastUtil
 import com.bobbyesp.spowlo.utils.USE_CACHING
 import com.bobbyesp.spowlo.utils.USE_SPOTIFY_CREDENTIALS
 import com.bobbyesp.spowlo.utils.USE_YT_METADATA
+import com.bobbyesp.spowlo.utils.UrlValidator // NEW: normalize incoming URL
 import com.google.accompanist.permissions.ExperimentalPermissionsApi
 import com.google.accompanist.permissions.PermissionStatus
 import com.google.accompanist.permissions.rememberPermissionState
@@ -104,7 +104,7 @@ fun DownloaderBottomSheet(
     val scope = rememberCoroutineScope()
 
     val pages =
-        listOf(BottomSheetPages.MAIN, BottomSheetPages.TERTIARY) //, BottomSheetPages.SECONDARY
+        listOf(BottomSheetPages.MAIN, BottomSheetPages.TERTIARY) // secondary page currently unused
     val pagerState = rememberPagerState(
         initialPage = 0, initialPageOffsetFraction = 0f
     ) {
@@ -130,89 +130,18 @@ fun DownloaderBottomSheet(
 
     val settings = PreferencesUtil
 
-    var preserveOriginalAudio by remember {
-        mutableStateOf(
-            settings.getValue(
-                ORIGINAL_AUDIO
-            )
-        )
-    }
-
-    var useSpotifyCredentials by remember {
-        mutableStateOf(
-            settings.getValue(
-                USE_SPOTIFY_CREDENTIALS
-            )
-        )
-    }
-
-    var useYtMetadata by remember {
-        mutableStateOf(
-            settings.getValue(
-                USE_YT_METADATA
-            )
-        )
-    }
-
-    var useCookies by remember {
-        mutableStateOf(
-            settings.getValue(
-                COOKIES
-            )
-        )
-    }
-
-    var useCaching by remember {
-        mutableStateOf(
-            settings.getValue(
-                USE_CACHING
-            )
-        )
-    }
-
-    var dontFilter by remember {
-        mutableStateOf(
-            settings.getValue(
-                DONT_FILTER_RESULTS
-            )
-        )
-    }
-
-    var downloadLyrics by remember {
-        mutableStateOf(
-            settings.getValue(DOWNLOAD_LYRICS)
-        )
-    }
-
-    var useSponsorBlock by remember {
-        mutableStateOf(
-            settings.getValue(SPONSORBLOCK)
-        )
-    }
-
-    var onlyVerifiedResults by remember {
-        mutableStateOf(
-            PreferencesUtil.getValue(ONLY_VERIFIED_RESULTS)
-        )
-    }
-
-    var skipExplicit by remember {
-        mutableStateOf(
-            PreferencesUtil.getValue(SKIP_EXPLICIT)
-        )
-    }
-
-    var generateLRC by remember {
-        mutableStateOf(
-            PreferencesUtil.getValue(GENERATE_LRC)
-        )
-    }
-
-    var skipAlbumArt by remember {
-        mutableStateOf(
-            PreferencesUtil.getValue(SKIP_ALBUM_ART)
-        )
-    }
+    var preserveOriginalAudio by remember { mutableStateOf(settings.getValue(ORIGINAL_AUDIO)) }
+    var useSpotifyCredentials by remember { mutableStateOf(settings.getValue(USE_SPOTIFY_CREDENTIALS)) }
+    var useYtMetadata by remember { mutableStateOf(settings.getValue(USE_YT_METADATA)) }
+    var useCookies by remember { mutableStateOf(settings.getValue(COOKIES)) }
+    var useCaching by remember { mutableStateOf(settings.getValue(USE_CACHING)) }
+    var dontFilter by remember { mutableStateOf(settings.getValue(DONT_FILTER_RESULTS)) }
+    var downloadLyrics by remember { mutableStateOf(settings.getValue(DOWNLOAD_LYRICS)) }
+    var useSponsorBlock by remember { mutableStateOf(settings.getValue(SPONSORBLOCK)) }
+    var onlyVerifiedResults by remember { mutableStateOf(PreferencesUtil.getValue(ONLY_VERIFIED_RESULTS)) }
+    var skipExplicit by remember { mutableStateOf(PreferencesUtil.getValue(SKIP_EXPLICIT)) }
+    var generateLRC by remember { mutableStateOf(PreferencesUtil.getValue(GENERATE_LRC)) }
+    var skipAlbumArt by remember { mutableStateOf(PreferencesUtil.getValue(SKIP_ALBUM_ART)) }
 
     var showAudioFormatDialog by remember { mutableStateOf(false) }
     var showAudioQualityDialog by remember { mutableStateOf(false) }
@@ -252,7 +181,6 @@ fun DownloaderBottomSheet(
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                     color = MaterialTheme.colorScheme.onSurface,
-                    textAlign = TextAlign.Center,
                     fontWeight = FontWeight.Bold
                 )
             }
@@ -287,9 +215,7 @@ fun DownloaderBottomSheet(
                         text = { Text(text = page) },
                         selected = pagerState.currentPage == index,
                         onClick = {
-                            scope.launch {
-                                pagerState.animateScrollToPage(index)
-                            }
+                            scope.launch { pagerState.animateScrollToPage(index) }
                         },
                     )
                 }
@@ -318,11 +244,7 @@ fun DownloaderBottomSheet(
                                 selected = preserveOriginalAudio,
                                 onClick = {
                                     preserveOriginalAudio = !preserveOriginalAudio
-                                    scope.launch {
-                                        settings.updateValue(
-                                            ORIGINAL_AUDIO, preserveOriginalAudio
-                                        )
-                                    }
+                                    scope.launch { settings.updateValue(ORIGINAL_AUDIO, preserveOriginalAudio) }
                                 })
                             ButtonChip(
                                 label = stringResource(id = R.string.audio_format),
@@ -349,11 +271,7 @@ fun DownloaderBottomSheet(
                                 selected = useSpotifyCredentials,
                                 onClick = {
                                     useSpotifyCredentials = !useSpotifyCredentials
-                                    scope.launch {
-                                        settings.updateValue(
-                                            USE_SPOTIFY_CREDENTIALS, useSpotifyCredentials
-                                        )
-                                    }
+                                    scope.launch { settings.updateValue(USE_SPOTIFY_CREDENTIALS, useSpotifyCredentials) }
                                 })
                             ButtonChip(
                                 label = stringResource(id = R.string.client_id),
@@ -368,14 +286,9 @@ fun DownloaderBottomSheet(
                                 onClick = { showClientSecretDialog = true },
                             )
                         }
-
                     }
                 }
-
-                BottomSheetPages.SECONDARY -> {
-
-                }
-
+                BottomSheetPages.SECONDARY -> Unit
                 BottomSheetPages.TERTIARY -> {
                     Column(
                         modifier = Modifier
@@ -395,11 +308,8 @@ fun DownloaderBottomSheet(
                                 selected = useCaching,
                                 onClick = {
                                     useCaching = !useCaching
-                                    scope.launch {
-                                        settings.updateValue(USE_CACHING, useCaching)
-                                    }
+                                    scope.launch { settings.updateValue(USE_CACHING, useCaching) }
                                 })
-
                             ButtonChip(
                                 label = stringResource(id = R.string.output_format),
                                 icon = Icons.Outlined.Output,
@@ -420,23 +330,15 @@ fun DownloaderBottomSheet(
                                 selected = useSponsorBlock,
                                 onClick = {
                                     useSponsorBlock = !useSponsorBlock
-                                    scope.launch {
-                                        settings.updateValue(SPONSORBLOCK, useSponsorBlock)
-                                    }
+                                    scope.launch { settings.updateValue(SPONSORBLOCK, useSponsorBlock) }
                                 })
-
                             AudioFilterChip(
                                 label = stringResource(id = R.string.only_verified_results),
                                 animated = true,
                                 selected = onlyVerifiedResults,
                                 onClick = {
                                     onlyVerifiedResults = !onlyVerifiedResults
-                                    scope.launch {
-                                        settings.updateValue(
-                                            ONLY_VERIFIED_RESULTS,
-                                            onlyVerifiedResults
-                                        )
-                                    }
+                                    scope.launch { settings.updateValue(ONLY_VERIFIED_RESULTS, onlyVerifiedResults) }
                                 })
                             AudioFilterChip(
                                 label = stringResource(id = R.string.skip_explict),
@@ -444,9 +346,7 @@ fun DownloaderBottomSheet(
                                 selected = skipExplicit,
                                 onClick = {
                                     skipExplicit = !skipExplicit
-                                    scope.launch {
-                                        settings.updateValue(SKIP_EXPLICIT, skipExplicit)
-                                    }
+                                    scope.launch { settings.updateValue(SKIP_EXPLICIT, skipExplicit) }
                                 })
                             AudioFilterChip(
                                 label = stringResource(id = R.string.generate_lrc),
@@ -454,9 +354,7 @@ fun DownloaderBottomSheet(
                                 selected = generateLRC,
                                 onClick = {
                                     generateLRC = !generateLRC
-                                    scope.launch {
-                                        settings.updateValue(GENERATE_LRC, generateLRC)
-                                    }
+                                    scope.launch { settings.updateValue(GENERATE_LRC, generateLRC) }
                                 })
                             AudioFilterChip(
                                 label = stringResource(id = R.string.skip_album_art),
@@ -464,9 +362,7 @@ fun DownloaderBottomSheet(
                                 selected = skipAlbumArt,
                                 onClick = {
                                     skipAlbumArt = !skipAlbumArt
-                                    scope.launch {
-                                        settings.updateValue(SKIP_ALBUM_ART, skipAlbumArt)
-                                    }
+                                    scope.launch { settings.updateValue(SKIP_ALBUM_ART, skipAlbumArt) }
                                 })
                         }
                         DrawerSheetSubtitle(text = stringResource(id = R.string.experimental_features))
@@ -482,9 +378,7 @@ fun DownloaderBottomSheet(
                                 selected = downloadLyrics,
                                 onClick = {
                                     downloadLyrics = !downloadLyrics
-                                    scope.launch {
-                                        settings.updateValue(DOWNLOAD_LYRICS, downloadLyrics)
-                                    }
+                                    scope.launch { settings.updateValue(DOWNLOAD_LYRICS, downloadLyrics) }
                                 })
                             AudioFilterChip(
                                 label = stringResource(id = R.string.dont_filter_results),
@@ -492,9 +386,7 @@ fun DownloaderBottomSheet(
                                 animated = true,
                                 onClick = {
                                     dontFilter = !dontFilter
-                                    scope.launch {
-                                        settings.updateValue(DONT_FILTER_RESULTS, dontFilter)
-                                    }
+                                    scope.launch { settings.updateValue(DONT_FILTER_RESULTS, dontFilter) }
                                 })
                             AudioFilterChip(
                                 label = stringResource(id = R.string.use_cookies),
@@ -502,9 +394,7 @@ fun DownloaderBottomSheet(
                                 selected = useCookies,
                                 onClick = {
                                     useCookies = !useCookies
-                                    scope.launch {
-                                        settings.updateValue(COOKIES, useCookies)
-                                    }
+                                    scope.launch { settings.updateValue(COOKIES, useCookies) }
                                 })
                             AudioFilterChip(
                                 label = stringResource(id = R.string.use_yt_metadata),
@@ -512,9 +402,7 @@ fun DownloaderBottomSheet(
                                 selected = useYtMetadata,
                                 onClick = {
                                     useYtMetadata = !useYtMetadata
-                                    scope.launch {
-                                        settings.updateValue(USE_YT_METADATA, useYtMetadata)
-                                    }
+                                    scope.launch { settings.updateValue(USE_YT_METADATA, useYtMetadata) }
                                 })
                         }
                     }
@@ -523,10 +411,7 @@ fun DownloaderBottomSheet(
         }
 
         val state = rememberLazyListState()
-
-        LaunchedEffect(Unit) {
-            state.scrollToItem(1)
-        }
+        LaunchedEffect(Unit) { state.scrollToItem(1) }
 
         LazyRow(
             modifier = Modifier
@@ -551,20 +436,22 @@ fun DownloaderBottomSheet(
                     text = stringResource(R.string.request_metadata)
                 )
             }
+
+            // Normalize the URL before matching route patterns
+            val nurl = UrlValidator.normalize(url)
+
             item {
-                val playlistPattern =
-                    "^https?://open.spotify.com/playlist/([a-zA-Z0-9]+)(\\?.*)?\$"
+                val playlistPattern = "^https?://open.spotify.com/playlist/([a-zA-Z0-9]+)(\\?.*)?\$"
+                val albumPattern    = "^https?://open.spotify.com/album/([a-zA-Z0-9]+)(\\?.*)?\$"
+                val artistPattern   = "^https?://open.spotify.com/artist/([a-zA-Z0-9]+)(\\?.*)?\$"
+
                 val playlistRegex = Regex(playlistPattern)
-
-                val albumPattern = "^https?://open.spotify.com/album/([a-zA-Z0-9]+)(\\?.*)?\$"
-                val albumRegex = Regex(albumPattern)
-
-                val artistPattern = "^https?://open.spotify.com/artist/([a-zA-Z0-9]+)(\\?.*)?\$"
-                val artistRegex = Regex(artistPattern)
+                val albumRegex    = Regex(albumPattern)
+                val artistRegex   = Regex(artistPattern)
 
                 when {
-                    playlistRegex.matches(url) -> {
-                        val playlistId = playlistRegex.find(url)!!.groupValues[1]
+                    playlistRegex.matches(nurl) -> {
+                        val playlistId = playlistRegex.find(nurl)!!.groupValues[1]
                         FilledButtonWithIcon(
                             modifier = Modifier.padding(end = 12.dp),
                             onClick = {
@@ -575,9 +462,8 @@ fun DownloaderBottomSheet(
                             text = stringResource(R.string.see_playlist)
                         )
                     }
-
-                    albumRegex.matches(url) -> {
-                        val albumId = albumRegex.find(url)!!.groupValues[1]
+                    albumRegex.matches(nurl) -> {
+                        val albumId = albumRegex.find(nurl)!!.groupValues[1]
                         FilledButtonWithIcon(
                             modifier = Modifier.padding(end = 12.dp),
                             onClick = {
@@ -588,17 +474,18 @@ fun DownloaderBottomSheet(
                             text = stringResource(R.string.see_album)
                         )
                     }
-
-                    artistRegex.matches(url) -> {
-                        val artistId = artistRegex.find(url)!!.groupValues[1]
+                    artistRegex.matches(nurl) -> {
+                        val artistId = artistRegex.find(nurl)!!.groupValues[1]
                         FilledButtonWithIcon(
-                            modifier = Modifier.padding(end = 12.dp), onClick = {
+                            modifier = Modifier.padding(end = 12.dp),
+                            onClick = {
                                 navigateToArtist(artistId)
                                 onBackPressed()
-                            }, icon = Artist, text = stringResource(R.string.see_artist)
+                            },
+                            icon = Artist,
+                            text = stringResource(R.string.see_artist)
                         )
                     }
-
                     else -> {
                         FilledButtonWithIcon(
                             modifier = Modifier.padding(end = 12.dp),
@@ -645,7 +532,7 @@ object BottomSheetPages {
     val TERTIARY = getString(R.string.downloader)
 }
 
-//GET STRING FROM APP.CONTEXT GIVEN A r.string ID
+// Helper for string resources out of composition
 fun getString(id: Int): String {
     return App.context.getString(id)
 }
