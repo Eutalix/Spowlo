@@ -49,6 +49,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign // FIX: import TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.bobbyesp.spowlo.App
@@ -79,7 +80,7 @@ import com.bobbyesp.spowlo.utils.ToastUtil
 import com.bobbyesp.spowlo.utils.USE_CACHING
 import com.bobbyesp.spowlo.utils.USE_SPOTIFY_CREDENTIALS
 import com.bobbyesp.spowlo.utils.USE_YT_METADATA
-import com.bobbyesp.spowlo.utils.UrlValidator // NEW: normalize incoming URL
+import com.bobbyesp.spowlo.utils.UrlValidator
 import com.google.accompanist.permissions.ExperimentalPermissionsApi
 import com.google.accompanist.permissions.PermissionStatus
 import com.google.accompanist.permissions.rememberPermissionState
@@ -104,7 +105,7 @@ fun DownloaderBottomSheet(
     val scope = rememberCoroutineScope()
 
     val pages =
-        listOf(BottomSheetPages.MAIN, BottomSheetPages.TERTIARY) // secondary page currently unused
+        listOf(BottomSheetPages.MAIN, BottomSheetPages.TERTIARY)
     val pagerState = rememberPagerState(
         initialPage = 0, initialPageOffsetFraction = 0f
     ) {
@@ -114,18 +115,13 @@ fun DownloaderBottomSheet(
     val storagePermission = rememberPermissionState(
         permission = Manifest.permission.WRITE_EXTERNAL_STORAGE
     ) { b: Boolean ->
-        if (b) {
-            onDownloadPressed()
-        } else {
-            ToastUtil.makeToast(R.string.permission_denied)
-        }
+        if (b) onDownloadPressed() else ToastUtil.makeToast(R.string.permission_denied)
     }
 
     val checkPermissionOrDownload = {
-        if (Build.VERSION.SDK_INT > 29 || storagePermission.status == PermissionStatus.Granted) onDownloadPressed()
-        else {
-            storagePermission.launchPermissionRequest()
-        }
+        if (Build.VERSION.SDK_INT > 29 || storagePermission.status == PermissionStatus.Granted)
+            onDownloadPressed()
+        else storagePermission.launchPermissionRequest()
     }
 
     val settings = PreferencesUtil
@@ -165,9 +161,7 @@ fun DownloaderBottomSheet(
         Column(
             modifier = Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically
-            ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(
                     imageVector = Icons.Outlined.DownloadDone,
                     contentDescription = null,
@@ -189,7 +183,7 @@ fun DownloaderBottomSheet(
                 style = MaterialTheme.typography.bodySmall,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                textAlign = TextAlign.Center,
+                textAlign = TextAlign.Center, // use TextAlign now that it's imported
             )
             IndicatorBehindScrollableTabRow(
                 selectedTabIndex = pagerState.currentPage,
@@ -214,9 +208,7 @@ fun DownloaderBottomSheet(
                     Tab(
                         text = { Text(text = page) },
                         selected = pagerState.currentPage == index,
-                        onClick = {
-                            scope.launch { pagerState.animateScrollToPage(index) }
-                        },
+                        onClick = { scope.launch { pagerState.animateScrollToPage(index) } },
                     )
                 }
             }
@@ -500,29 +492,19 @@ fun DownloaderBottomSheet(
     }
 
     if (showAudioFormatDialog) {
-        AudioFormatDialog(
-            onDismissRequest = { showAudioFormatDialog = false },
-        )
+        AudioFormatDialog(onDismissRequest = { showAudioFormatDialog = false })
     }
     if (showAudioQualityDialog) {
-        AudioQualityDialog(
-            onDismissRequest = { showAudioQualityDialog = false },
-        )
+        AudioQualityDialog(onDismissRequest = { showAudioQualityDialog = false })
     }
     if (showClientIdDialog) {
-        SpotifyClientIDDialog {
-            showClientIdDialog = !showClientIdDialog
-        }
+        SpotifyClientIDDialog { showClientIdDialog = !showClientIdDialog }
     }
     if (showClientSecretDialog) {
-        SpotifyClientSecretDialog {
-            showClientSecretDialog = !showClientSecretDialog
-        }
+        SpotifyClientSecretDialog { showClientSecretDialog = !showClientSecretDialog }
     }
     if (showOutputFormatDialog) {
-        OutputFormatDialog(
-            onDismissRequest = { showOutputFormatDialog = false },
-        )
+        OutputFormatDialog(onDismissRequest = { showOutputFormatDialog = false })
     }
 }
 
@@ -532,7 +514,4 @@ object BottomSheetPages {
     val TERTIARY = getString(R.string.downloader)
 }
 
-// Helper for string resources out of composition
-fun getString(id: Int): String {
-    return App.context.getString(id)
-}
+fun getString(id: Int): String = App.context.getString(id)
