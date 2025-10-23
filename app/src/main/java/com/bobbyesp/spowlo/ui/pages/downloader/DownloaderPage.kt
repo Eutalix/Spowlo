@@ -90,6 +90,7 @@ import com.bobbyesp.spowlo.utils.DEBUG
 import com.bobbyesp.spowlo.utils.PreferencesUtil
 import com.bobbyesp.spowlo.utils.PreferencesUtil.getBoolean
 import com.bobbyesp.spowlo.utils.ToastUtil
+import com.bobbyesp.spowlo.utils.UrlValidator // NEW: URL normalize/classify
 import com.bobbyesp.spowlo.utils.matchUrlFromClipboard
 import com.google.accompanist.permissions.ExperimentalPermissionsApi
 import com.google.accompanist.permissions.PermissionStatus
@@ -123,7 +124,7 @@ fun DownloaderPage(
         }
     }
 
-    //STATE FLOWS
+    // STATE FLOWS
     val viewState by downloaderViewModel.viewStateFlow.collectAsStateWithLifecycle()
     val downloaderState by Downloader.downloaderState.collectAsStateWithLifecycle()
     val taskState by Downloader.taskState.collectAsStateWithLifecycle()
@@ -134,17 +135,24 @@ fun DownloaderPage(
     val clipboardManager = LocalClipboardManager.current
     val keyboardController = LocalSoftwareKeyboardController.current
 
+    // Decide next action for the current URL using a single classifier
     val checkPermissionOrDownload = {
+        val url = viewState.url
         if (Build.VERSION.SDK_INT > 29 || storagePermission.status == PermissionStatus.Granted) {
-            val url = viewState.url
             if (url.isNotEmpty()) {
-                if (CONFIGURE.getBoolean()) {
-                    navigateToDownloaderSheet()
-                } else {
-                    if (url.contains("track")) {
-                        downloaderViewModel.startDownloadSong()
-                    } else if (url.contains("album") || url.contains("artist") || url.contains("playlist")) {
+                when (UrlValidator.classify(url)) {
+                    UrlValidator.Type.SpotifyTrack -> {
+                        if (PreferencesUtil.getValue(CONFIGURE)) navigateToDownloaderSheet()
+                        else downloaderViewModel.startDownloadSong()
+                    }
+                    UrlValidator.Type.SpotifyAlbum,
+                    UrlValidator.Type.SpotifyArtist,
+                    UrlValidator.Type.SpotifyPlaylist -> {
                         navigateToDownloaderSheet()
+                    }
+                    UrlValidator.Type.Other -> {
+                        if (PreferencesUtil.getValue(CONFIGURE)) navigateToDownloaderSheet()
+                        else downloaderViewModel.startDownloadSong()
                     }
                 }
             }
@@ -165,17 +173,33 @@ fun DownloaderPage(
             PreferencesUtil.getValue(DEBUG) && downloaderState !is Downloader.State.Idle
     }
 
+    // Handle share/deep-link trigger
     if (viewState.isUrlSharingTriggered) {
         val url = viewState.url
         if (url.isNotEmpty()) {
-            if (CONFIGURE.getBoolean()) {
-                navigateToDownloaderSheet()
-            } else {
-                if (url.contains("track")) {
-                    ToastUtil.makeToast(R.string.fetching_metadata)
-                    downloaderViewModel.requestMetadata()
-                } else if (url.contains("album") || url.contains("artist") || url.contains("playlist")) {
+            when (UrlValidator.classify(url)) {
+                UrlValidator.Type.SpotifyTrack -> {
+                    if (PreferencesUtil.getValue(CONFIGURE)) {
+                        navigateToDownloaderSheet()
+                    } else {
+                        ToastUtil.makeToast(R.string.fetching_metadata)
+                        downloaderViewModel.requestMetadata()
+                    }
+                }
+                UrlValidator.Type.SpotifyAlbum,
+                UrlValidator.Type.SpotifyArtist,
+                UrlValidator.Type.SpotifyPlaylist -> {
                     navigateToDownloaderSheet()
+                }
+                UrlValidator.Type.Other -> {
+                    // For other providers (YouTube/YT Music/spotify.link), follow the same UX:
+                    // request metadata when not pre-configuring; otherwise open the sheet.
+                    if (PreferencesUtil.getValue(CONFIGURE)) {
+                        navigateToDownloaderSheet()
+                    } else {
+                        ToastUtil.makeToast(R.string.fetching_metadata)
+                        downloaderViewModel.requestMetadata()
+                    }
                 }
             }
         }
@@ -204,21 +228,18 @@ fun DownloaderPage(
         showSongCard = true,
         showDownloadProgress = taskState.taskId.isNotEmpty(),
         pasteCallback = {
-            clipboardManager.getText()?.toString()?.let {
-                matchUrlFromClipboard(it).let { url ->
-                    downloaderViewModel.updateUrl(url)
-                    if (url.isNotEmpty()) {
-                        if (CONFIGURE.getBoolean()) {
-                            navigateToDownloaderSheet()
-                        } else {
-                            if (url.contains("track")) {
-                                ToastUtil.makeToast(R.string.fetching_metadata)
-                                downloaderViewModel.requestMetadata()
-                            } else if (url.contains("album") || url.contains("artist") || url.contains("playlist")) {
-                                navigateToDownloaderSheet()
-                            }
-                        }
+            // Use robust paste-and-download: normalize/validate and trigger appropriate action
+            clipboardManager.getText()?.toString()?.let { raw ->
+                downloaderViewModel.onPasteAndDownload(raw)
+                // If it is a list-type URL and pre-configure is enabled, open the sheet
+                val current = downloaderViewModel.viewStateFlow.value.url
+                when (UrlValidator.classify(current)) {
+                    UrlValidator.Type.SpotifyAlbum,
+                    UrlValidator.Type.SpotifyArtist,
+                    UrlValidator.Type.SpotifyPlaylist -> {
+                        if (PreferencesUtil.getValue(CONFIGURE)) navigateToDownloaderSheet()
                     }
+                    else -> Unit
                 }
             }
         },
@@ -252,7 +273,7 @@ fun DownloaderPageImplementation(
     onUrlChanged: (String) -> Unit = {},
     content: @Composable () -> Unit
 ) {
-    // --- ADDED: State to track if the app core is initialized ---
+    // Display a spinner either while downloading or while the core is still initializing
     val isAppInitialized by App.isInitialized.collectAsStateWithLifecycle()
 
     Scaffold(modifier = Modifier.fillMaxSize(), topBar = {
@@ -332,7 +353,7 @@ fun DownloaderPageImplementation(
                         )
                     }
                     AnimatedVisibility(
-                        // --- MODIFIED: Show indicator if downloading OR if app is not yet initialized ---
+                        // Show spinner if downloading OR core is not yet initialized
                         visible = !isAppInitialized || downloaderState !is Downloader.State.Idle,
                         modifier = Modifier
                     ) {
