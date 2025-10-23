@@ -67,9 +67,10 @@ object UpdateUtil {
         }
     }
 
-
-    private const val OWNER = "BobbyESP"
+    // UPDATED: point to your fork (Eutalix/Spowlo)
+    private const val OWNER = "Eutalix"
     private const val REPO = "Spowlo"
+
     private const val ARM64 = "arm64-v8a"
     private const val ARM32 = "armeabi-v7a"
     private const val X86 = "x86"
@@ -97,22 +98,18 @@ object UpdateUtil {
         }
     }
 
-
     private suspend fun getLatestRelease(): LatestRelease {
         return suspendCoroutine { continuation ->
             client.newCall(requestForReleases).enqueue(object : Callback {
                 override fun onResponse(call: Call, response: Response) {
                     val responseData = response.body.string()
-//                    val latestRelease = jsonFormat.decodeFromString<LatestRelease>(responseData)
                     val releaseList =
                         jsonFormat.decodeFromString<List<LatestRelease>>(responseData)
+                    // Keep stable/pre-release filtering behavior
                     val latestRelease =
                         releaseList.filter { if (UPDATE_CHANNEL.getInt() == STABLE) it.name.toVersion() is Version.Stable else true }
                             .maxByOrNull { it.name.toVersion() }
                             ?: throw Exception("null response")
-                    releaseList.sortedBy { it.name.toVersion() }.forEach {
-                        Log.d(TAG, it.tagName.toString())
-                    }
                     response.body.close()
                     continuation.resume(latestRelease)
                 }
@@ -142,7 +139,6 @@ object UpdateUtil {
                 packageName, 0
             ).versionName.toVersion()
         }
-
 
     private fun Context.getLatestApk() = File(getExternalFilesDir("apk"), "latest.apk")
 
@@ -192,7 +188,6 @@ object UpdateUtil {
         }
         emptyFlow()
     }
-
 
     fun ResponseBody.downloadFileWithProgress(saveFile: File): Flow<DownloadStatus> = flow {
         emit(DownloadStatus.Progress(0))
@@ -265,6 +260,7 @@ object UpdateUtil {
         data class Finished(val file: File) : DownloadStatus()
     }
 
+    // Version parsing and precedence (Stable > RC > Beta)
     private val pattern = Pattern.compile("""v?(\d+)\.(\d+)\.(\d+)(-(\w+)\.(\d+))?""")
     private val EMPTY_VERSION = Version.Stable()
 
@@ -282,7 +278,6 @@ object UpdateUtil {
             }
         } else EMPTY_VERSION
     } ?: EMPTY_VERSION
-
 
     sealed class Version(
         val major: Int, val minor: Int, val patch: Int, val build: Int = 0
@@ -303,17 +298,15 @@ object UpdateUtil {
 
             override fun toNumber(): Long =
                 major * MAJOR + minor * MINOR + patch * PATCH + build * BUILD
-
         }
 
         class Stable(versionMajor: Int = 0, versionMinor: Int = 0, versionPatch: Int = 0) :
             Version(versionMajor, versionMinor, versionPatch) {
             override fun toVersionName(): String = "${major}.${minor}.${patch}"
 
+            // Stable gets a boost to always win over RC/Beta with same numbers
             override fun toNumber(): Long =
                 major * MAJOR + minor * MINOR + patch * PATCH + build * BUILD + 50
-            // Prioritize stable versions
-
         }
 
         class ReleaseCandidate(
@@ -327,6 +320,5 @@ object UpdateUtil {
 
         override operator fun compareTo(other: Version): Int =
             this.toNumber().compareTo(other.toNumber())
-
     }
 }
