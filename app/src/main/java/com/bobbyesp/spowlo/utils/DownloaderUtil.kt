@@ -44,7 +44,6 @@ object DownloaderUtil {
 
     val settings = PreferencesUtil
 
-    //SONGS FLOW
     private val mutableSongsState = MutableStateFlow(listOf<SpotifySong>())
     val songsState = mutableSongsState.asStateFlow()
 
@@ -152,40 +151,33 @@ object DownloaderUtil {
         }
     }
 
-    private fun getRandomUUID(): String {
-        return UUID.randomUUID().toString()
-    }
+    private fun getRandomUUID(): String = UUID.randomUUID().toString()
 
     private fun SpotDLRequest.useCookies(): SpotDLRequest = this.apply {
         if (PreferencesUtil.getValue(COOKIES)) {
-            addOption(
-                "--cookie-file", context.getCookiesFile().absolutePath
-            )
+            addOption("--cookie-file", context.getCookiesFile().absolutePath)
         }
     }
 
     @CheckResult
     private fun getSongInfo(
         url: String? = null,
+        processId: String? = null
     ): Result<List<SpotifySong>> = kotlin.runCatching {
-        val response: List<SpotifySong> = SpotDL.getInstance().getSongInfo(url ?: "")
-        mutableSongsState.update {
-            response
-        }
+        val response: List<SpotifySong> =
+            SpotDL.getInstance().getSongInfo(url ?: "", songId = processId ?: getRandomUUID())
+        mutableSongsState.update { response }
         response
     }
 
     @CheckResult
     fun fetchSongInfoFromUrl(
-        url: String
-    ): Result<List<SpotifySong>> = kotlin.run {
-        getSongInfo(url)
-    }
+        url: String,
+        processId: String? = null
+    ): Result<List<SpotifySong>> = getSongInfo(url, processId)
 
     fun updateSongsState(songs: List<SpotifySong>) {
-        mutableSongsState.update {
-            songs
-        }
+        mutableSongsState.update { songs }
     }
 
     private fun SpotDLRequest.addAudioFormat(): SpotDLRequest = this.apply {
@@ -227,21 +219,11 @@ object DownloaderUtil {
         this.apply {
             if (downloadPreferences.audioProviders.isNotEmpty()) {
                 addOption("--audio")
-                if (downloadPreferences.audioProviders.contains("YouTube")) {
-                    addOption("youtube")
-                }
-                if (downloadPreferences.audioProviders.contains("YouTube Music")) {
-                    addOption("youtube-music")
-                }
-                if (downloadPreferences.audioProviders.contains("Soundcloud")) {
-                    addOption("soundcloud")
-                }
-                if (downloadPreferences.audioProviders.contains("Bandcamp")) {
-                    addOption("bandcamp")
-                }
-                if (downloadPreferences.audioProviders.contains("Piped")) {
-                    addOption("piped")
-                }
+                if (downloadPreferences.audioProviders.contains("YouTube")) addOption("youtube")
+                if (downloadPreferences.audioProviders.contains("YouTube Music")) addOption("youtube-music")
+                if (downloadPreferences.audioProviders.contains("Soundcloud")) addOption("soundcloud")
+                if (downloadPreferences.audioProviders.contains("Bandcamp")) addOption("bandcamp")
+                if (downloadPreferences.audioProviders.contains("Piped")) addOption("piped")
             }
         }
 
@@ -264,53 +246,23 @@ object DownloaderUtil {
 
                 addOption("--output", pathBuilder.toString())
 
-                if (useCookies) {
-                    useCookies()
-                }
-
-                if (useYtMetadata) {
-                    addOption("--ytm-data")
-                }
-
-                if (dontFilter) {
-                    addOption("--dont-filter-results")
-                }
+                if (useCookies) useCookies()
+                if (useYtMetadata) addOption("--ytm-data")
+                if (dontFilter) addOption("--dont-filter-results")
 
                 if (downloadPreferences.downloadLyrics && downloadPreferences.lyricProviders.isNotEmpty()) {
                     addOption("--lyrics")
-                    if (downloadPreferences.lyricProviders.contains("Synced")) {
-                        addOption("synced")
-                    }
-                    if (downloadPreferences.lyricProviders.contains("Genius")) {
-                        addOption("genius")
-                    }
-                    if (downloadPreferences.lyricProviders.contains("Musixmatch")) {
-                        addOption("musixmatch")
-                    }
-                    if (downloadPreferences.lyricProviders.contains("AZLyrics")) {
-                        addOption("azlyrics")
-                    }
+                    if (downloadPreferences.lyricProviders.contains("Synced")) addOption("synced")
+                    if (downloadPreferences.lyricProviders.contains("Genius")) addOption("genius")
+                    if (downloadPreferences.lyricProviders.contains("Musixmatch")) addOption("musixmatch")
+                    if (downloadPreferences.lyricProviders.contains("AZLyrics")) addOption("azlyrics")
                 }
 
-                if (sponsorBlock) {
-                    addOption("--sponsor-block")
-                }
-
-                if (onlyVerifiedResults) {
-                    addOption("--only-verified-results")
-                }
-
-                if (skipExplicit) {
-                    addOption("--skip-explicit")
-                }
-
-                if (generateLRC) {
-                    addOption("--generate-lrc")
-                }
-
-                if (skipAlbumArt) {
-                    addOption("--skip-album-art")
-                }
+                if (sponsorBlock) addOption("--sponsor-block")
+                if (onlyVerifiedResults) addOption("--only-verified-results")
+                if (skipExplicit) addOption("--skip-explicit")
+                if (generateLRC) addOption("--generate-lrc")
+                if (skipAlbumArt) addOption("--skip-album-art")
 
                 if (preserveOriginalAudio) {
                     addOption("--bitrate", "disable")
@@ -374,14 +326,12 @@ object DownloaderUtil {
                         response.output.contains("Skipping explicit song") -> Result.failure(
                             Throwable("An explicit song has been skipped. Disable 'Skip explicit songs' in spotDL settings to download this song.")
                         )
-
                         else -> onFinishDownloading(
                             this,
                             songInfo = songInfo,
                             downloadPath = buildPathForDatabase(pathBuilder.toString(), songInfo),
                             sdcardUri = sdcardUri
                         )
-
                     }
                 }
             return onFinishDownloading(
@@ -458,7 +408,6 @@ object DownloaderUtil {
         return int
     }
 
-
     fun executeParallelDownload(url: String, name: String) {
         val taskId = Downloader.makeKey(url, url.reversed())
         ToastUtil.makeToastSuspend(context.getString(R.string.download_started_msg))
@@ -507,16 +456,12 @@ object DownloaderUtil {
     }
 
     fun clearLinesWithEllipsis(input: String): String {
-        val lines = input.split("\n")
-            .filterNot { it.contains("…") }
-            .joinToString("\n")
+        val lines = input.split("\n").filterNot { it.contains("…") }.joinToString("\n")
         return lines
     }
 
     fun removeDuplicateLines(input: String): String {
-        val lines = input.split("\n")
-            .distinct()
-            .joinToString("\n")
+        val lines = input.split("\n").distinct().joinToString("\n")
         return lines
     }
 
@@ -537,20 +482,14 @@ object DownloaderUtil {
 
     fun getExtension(): String? {
         val audioFormat = PreferencesUtil.getAudioFormat()
-        if (audioFormat == 0) {
-            return "mp3"
-        } else if (audioFormat == 1) {
-            return "flac"
-        } else if (audioFormat == 2) {
-            return "ogg"
-        } else if (audioFormat == 3) {
-            return "opus"
-        } else if (audioFormat == 4) {
-            return "m4a"
-        } else if (audioFormat == 5) {
-            return "wav"
-        } else {
-            return null
+        return when (audioFormat) {
+            0 -> "mp3"
+            1 -> "flac"
+            2 -> "ogg"
+            3 -> "opus"
+            4 -> "m4a"
+            5 -> "wav"
+            else -> null
         }
     }
 }
