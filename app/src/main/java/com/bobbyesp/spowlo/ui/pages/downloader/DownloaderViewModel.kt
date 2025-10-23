@@ -9,6 +9,8 @@ import com.bobbyesp.spowlo.App
 import com.bobbyesp.spowlo.Downloader
 import com.bobbyesp.spowlo.Downloader.showErrorMessage
 import com.bobbyesp.spowlo.R
+import com.bobbyesp.spowlo.utils.PreferencesUtil
+import com.bobbyesp.spowlo.utils.SKIP_INFO_FETCH
 import com.bobbyesp.spowlo.utils.ToastUtil
 import com.bobbyesp.spowlo.utils.UrlValidator
 import kotlinx.coroutines.CoroutineScope
@@ -33,9 +35,7 @@ class DownloaderViewModel : ViewModel() {
 
     fun updateUrl(url: String, isUrlSharingTriggered: Boolean = false) =
         mutableViewStateFlow.update {
-            it.copy(
-                url = url, isUrlSharingTriggered = isUrlSharingTriggered
-            )
+            it.copy(url = url, isUrlSharingTriggered = isUrlSharingTriggered)
         }
 
     /**
@@ -43,14 +43,13 @@ class DownloaderViewModel : ViewModel() {
      * - Normalizes and validates the pasted URL.
      * - Updates the input field with the normalized URL.
      * - Triggers the appropriate action:
-     *   - Spotify track -> start download directly
-     *   - Spotify album/artist/playlist -> UI decides (sheet)
-     *   - Others (YouTube, YouTube Music, youtu.be, spotify.link, URIs) -> start download directly
+     *   - Spotify track -> start download directly if SKIP_INFO_FETCH is true; otherwise use normal flow
+     *   - Spotify album/artist/playlist -> UI decides (settings sheet)
+     *   - Other (YouTube, YouTube Music, youtu.be, spotify.link, URIs) -> start download directly (skipInfoFetch=true)
      */
     fun onPasteAndDownload(raw: String) {
         val normalized = UrlValidator.normalize(raw)
         if (!UrlValidator.isSupported(normalized)) {
-            // Use existing string to avoid missing resource
             showErrorMessage(R.string.url_empty)
             return
         }
@@ -62,13 +61,19 @@ class DownloaderViewModel : ViewModel() {
         }
 
         when (UrlValidator.classify(normalized)) {
-            UrlValidator.Type.SpotifyTrack -> startDownloadSong()
+            UrlValidator.Type.SpotifyTrack -> {
+                val skip = PreferencesUtil.getValue(SKIP_INFO_FETCH)
+                startDownloadSong(skipInfoFetch = skip)
+            }
             UrlValidator.Type.SpotifyAlbum,
             UrlValidator.Type.SpotifyArtist,
             UrlValidator.Type.SpotifyPlaylist -> {
-                // The UI will open the settings sheet if configured
+                // No-op here; the UI already opens the settings sheet when needed
             }
-            UrlValidator.Type.Other -> startDownloadSong()
+            UrlValidator.Type.Other -> {
+                // Direct download for non-Spotify URLs: skip metadata fetch
+                startDownloadSong(skipInfoFetch = true)
+            }
         }
     }
 
