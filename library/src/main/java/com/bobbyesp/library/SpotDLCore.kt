@@ -151,19 +151,16 @@ abstract class SpotDLCore {
         } catch (e: InterruptedException) {
             process.destroy()
             processId?.let { idProcessMap.remove(it) }
-            // Map to cancellation at this level
             throw e
         }
 
-        // Clean processId map entry after the process has finished
+        // Remove id from map after the process ends
         processId?.let { idProcessMap.remove(it) }
 
         val out = outBuffer.toString()
         val err = errBuffer.toString()
 
         if (exitCode > 0) {
-            // DO NOT treat “not in map” as cancellation here; map has been cleared above.
-            // Only map to SpotDLException with stderr (or stdout if stderr is empty).
             if (!ignoreErrors(request, err)) {
                 if (isDebug) Log.e("SpotDL", "Non-zero exit. EXIT=$exitCode, STDERR=$err, STDOUT=$out")
                 throw SpotDLException(err.ifBlank { out })
@@ -185,7 +182,10 @@ abstract class SpotDLCore {
             setOperation("save")
             urls = listOf(url)
 
-            // Keep verbose flags; useful for diagnostics
+            // REQUIRED for spotdl v4: output JSON; '-' means stdout
+            addOption("--save-file", "-")
+
+            // Helpful for diagnostics
             addOption("--log-level", "DEBUG")
             addOption("--print-errors")
 
@@ -220,7 +220,6 @@ abstract class SpotDLCore {
         }
     }
 
-    // Only ignore when stderr is blank and --print-errors is not present
     private fun ignoreErrors(request: SpotDLRequest, err: String): Boolean =
         err.isBlank() && !request.hasOption("--print-errors")
 
