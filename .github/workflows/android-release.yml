@@ -1,9 +1,16 @@
-# .github/workflows/android-release.yml
-
 name: Android Release APK
 
 on:
   workflow_dispatch:
+    inputs:
+      publish_release:
+        description: "Publish GitHub Release after build?"
+        type: boolean
+        default: false
+      release_name:
+        description: "Optional release name (used only if publish_release=true). Defaults to the ref name."
+        required: false
+        type: string
   push:
     tags:
       - 'v*.*.*'
@@ -25,8 +32,7 @@ jobs:
           java-version: '21'
           distribution: 'temurin'
 
-      # NOTE: Disabling cache temporarily to rule out caching issues.
-      # We can re-enable this once the build is stable.
+      # Cache can be re-enabled once the build is stable
       # - name: Cache Gradle packages
       #   uses: actions/cache@v4
       #   with:
@@ -54,15 +60,28 @@ jobs:
       - name: Make gradlew executable
         run: chmod +x ./gradlew
 
-      # --- MODIFIED: Added 'clean' task to ensure a fresh build ---
-      # This command will delete old build artifacts before compiling,
-      # which can resolve intermittent packaging errors caused by inconsistent state.
       - name: Build with Gradle (Clean + Assemble)
         run: ./gradlew clean :app:assembleRelease
 
+      # NEW: Always upload APK as artifact so you can download it from the workflow run
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Spowlo-APK-${{ github.ref_name || github.sha }}
+          path: app/build/outputs/apk/release/*.apk
+          if-no-files-found: error
+          retention-days: 7
+          compression-level: 6
+
+      # Create a GitHub Release only when:
+      # - push event with a tag (vX.Y.Z), OR
+      # - workflow_dispatch with publish_release=true
       - name: Create GitHub Release
+        if: >
+          (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')) ||
+          (github.event_name == 'workflow_dispatch' && inputs.publish_release == 'true')
         uses: softprops/action-gh-release@v2
         with:
           files: app/build/outputs/apk/release/*.apk
-          name: Release ${{ github.ref_name }}
+          name: ${{ inputs.release_name || format('Release {0}', github.ref_name) }}
           generate_release_notes: true
