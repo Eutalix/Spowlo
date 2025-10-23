@@ -5,7 +5,8 @@ import android.util.Log
 import androidx.annotation.CheckResult
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.ui.text.AnnotatedString
-import com.bobbyesp.library.SpotDL
+import com.bobbyesp.library.SpotDL // NEW: used to cancel processes on timeout
+import com.bobbyesp.library.SpotDL.getInstance
 import com.bobbyesp.library.domain.model.SpotifySong
 import com.bobbyesp.library.util.exceptions.CanceledException
 import com.bobbyesp.spowlo.App.Companion.applicationScope
@@ -26,9 +27,16 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeout
+import kotlinx.coroutines.TimeoutCancellationException
 import java.util.UUID
+import java.util.concurrent.TimeoutException
 
 object Downloader {
+
+    // Timeouts to avoid infinite loading
+    private const val FETCH_TIMEOUT_MS = 30_000L
+    private const val DOWNLOAD_TIMEOUT_MS = 120_000L
 
     sealed class State {
         data class DownloadingPlaylist(
@@ -95,21 +103,17 @@ object Downloader {
             ToastUtil.makeToastSuspend(context.getString(R.string.link_copied))
         }
 
-
         fun onRestart() {
             applicationScope.launch(Dispatchers.IO) {
                 executeParallelDownloadWithUrl(url, name = taskName)
             }
         }
 
-        // --- CORRECTED: Improved the logic to safely access the error report ---
         fun onCopyError(clipboardManager: androidx.compose.ui.platform.ClipboardManager) {
-            // Check if the state is 'Error' and cast it safely.
             val errorState = state as? State.Error
             if (errorState != null) {
                 clipboardManager.setText(AnnotatedString(errorState.errorReport))
             } else {
-                // Fallback in case this is called on a non-error state.
                 clipboardManager.setText(AnnotatedString("No detailed error report available. Last line: $currentLine"))
             }
             ToastUtil.makeToast(R.string.error_copied)
@@ -121,7 +125,6 @@ object Downloader {
                 onProcessCanceled(this)
             }
         }
-
     }
 
     data class DownloadTaskItem(
@@ -342,22 +345,36 @@ object Downloader {
         currentJob = applicationScope.launch(Dispatchers.IO) {
             updateState(State.FetchingInfo)
             if (skipInfoFetch) {
-                downloadResultTemp = downloadSong(
-                    songInfo = SpotifySong(url = url),
-                    preferences = downloadPreferences
-                ).onFailure { manageDownloadError(it, isFetchingInfo = true, isTaskAborted = true) }
+                try {
+                    withTimeout(DOWNLOAD_TIMEOUT_MS) {
+                        downloadResultTemp = downloadSong(
+                            songInfo = SpotifySong(url = url),
+                            preferences = downloadPreferences
+                        ).onFailure { manageDownloadError(it, isFetchingInfo = true, isTaskAborted = true) }
+                    }
+                } catch (e: TimeoutCancellationException) {
+                    // Attempt to kill the underlying process if we have a taskId
+                    val tid = taskState.value.taskId
+                    if (tid.isNotEmpty()) SpotDL.getInstance().destroyProcessById(tid)
+                    manageDownloadError(TimeoutException("Download timed out"), isFetchingInfo = true, isTaskAborted = true)
+                }
                 return@launch
             } else {
-                DownloaderUtil.fetchSongInfoFromUrl(url = url)
-                    .onFailure {
-                        manageDownloadError(it, isFetchingInfo = true, isTaskAborted = true)
-                        return@launch
+                val procId = UUID.randomUUID().toString()
+                try {
+                    withTimeout(FETCH_TIMEOUT_MS) {
+                        DownloaderUtil.fetchSongInfoFromUrl(url = url, processId = procId)
+                            .onFailure { manageDownloadError(it, isFetchingInfo = true, isTaskAborted = true) }
+                            .onSuccess { info ->
+                                for (song in info) {
+                                    downloadResultTemp = downloadSong(songInfo = song, preferences = downloadPreferences)
+                                }
+                            }
                     }
-                    .onSuccess { info ->
-                        for (song in info) {
-                            downloadResultTemp = downloadSong(songInfo = song, preferences = downloadPreferences)
-                        }
-                    }
+                } catch (e: TimeoutCancellationException) {
+                    SpotDL.getInstance().destroyProcessById(procId)
+                    manageDownloadError(TimeoutException("Metadata fetch timed out"), isFetchingInfo = true, isTaskAborted = true)
+                }
             }
         }
     }
@@ -368,15 +385,23 @@ object Downloader {
     ) {
         currentJob = applicationScope.launch(Dispatchers.IO) {
             updateState(State.FetchingInfo)
-            DownloaderUtil.fetchSongInfoFromUrl(url = url)
-                .onFailure { manageDownloadError(it, isFetchingInfo = true, isTaskAborted = true) }
-                .onSuccess { info ->
-                    DownloaderUtil.updateSongsState(info)
-                    mutableTaskState.update {
-                        DownloaderUtil.songsState.value[0].toTask(preferencesHash = downloadPreferences.hashCode())
-                    }
-                    finishProcessing()
+            val procId = UUID.randomUUID().toString()
+            try {
+                withTimeout(FETCH_TIMEOUT_MS) {
+                    DownloaderUtil.fetchSongInfoFromUrl(url = url, processId = procId)
+                        .onFailure { manageDownloadError(it, isFetchingInfo = true, isTaskAborted = true) }
+                        .onSuccess { info ->
+                            DownloaderUtil.updateSongsState(info)
+                            mutableTaskState.update {
+                                DownloaderUtil.songsState.value[0].toTask(preferencesHash = downloadPreferences.hashCode())
+                            }
+                            finishProcessing()
+                        }
                 }
+            } catch (e: TimeoutCancellationException) {
+                SpotDL.getInstance().destroyProcessById(procId)
+                manageDownloadError(TimeoutException("Metadata fetch timed out"), isFetchingInfo = true, isTaskAborted = true)
+            }
         }
     }
 
@@ -403,11 +428,7 @@ object Downloader {
         th.printStackTrace()
         val resId = if (isFetchingInfo) R.string.fetch_info_error_msg else R.string.download_error_msg
         ToastUtil.makeToastSuspend(context.getString(resId))
-        mutableErrorState.update {
-            ErrorState(
-                errorReport = th.stackTraceToString()
-            )
-        }
+        mutableErrorState.update { ErrorState(errorReport = th.stackTraceToString()) }
         notificationId?.let {
             NotificationsUtil.finishNotification(
                 notificationId = notificationId,
