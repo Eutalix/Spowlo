@@ -9,6 +9,7 @@ import com.bobbyesp.spowlo.App
 import com.bobbyesp.spowlo.Downloader
 import com.bobbyesp.spowlo.Downloader.showErrorMessage
 import com.bobbyesp.spowlo.R
+import com.bobbyesp.spowlo.utils.DebugLogger
 import com.bobbyesp.spowlo.utils.PreferencesUtil
 import com.bobbyesp.spowlo.utils.SKIP_INFO_FETCH
 import com.bobbyesp.spowlo.utils.ToastUtil
@@ -39,39 +40,39 @@ class DownloaderViewModel : ViewModel() {
         }
 
     /**
-     * Paste-and-download action.
-     * - Normalizes and validates the pasted URL.
-     * - Updates the input field with the normalized URL.
-     * - Triggers the appropriate action:
-     *   - Spotify track -> start download directly if SKIP_INFO_FETCH is true; otherwise use normal flow
-     *   - Spotify album/artist/playlist -> UI decides (settings sheet)
-     *   - Other (YouTube, YouTube Music, youtu.be, spotify.link, URIs) -> start download directly (skipInfoFetch=true)
+     * Paste-and-download action with diagnostics.
      */
     fun onPasteAndDownload(raw: String) {
+        DebugLogger.log("VM", "onPasteAndDownload called, raw='$raw'")
         val normalized = UrlValidator.normalize(raw)
         if (!UrlValidator.isSupported(normalized)) {
+            DebugLogger.log("VM", "URL not supported after normalize='$normalized'")
             showErrorMessage(R.string.url_empty)
             return
         }
         updateUrl(normalized)
+        val klass = UrlValidator.classify(normalized)
+        DebugLogger.log("VM", "URL set='$normalized' classify=$klass")
 
         if (!App.isInitialized.value) {
+            DebugLogger.log("VM", "App not initialized yet")
             ToastUtil.makeToast(R.string.app_is_initializing)
             return
         }
 
-        when (UrlValidator.classify(normalized)) {
+        when (klass) {
             UrlValidator.Type.SpotifyTrack -> {
                 val skip = PreferencesUtil.getValue(SKIP_INFO_FETCH)
+                DebugLogger.log("VM", "SpotifyTrack, skipInfoFetch=$skip → startDownloadSong")
                 startDownloadSong(skipInfoFetch = skip)
             }
             UrlValidator.Type.SpotifyAlbum,
             UrlValidator.Type.SpotifyArtist,
             UrlValidator.Type.SpotifyPlaylist -> {
-                // No-op here; the UI already opens the settings sheet when needed
+                DebugLogger.log("VM", "List-type URL → UI opens sheet")
             }
             UrlValidator.Type.Other -> {
-                // Direct download for non-Spotify URLs: skip metadata fetch
+                DebugLogger.log("VM", "Other provider → startDownloadSong(skipInfoFetch=true)")
                 startDownloadSong(skipInfoFetch = true)
             }
         }
@@ -94,12 +95,14 @@ class DownloaderViewModel : ViewModel() {
     }
 
     fun requestMetadata() {
+        val url = viewStateFlow.value.url
+        DebugLogger.log("VM", "requestMetadata url='$url'")
         if (!App.isInitialized.value) {
+            DebugLogger.log("VM", "requestMetadata aborted: app initializing")
             ToastUtil.makeToast(R.string.app_is_initializing)
             return
         }
 
-        val url = viewStateFlow.value.url
         Downloader.clearErrorState()
         if (!Downloader.isDownloaderAvailable()) return
         if (url.isBlank()) {
@@ -110,12 +113,14 @@ class DownloaderViewModel : ViewModel() {
     }
 
     fun startDownloadSong(skipInfoFetch: Boolean = false) {
+        val url = viewStateFlow.value.url
+        DebugLogger.log("VM", "startDownloadSong url='$url' skipInfoFetch=$skipInfoFetch")
         if (!App.isInitialized.value) {
+            DebugLogger.log("VM", "startDownloadSong aborted: app initializing")
             ToastUtil.makeToast(R.string.app_is_initializing)
             return
         }
 
-        val url = viewStateFlow.value.url
         Downloader.clearErrorState()
         if (!Downloader.isDownloaderAvailable()) return
         if (url.isBlank()) {
