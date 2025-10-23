@@ -10,6 +10,7 @@ import com.bobbyesp.spowlo.Downloader
 import com.bobbyesp.spowlo.Downloader.showErrorMessage
 import com.bobbyesp.spowlo.R
 import com.bobbyesp.spowlo.utils.ToastUtil
+import com.bobbyesp.spowlo.utils.UrlValidator // NEW: URL normalize/validate/classify
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -37,6 +38,45 @@ class DownloaderViewModel : ViewModel() {
             )
         }
 
+    /**
+     * Paste-and-download action.
+     * - Normalizes and validates the pasted URL.
+     * - Updates the input field with the normalized URL.
+     * - Triggers the appropriate action:
+     *   - Spotify track -> start download directly
+     *   - Spotify album/artist/playlist -> UI decides (sheet) as it already does
+     *   - Others (YouTube, YouTube Music, youtu.be, spotify.link, URIs) -> start download directly
+     */
+    fun onPasteAndDownload(raw: String) {
+        val normalized = UrlValidator.normalize(raw)
+        if (!UrlValidator.isSupported(normalized)) {
+            showErrorMessage(R.string.invalid_url)
+            return
+        }
+        // Reflect the final URL in the input field
+        updateUrl(normalized)
+
+        // Ensure core is initialized before triggering the pipeline
+        if (!App.isInitialized.value) {
+            ToastUtil.makeToast(R.string.app_is_initializing)
+            return
+        }
+
+        when (UrlValidator.classify(normalized)) {
+            UrlValidator.Type.SpotifyTrack -> {
+                startDownloadSong()
+            }
+            UrlValidator.Type.SpotifyAlbum,
+            UrlValidator.Type.SpotifyArtist,
+            UrlValidator.Type.SpotifyPlaylist -> {
+                // Intentionally no-op here; the UI already opens the settings sheet when needed
+            }
+            UrlValidator.Type.Other -> {
+                startDownloadSong()
+            }
+        }
+    }
+
     @OptIn(ExperimentalMaterial3Api::class)
     fun hideDialog(scope: CoroutineScope, isDialog: Boolean, sheetState: SheetState) {
         scope.launch {
@@ -54,7 +94,7 @@ class DownloaderViewModel : ViewModel() {
     }
 
     fun requestMetadata() {
-        // --- ADDED: Check if the app is initialized before proceeding ---
+        // Guard init
         if (!App.isInitialized.value) {
             ToastUtil.makeToast(R.string.app_is_initializing)
             return
@@ -72,7 +112,7 @@ class DownloaderViewModel : ViewModel() {
     }
 
     fun startDownloadSong(skipInfoFetch: Boolean = false) {
-        // --- ADDED: Check if the app is initialized before proceeding ---
+        // Guard init
         if (!App.isInitialized.value) {
             ToastUtil.makeToast(R.string.app_is_initializing)
             return
