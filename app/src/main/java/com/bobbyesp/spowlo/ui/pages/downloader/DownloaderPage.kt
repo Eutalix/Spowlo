@@ -21,6 +21,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size // FIX: import size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
@@ -133,7 +134,6 @@ fun DownloaderPage(
     val clipboardManager = LocalClipboardManager.current
     val keyboardController = LocalSoftwareKeyboardController.current
 
-    // Decide next action for the current URL using a single classifier and SKIP_INFO_FETCH for Spotify tracks
     val checkPermissionOrDownload = {
         val url = viewState.url
         if (Build.VERSION.SDK_INT > 29 || storagePermission.status == PermissionStatus.Granted) {
@@ -172,7 +172,6 @@ fun DownloaderPage(
             PreferencesUtil.getValue(DEBUG) && downloaderState !is Downloader.State.Idle
     }
 
-    // Handle share/deep-link trigger
     if (viewState.isUrlSharingTriggered) {
         val url = viewState.url
         if (url.isNotEmpty()) {
