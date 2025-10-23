@@ -21,7 +21,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
@@ -72,7 +71,6 @@ import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.input.ImeAction
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -89,9 +87,9 @@ import com.bobbyesp.spowlo.utils.CONFIGURE
 import com.bobbyesp.spowlo.utils.DEBUG
 import com.bobbyesp.spowlo.utils.PreferencesUtil
 import com.bobbyesp.spowlo.utils.PreferencesUtil.getBoolean
+import com.bobbyesp.spowlo.utils.SKIP_INFO_FETCH
 import com.bobbyesp.spowlo.utils.ToastUtil
-import com.bobbyesp.spowlo.utils.UrlValidator // NEW: URL normalize/classify
-import com.bobbyesp.spowlo.utils.matchUrlFromClipboard
+import com.bobbyesp.spowlo.utils.UrlValidator
 import com.google.accompanist.permissions.ExperimentalPermissionsApi
 import com.google.accompanist.permissions.PermissionStatus
 import com.google.accompanist.permissions.rememberPermissionState
@@ -135,15 +133,16 @@ fun DownloaderPage(
     val clipboardManager = LocalClipboardManager.current
     val keyboardController = LocalSoftwareKeyboardController.current
 
-    // Decide next action for the current URL using a single classifier
+    // Decide next action for the current URL using a single classifier and SKIP_INFO_FETCH for Spotify tracks
     val checkPermissionOrDownload = {
         val url = viewState.url
         if (Build.VERSION.SDK_INT > 29 || storagePermission.status == PermissionStatus.Granted) {
             if (url.isNotEmpty()) {
                 when (UrlValidator.classify(url)) {
                     UrlValidator.Type.SpotifyTrack -> {
+                        val skip = PreferencesUtil.getValue(SKIP_INFO_FETCH)
                         if (PreferencesUtil.getValue(CONFIGURE)) navigateToDownloaderSheet()
-                        else downloaderViewModel.startDownloadSong()
+                        else downloaderViewModel.startDownloadSong(skipInfoFetch = skip)
                     }
                     UrlValidator.Type.SpotifyAlbum,
                     UrlValidator.Type.SpotifyArtist,
@@ -152,7 +151,7 @@ fun DownloaderPage(
                     }
                     UrlValidator.Type.Other -> {
                         if (PreferencesUtil.getValue(CONFIGURE)) navigateToDownloaderSheet()
-                        else downloaderViewModel.startDownloadSong()
+                        else downloaderViewModel.startDownloadSong(skipInfoFetch = true)
                     }
                 }
             }
@@ -182,8 +181,13 @@ fun DownloaderPage(
                     if (PreferencesUtil.getValue(CONFIGURE)) {
                         navigateToDownloaderSheet()
                     } else {
-                        ToastUtil.makeToast(R.string.fetching_metadata)
-                        downloaderViewModel.requestMetadata()
+                        val skip = PreferencesUtil.getValue(SKIP_INFO_FETCH)
+                        if (skip) {
+                            downloaderViewModel.startDownloadSong(skipInfoFetch = true)
+                        } else {
+                            ToastUtil.makeToast(R.string.fetching_metadata)
+                            downloaderViewModel.requestMetadata()
+                        }
                     }
                 }
                 UrlValidator.Type.SpotifyAlbum,
@@ -192,13 +196,10 @@ fun DownloaderPage(
                     navigateToDownloaderSheet()
                 }
                 UrlValidator.Type.Other -> {
-                    // For other providers (YouTube/YT Music/spotify.link), follow the same UX:
-                    // request metadata when not pre-configuring; otherwise open the sheet.
                     if (PreferencesUtil.getValue(CONFIGURE)) {
                         navigateToDownloaderSheet()
                     } else {
-                        ToastUtil.makeToast(R.string.fetching_metadata)
-                        downloaderViewModel.requestMetadata()
+                        downloaderViewModel.startDownloadSong(skipInfoFetch = true)
                     }
                 }
             }
@@ -228,10 +229,8 @@ fun DownloaderPage(
         showSongCard = true,
         showDownloadProgress = taskState.taskId.isNotEmpty(),
         pasteCallback = {
-            // Use robust paste-and-download: normalize/validate and trigger appropriate action
             clipboardManager.getText()?.toString()?.let { raw ->
                 downloaderViewModel.onPasteAndDownload(raw)
-                // If it is a list-type URL and pre-configure is enabled, open the sheet
                 val current = downloaderViewModel.viewStateFlow.value.url
                 when (UrlValidator.classify(current)) {
                     UrlValidator.Type.SpotifyAlbum,
@@ -246,13 +245,11 @@ fun DownloaderPage(
         cancelCallback = {
             Downloader.cancelDownload()
         },
-        onUrlChanged = { url -> downloaderViewModel.updateUrl(url) }) {}
-
+        onUrlChanged = { url -> downloaderViewModel.updateUrl(url) }
+    ) { }
 }
 
-@OptIn(
-    ExperimentalMaterial3Api::class
-)
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DownloaderPageImplementation(
     downloaderState: Downloader.State,
@@ -273,7 +270,6 @@ fun DownloaderPageImplementation(
     onUrlChanged: (String) -> Unit = {},
     content: @Composable () -> Unit
 ) {
-    // Display a spinner either while downloading or while the core is still initializing
     val isAppInitialized by App.isInitialized.collectAsStateWithLifecycle()
 
     Scaffold(modifier = Modifier.fillMaxSize(), topBar = {
@@ -353,7 +349,6 @@ fun DownloaderPageImplementation(
                         )
                     }
                     AnimatedVisibility(
-                        // Show spinner if downloading OR core is not yet initialized
                         visible = !isAppInitialized || downloaderState !is Downloader.State.Idle,
                         modifier = Modifier
                     ) {
@@ -463,7 +458,6 @@ fun FABs(
                 }
             )
         }
-
     }
 }
 
@@ -524,7 +518,6 @@ fun InputUrl(
             )
             Text(
                 text = if (progress < 0) "0%" else "$progress%",
-                textAlign = TextAlign.Center,
                 modifier = Modifier.weight(0.25f)
             )
         }
