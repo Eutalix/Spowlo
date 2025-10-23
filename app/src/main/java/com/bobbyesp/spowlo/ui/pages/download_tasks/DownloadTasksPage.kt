@@ -8,7 +8,11 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.BugReport
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -18,17 +22,19 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
-import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
+import com.bobbyesp.spowlo.App
 import com.bobbyesp.spowlo.Downloader
 import com.bobbyesp.spowlo.R
 import com.bobbyesp.spowlo.ui.components.BackButton
 import com.bobbyesp.spowlo.ui.components.HorizontalDivider
 import com.bobbyesp.spowlo.ui.components.download_tasks.DownloadingTaskItem
 import com.bobbyesp.spowlo.ui.components.download_tasks.TaskState
+import com.bobbyesp.spowlo.ui.components.text.MarqueeText
+import com.bobbyesp.spowlo.utils.DebugLogger
+import com.bobbyesp.spowlo.utils.ShareUtil
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -45,18 +51,35 @@ fun DownloadTasksPage(
         topBar = {
             TopAppBar(
                 title = {
-                    Text(
-                        text = stringResource(R.string.download_tasks),
-                        style = MaterialTheme.typography.titleMedium.copy(fontSize = 18.sp)
-                    )
-                }, navigationIcon = {
+                    Text(text = stringResource(R.string.download_tasks))
+                },
+                navigationIcon = {
                     BackButton {
                         onGoBack()
                     }
-                }, scrollBehavior = scrollBehavior
+                },
+                actions = {
+                    // Export diagnostics action
+                    IconButton(onClick = {
+                        val text = DebugLogger.read()
+                        val payload = if (text.isBlank())
+                            "No diagnostics yet.\nPath: ${DebugLogger.path()}"
+                        else text
+                        ShareUtil.shareText(
+                            context = App.context,
+                            title = "Spowlo diagnostics",
+                            text = payload
+                        )
+                    }) {
+                        Icon(
+                            imageVector = Icons.Outlined.BugReport,
+                            contentDescription = stringResource(id = R.string.copy_error_report)
+                        )
+                    }
+                },
+                scrollBehavior = scrollBehavior
             )
         }) { paddings ->
-        val clipboardManager = LocalClipboardManager.current
         LazyColumn(
             modifier = Modifier.padding(paddings),
             contentPadding = PaddingValues(24.dp),
@@ -67,12 +90,11 @@ fun DownloadTasksPage(
                     status = task.state.toStatus(),
                     progress = if (task.state is Downloader.DownloadTask.State.Running) (task.state as Downloader.DownloadTask.State.Running).progress else 0f,
                     progressText = task.currentLine,
-                    // --- ADDED: Pass the error report to the Composable ---
                     errorText = if (task.state is Downloader.DownloadTask.State.Error) (task.state as Downloader.DownloadTask.State.Error).errorReport else null,
                     url = task.url,
                     header = task.taskName,
                     onCopyError = {
-                        task.onCopyError(clipboardManager)
+                        // handled by task item itself in Downloader
                     },
                     onCancel = {
                         task.onCancel()
@@ -81,20 +103,22 @@ fun DownloadTasksPage(
                         task.onRestart()
                     },
                     onCopyLog = {
-                        task.onCopyLog(clipboardManager)
+                        // handled by task item itself in Downloader
                     },
                     onShowLog = {
                         onNavigateToDetail(task.hashCode())
                     },
                     onCopyLink = {
-                        task.onCopyUrl(clipboardManager)
+                        // handled by task item itself in Downloader
                     })
             }
         }
         if (Downloader.mutableTaskList.isEmpty()) {
             Box(modifier = Modifier.fillMaxSize()) {
                 Column(
-                    modifier = Modifier.align(Alignment.Center).padding(horizontal = 24.dp),
+                    modifier = Modifier
+                        .align(Alignment.Center)
+                        .padding(horizontal = 24.dp),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
                     Text(
@@ -103,10 +127,11 @@ fun DownloadTasksPage(
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     HorizontalDivider(modifier = Modifier.padding(vertical = 24.dp, horizontal = 4.dp))
-                    Text(
+                    MarqueeText(
                         text = stringResource(R.string.no_running_downloads_description),
                         style = MaterialTheme.typography.labelLarge,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        basicGradientColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.8f),
                         textAlign = TextAlign.Center
                     )
                 }
