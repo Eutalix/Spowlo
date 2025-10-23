@@ -37,7 +37,8 @@ abstract class SpotDLCore {
     private lateinit var LDFLAGS: String
     private lateinit var TMPDIR: String
     private val pythonLibVersion = "pythonLibVersion"
-    protected open val idProcessMap: MutableMap<String, Process> = Collections.synchronizedMap(HashMap<String, Process>())
+    protected open val idProcessMap: MutableMap<String, Process> =
+        Collections.synchronizedMap(HashMap<String, Process>())
     internal val isDebug = BuildConfig.DEBUG
 
     open fun init(context: Context) {
@@ -64,7 +65,12 @@ abstract class SpotDLCore {
     }
 
     @Throws(IllegalStateException::class)
-    abstract fun ensureDependencies(appContext: Context, skipDependencies: List<Dependency> = emptyList(), callback: dependencyDownloadCallback? = null): DownloadedDependencies?
+    abstract fun ensureDependencies(
+        appContext: Context,
+        skipDependencies: List<Dependency> = emptyList(),
+        callback: dependencyDownloadCallback? = null
+    ): DownloadedDependencies?
+
     internal abstract fun initPython(appContext: Context, pythonDir: File)
 
     fun destroyProcessById(id: String): Boolean {
@@ -96,12 +102,20 @@ abstract class SpotDLCore {
 
     @JvmOverloads
     @Throws(SpotDLException::class, InterruptedException::class, CanceledException::class)
-    fun execute(request: SpotDLRequest, processId: String? = null, callback: ((Float, Long, String) -> Unit)? = null): SpotDLResponse {
+    fun execute(
+        request: SpotDLRequest,
+        processId: String? = null,
+        callback: ((Float, Long, String) -> Unit)? = null
+    ): SpotDLResponse {
         assertInit()
-        if (processId != null && idProcessMap.containsKey(processId)) throw SpotDLException("Process ID already exists")
+        if (processId != null && idProcessMap.containsKey(processId)) {
+            throw SpotDLException("Process ID already exists")
+        }
         request.addOption("--ffmpeg", ffmpegPath!!.absolutePath)
         val args = request.buildCommand()
-        val command = mutableListOf<String?>(pythonPath!!.absolutePath, "-m", "spotdl").apply { addAll(args) }
+        val command = mutableListOf<String?>(pythonPath!!.absolutePath, "-m", "spotdl").apply {
+            addAll(args)
+        }
         val processBuilder = ProcessBuilder(command)
         processBuilder.environment().apply {
             this["LD_LIBRARY_PATH"] = ENV_LD_LIBRARY_PATH
@@ -119,17 +133,17 @@ abstract class SpotDLCore {
             throw SpotDLException(e)
         }
         processId?.let { idProcessMap[it] = process }
+
         val outBuffer = StringBuilder()
         val errBuffer = StringBuilder()
-        
+
         val stdOutProcessor: Thread = if (callback != null) {
             StreamProcessExtractor(outBuffer, process.inputStream, callback)
         } else {
             StreamGobbler(outBuffer, process.inputStream)
         }
-
         val stdErrProcessor = StreamGobbler(errBuffer, process.errorStream)
-        
+
         val exitCode = try {
             stdOutProcessor.join()
             stdErrProcessor.join()
@@ -137,52 +151,61 @@ abstract class SpotDLCore {
         } catch (e: InterruptedException) {
             process.destroy()
             processId?.let { idProcessMap.remove(it) }
+            // Map to cancellation at this level
             throw e
         }
+
+        // Clean processId map entry after the process has finished
         processId?.let { idProcessMap.remove(it) }
-        
+
         val out = outBuffer.toString()
         val err = errBuffer.toString()
-        
+
         if (exitCode > 0) {
-            if (processId != null && !idProcessMap.containsKey(processId)) throw CanceledException()
-            if (!ignoreErrors(request, err)) { // MODIFIED: Check stderr for errors
-                Log.e("SpotDL", "Error occurred. STDERR: $err, STDOUT: $out, ExitCode: $exitCode")
-                throw SpotDLException(err.ifBlank { out }) // Throw stderr, or stdout if stderr is empty
+            // DO NOT treat “not in map” as cancellation here; map has been cleared above.
+            // Only map to SpotDLException with stderr (or stdout if stderr is empty).
+            if (!ignoreErrors(request, err)) {
+                if (isDebug) Log.e("SpotDL", "Non-zero exit. EXIT=$exitCode, STDERR=$err, STDOUT=$out")
+                throw SpotDLException(err.ifBlank { out })
             }
         }
+
         return SpotDLResponse(command, exitCode, System.currentTimeMillis() - 0L, out, err)
     }
-    
+
     @Throws(SpotDLException::class, InterruptedException::class, CanceledException::class)
-    fun getSongInfo(url: String, songId: String = UUID.randomUUID().toString(), extraArguments: Map<String, String>? = null): List<SpotifySong> {
+    fun getSongInfo(
+        url: String,
+        songId: String = UUID.randomUUID().toString(),
+        extraArguments: Map<String, String>? = null
+    ): List<SpotifySong> {
         assertInit()
-        
+
         val request = SpotDLRequest().apply {
             setOperation("save")
             urls = listOf(url)
-            
-            // --- DEBUGGING STEP: Add verbose logging flags ---
+
+            // Keep verbose flags; useful for diagnostics
             addOption("--log-level", "DEBUG")
             addOption("--print-errors")
-            // --------------------------------------------------
-            
+
             extraArguments?.forEach { (key, value) -> addOption(key, value) }
             if (!hasOption("--client-id") || !hasOption("--client-secret")) {
                 addOption("--client-id", BuildConfig.CLIENT_ID)
                 addOption("--client-secret", BuildConfig.CLIENT_SECRET)
             }
         }
-        
+
         val response = execute(request, songId, null)
         val jsonText = response.output
 
         try {
             if (jsonText.isBlank()) {
-                // If stdout is empty, the real error is in stderr
-                throw SpotDLException("Spotdl returned empty metadata. See error report for details. Raw Error:\n---\n${response.error}\n---")
+                throw SpotDLException(
+                    "Spotdl returned empty metadata. See error report for details. Raw Error:\n---\n${response.error}\n---"
+                )
             }
-            
+
             return if (jsonText.trim().startsWith("[")) {
                 json.decodeFromString<List<SpotifySong>>(jsonText)
             } else {
@@ -190,15 +213,23 @@ abstract class SpotDLCore {
                 listOf(singleSong)
             }
         } catch (e: Exception) {
-            throw SpotDLException("Failed to parse spotdl's JSON output. Raw output below:\n---\n$jsonText\n--- \n\nRaw Error:\n---\n${response.error}\n---", e)
+            throw SpotDLException(
+                "Failed to parse spotdl's JSON output. Raw output below:\n---\n$jsonText\n--- \n\nRaw Error:\n---\n${response.error}\n---",
+                e
+            )
         }
     }
 
-    // MODIFIED: ignoreErrors should check stderr, not stdout
-    private fun ignoreErrors(request: SpotDLRequest, err: String): Boolean = err.isBlank() && !request.hasOption("--print-errors")
-    
+    // Only ignore when stderr is blank and --print-errors is not present
+    private fun ignoreErrors(request: SpotDLRequest, err: String): Boolean =
+        err.isBlank() && !request.hasOption("--print-errors")
+
     @Throws(SpotDLException::class)
     private fun assertInit() = check(initialized) { "The SpotDL instance is not initialized" }
-    fun updatePython(appContext: Context, version: String) = SharedPrefsHelper.update(appContext, pythonLibVersion, version)
-    fun shouldUpdatePython(appContext: Context, version: String): Boolean = version != SharedPrefsHelper[appContext, pythonLibVersion]
+
+    fun updatePython(appContext: Context, version: String) =
+        SharedPrefsHelper.update(appContext, pythonLibVersion, version)
+
+    fun shouldUpdatePython(appContext: Context, version: String): Boolean =
+        version != SharedPrefsHelper[appContext, pythonLibVersion]
 }
