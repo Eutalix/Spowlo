@@ -36,7 +36,6 @@ import java.util.concurrent.TimeoutException
 
 object Downloader {
 
-    // Timeouts to avoid infinite loading
     private const val FETCH_TIMEOUT_MS = 30_000L
     private const val DOWNLOAD_TIMEOUT_MS = 120_000L
 
@@ -45,7 +44,6 @@ object Downloader {
             val currentItem: Int = 0,
             val itemCount: Int = 0,
         ) : State()
-
         data object DownloadingSong : State()
         data object FetchingInfo : State()
         data object Idle : State()
@@ -78,7 +76,6 @@ object Downloader {
         }
 
         override fun hashCode(): Int = (this.url + this.url.reversed()).hashCode()
-
         override fun equals(other: Any?): Boolean {
             if (this === other) return true
             if (javaClass != other?.javaClass) return false
@@ -171,12 +168,11 @@ object Downloader {
     private val mutableQuickDownloadCount = MutableStateFlow(0)
 
     private lateinit var songsDao: SongsInfoDao
+    val mutableTaskList = mutableStateMapOf<String, DownloadTask>()
 
     fun initialize(dao: SongsInfoDao) {
         songsDao = dao
     }
-
-    val mutableTaskList = mutableStateMapOf<String, DownloadTask>()
 
     init {
         applicationScope.launch {
@@ -198,7 +194,6 @@ object Downloader {
         ).run {
             DebugLogger.log("DL", "onTaskStarted url='$url' name='$name'")
             mutableTaskList[this.toKey()] = this
-
             val key = makeKey(url, url.reversed())
             NotificationsUtil.notifyProgress(
                 name + " - " + context.getString(R.string.parallel_download),
@@ -237,11 +232,7 @@ object Downloader {
         return (matchResult?.groupValues?.get(1)?.toFloat() ?: 0f) / 100f
     }
 
-    fun onTaskEnded(
-        url: String,
-        response: String? = null,
-        notificationTitle: String? = null
-    ) {
+    fun onTaskEnded(url: String, response: String? = null, notificationTitle: String? = null) {
         DebugLogger.log("DL", "onTaskEnded url='$url'")
         val key = makeKey(url, url.reversed())
         NotificationsUtil.finishNotification(
@@ -311,7 +302,14 @@ object Downloader {
             )
         }.onFailure {
             Log.d("Downloader", "$it")
-            if (it is CanceledException) return@onFailure
+            if (it is CanceledException) {
+                // Still treat as error: ensure UI returns to Idle
+                manageDownloadError(
+                    it, false, notificationId = notificationId, isTaskAborted = !isDownloadingPlaylist,
+                    songName = "${songInfo.artist} - ${songInfo.name}"
+                )
+                return@onFailure
+            }
             manageDownloadError(
                 it, false, notificationId = notificationId, isTaskAborted = !isDownloadingPlaylist,
                 songName = "${songInfo.artist} - ${songInfo.name}"
@@ -456,7 +454,7 @@ object Downloader {
         notificationId: Int? = null,
         songName: String? = null
     ) {
-        if (th is CanceledException) return
+        // Treat CanceledException as an error for state recovery (avoid infinite spinner)
         DebugLogger.logError("DL", th)
         th.printStackTrace()
         val resId = if (isFetchingInfo) R.string.fetch_info_error_msg else R.string.download_error_msg
