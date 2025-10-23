@@ -52,7 +52,8 @@ fun AboutPage(onBackPressed: () -> Unit) {
     val BobbyESPLogoUrl = "https://avatars.githubusercontent.com/u/60316747"
     val BobbyESPGHUrl = "https://github.com/BobbyESP"
 
-    val spowloRepo = "https://github.com/BobbyESP/Spowlo"
+    // UPDATED: point to your fork's repository
+    val spowloRepo = "https://github.com/Eutalix/Spowlo"
 
     val context = LocalContext.current
     val clipboardManager = LocalClipboardManager.current
