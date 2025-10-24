@@ -1,16 +1,10 @@
-<?xml version="1.0" encoding="utf-8"?>
-<resources
-    xmlns:tools="http://schemas.android.com/tools"
-    xmlns:xliff="urn:oasis:names:tc:xliff:document:1.2"
-    xmlns:ns1="http://schemas.android.com/tools"
-    xmlns:ns2="urn:oasis:names:tc:xliff:document:1.2">
-
-    <string name="app_name" translatable="false">Spowlo</string>
+<?xml version='1.0' encoding='utf-8'?>
+<resources><string name="app_name" translatable="false">Spowlo</string>
     <string name="follow_system">Follow system</string>
     <string name="on">On</string>
     <string name="off">Off</string>
     <string name="share_fail_msg">Unable to match URL from shared content</string>
-    <string name="paste_fail_msg"><![CDATA[Couldn't match the URL from clipboard]]></string>
+    <string name="paste_fail_msg">Couldn't match the URL from clipboard</string>
     <string name="paste_msg">URL pasted from clipboard</string>
     <string name="filesize_mb">%.2f MB</string>
     <string name="filesize_gb">%.2f GB</string>
@@ -33,7 +27,7 @@
     <string name="app_update_failed">An error happened while trying to update the app.</string>
     <string name="update">Update</string>
 
-    <!-- Default translation for 'error' -->
+    
     <string name="error">Error</string>
 
     <string name="permission_denied">Permission denied</string>
@@ -66,7 +60,7 @@
     <string name="print_details">Detailed console output</string>
     <string name="print_details_desc">Show the console log</string>
     <string name="permission_issue">Directories not supported</string>
-    <string name="permission_issue_desc">Your Android version or your granted permissions won't allow you to make downloads away from the &quot;Downloads&quot; or &quot;Documents&quot; folders</string>
+    <string name="permission_issue_desc">Your Android version or your granted permissions won't allow you to make downloads away from the "Downloads" or "Documents" folders</string>
     <string name="audio_directory">Download location</string>
     <string name="sdcard_directory">SD Cards downloads directory</string>
     <string name="sdcard_not_activable_hint">You won't be able to select the option for downloading to an SD until you don't select a path by clicking on the button.</string>
@@ -159,8 +153,8 @@
     <string name="clear_all_cookies">Delete all the cookies</string>
     <string name="cookies_desc">Use Netscape formatted cookies for downloads</string>
     <string name="cookies_file_name" translatable="false">cookies.txt</string>
-    <string name="cookies_usage_msg">Downloading songs with high quality requires YT Music account authentication information. Click &quot;Generate new cookies&quot;, enter the URL of the website and then log in with your account in the browser page, the app will generate it for you.</string>
-    <string name="remove_cookie_profile_desc">Remove cookies for &quot;%1$s&quot;?</string>
+    <string name="cookies_usage_msg">Downloading songs with high quality requires YT Music account authentication information. Click "Generate new cookies", enter the URL of the website and then log in with your account in the browser page, the app will generate it for you.</string>
+    <string name="remove_cookie_profile_desc">Remove cookies for "%1$s"?</string>
     <string name="clear_all_cookies_desc">Delete all the cookies stored in the app?</string>
     <string name="download_lyrics">Download Lyrics</string>
     <string name="download_lyrics_desc">Fetch and save lyrics</string>
@@ -194,7 +188,7 @@ This will have some instability in these versions, so please don't hesitate to g
     <string name="documentation_info">Please, know that this pages will be changed by FAQs and the actual full markdown files will be replaced in a future by the mentioned before.</string>
     <string name="delete_info">Delete song from the history</string>
     <string name="remove_song">Do you want to remove this song?</string>
-    <string name="remove_song_info">You are going to delete &quot;%1$s&quot; by &quot;%2$s&quot;.</string>
+    <string name="remove_song_info">You are going to delete "%1$s" by "%2$s".</string>
     <string name="delete_file">Delete file from system</string>
     <string name="are_you_sure">Are you sure?</string>
     <string name="spotify_link">Spotify link</string>
@@ -307,7 +301,6 @@ This will have some instability in these versions, so please don't hesitate to g
     <string name="service_channel_name">Download Starting</string>
     <string name="service_title">Spowlo is downloading...</string>
     <string name="channel_description">Show up your downloads on notification centre</string>
-    <string name="service_title">Spowlo is downloading...</string>
     <string name="execute_parallel_download">Executing parallel download</string>
     <string name="followers">Followers</string>
     <string name="no_running_downloads_description">All the downloads that you make from the search page will appear here.</string>
