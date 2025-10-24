@@ -59,7 +59,7 @@ val currentVersion: Version = Version.Stable(
     versionMajor = 1,
     versionMinor = 5,
     versionPatch = 4,
-    versionBuild = 1
+    versionBuild = 1 // increase when you publish a rebuild without changing X.Y.Z
 )
 
 val keystorePropertiesFile = rootProject.file("keystore.properties")
@@ -113,10 +113,6 @@ android {
         ndk {
             abiFilters.addAll(listOf("arm64-v8a", "armeabi-v7a"))
         }
-
-        // TEMP: limit release resources to English to bypass problematic merged resources
-        // Revert this once resource merge issues are fixed
-        resourceConfigurations += listOf("en")
     }
 
     buildTypes {
@@ -199,6 +195,7 @@ android {
         }
         jniLibs.useLegacyPackaging = true
     }
+
     namespace = "com.bobbyesp.spowlo"
 }
 
@@ -214,6 +211,8 @@ dependencies {
     implementation(libs.androidx.activity.compose)
     implementation(libs.androidx.lifecycle.runtimeCompose)
     implementation(libs.androidx.lifecycle.viewModelCompose)
+
+    // Compose BOM
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.compose.ui)
     implementation(libs.androidx.compose.ui.tooling.preview)
@@ -264,9 +263,7 @@ dependencies {
 
 fun String.capitalizeWord(): String {
     return this.replaceFirstChar {
-        if (it.isLowerCase()) it.titlecase(
-            Locale.getDefault()
-        ) else it.toString()
+        if (it.isLowerCase()) it.titlecase(Locale.getDefault()) else it.toString()
     }
 }
 
