@@ -31,7 +31,7 @@ sealed class Version(
             "${versionMajor}.${versionMinor}.${versionPatch}-beta.$versionBuild"
     }
 
-    // UPDATED: Stable accepts versionBuild but keeps plain X.Y.Z as versionName
+    // Stable accepts versionBuild but keeps plain X.Y.Z as versionName
     class Stable(
         versionMajor: Int,
         versionMinor: Int,
@@ -83,11 +83,12 @@ android {
     }
 
     val localProperties = Properties()
-    if(rootProject.file("local.properties").exists()){
+    if (rootProject.file("local.properties").exists()) {
         localProperties.load(FileInputStream(rootProject.file("local.properties")))
     }
 
     compileSdk = 35
+
     defaultConfig {
         applicationId = "com.bobbyesp.spowlo"
         minSdk = 26
@@ -95,9 +96,9 @@ android {
         versionCode = currentVersion.toVersionCode()
 
         versionName = currentVersion.toVersionName().run {
-            if (!splitApks) "$this-(F-Droid)"
-            else this
+            if (!splitApks) "$this-(F-Droid)" else this
         }
+
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
             useSupportLibrary = true
@@ -112,6 +113,10 @@ android {
         ndk {
             abiFilters.addAll(listOf("arm64-v8a", "armeabi-v7a"))
         }
+
+        // TEMP: limit release resources to English to bypass problematic merged resources
+        // Revert this once resource merge issues are fixed
+        resourceConfigurations += listOf("en")
     }
 
     buildTypes {
@@ -123,8 +128,16 @@ android {
 
             signingConfig = signingConfigs.getByName("release")
 
-            buildConfigField("String", "CLIENT_ID", "\"${localProperties.getProperty("CLIENT_ID", "YOUR_CLIENT_ID_PLACEHOLDER")}\"")
-            buildConfigField("String", "CLIENT_SECRET", "\"${localProperties.getProperty("CLIENT_SECRET", "YOUR_CLIENT_SECRET_PLACEHOLDER")}\"")
+            buildConfigField(
+                "String",
+                "CLIENT_ID",
+                "\"${localProperties.getProperty("CLIENT_ID", "YOUR_CLIENT_ID_PLACEHOLDER")}\""
+            )
+            buildConfigField(
+                "String",
+                "CLIENT_SECRET",
+                "\"${localProperties.getProperty("CLIENT_SECRET", "YOUR_CLIENT_SECRET_PLACEHOLDER")}\""
+            )
 
             matchingFallbacks.add(0, "debug")
             matchingFallbacks.add(1, "release")
@@ -133,8 +146,16 @@ android {
             if (keystorePropertiesFile.exists())
                 signingConfig = signingConfigs.getByName("debug")
 
-            buildConfigField("String", "CLIENT_ID", "\"${localProperties.getProperty("CLIENT_ID", "YOUR_CLIENT_ID_PLACEHOLDER")}\"")
-            buildConfigField("String", "CLIENT_SECRET", "\"${localProperties.getProperty("CLIENT_SECRET", "YOUR_CLIENT_SECRET_PLACEHOLDER")}\"")
+            buildConfigField(
+                "String",
+                "CLIENT_ID",
+                "\"${localProperties.getProperty("CLIENT_ID", "YOUR_CLIENT_ID_PLACEHOLDER")}\""
+            )
+            buildConfigField(
+                "String",
+                "CLIENT_SECRET",
+                "\"${localProperties.getProperty("CLIENT_SECRET", "YOUR_CLIENT_SECRET_PLACEHOLDER")}\""
+            )
 
             System.setProperty("CLIENT_ID", "\"${localProperties.getProperty("CLIENT_ID")}\"")
             System.setProperty("CLIENT_SECRET", "\"${localProperties.getProperty("CLIENT_SECRET")}\"")
@@ -202,6 +223,7 @@ dependencies {
     implementation(libs.androidx.compose.material3.windowSizeClass)
     implementation(libs.androidx.compose.foundation)
     implementation(libs.androidx.navigation.compose)
+
     implementation(libs.accompanist.systemuicontroller)
     implementation(libs.accompanist.permissions)
     implementation(libs.accompanist.navigation.animation)
@@ -209,6 +231,7 @@ dependencies {
     implementation(libs.accompanist.flowlayout)
     implementation(libs.accompanist.material)
     implementation(libs.accompanist.pager.indicators)
+
     implementation(libs.paging.compose)
     implementation(libs.paging.runtime)
     implementation(libs.coil.kt.compose)
@@ -220,15 +243,18 @@ dependencies {
     implementation(libs.room.runtime)
     implementation(libs.room.ktx)
     ksp(libs.room.compiler)
+
     implementation(project(":library"))
     implementation(project(":ffmpeg"))
     implementation(project(":common"))
+
     implementation(libs.spotify.api.android)
     implementation(libs.okhttp)
     implementation(libs.bundles.ktor)
     implementation(libs.mmkv)
     implementation(libs.markdown)
     implementation(libs.customtabs)
+
     debugImplementation(libs.crash.handler)
     testImplementation(libs.junit4)
     androidTestImplementation(libs.androidx.test.ext)
