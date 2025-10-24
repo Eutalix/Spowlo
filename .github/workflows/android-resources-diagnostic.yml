@@ -30,6 +30,12 @@ jobs:
           yes | sdkmanager --licenses
           sdkmanager --install "platform-tools" "platforms;android-35" "build-tools;35.0.0"
 
+      # Create local.properties so :library and :app can read CLIENT_ID/CLIENT_SECRET
+      - name: Configure Build Properties
+        run: |
+          echo "CLIENT_ID=${{ secrets.CLIENT_ID || 'PLACEHOLDER' }}" >> local.properties
+          echo "CLIENT_SECRET=${{ secrets.CLIENT_SECRET || 'PLACEHOLDER' }}" >> local.properties
+
       # Quick environment introspection
       - name: Print Android SDK info
         run: |
