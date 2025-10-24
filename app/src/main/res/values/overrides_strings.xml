@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Overrides to replace any "{str}" coming from transitive merges -->
+    <string name="api_call_failed"><![CDATA[Calling the MODs API wasn't successful]]></string>
+    <string name="generate_lrc_desc"><![CDATA[Generate lrc file for the downloaded songs if found. Requires 'Synced' lyric provider to be enabled.]]></string>
+    <string name="url_empty"><![CDATA[There's no URL to download]]></string>
+    <string name="update_channel_desc"><![CDATA[Install pre-release builds to preview new features and changes.
+
+There will be some instability in these versions, so please don't hesitate to give us feedback if you experience any problems to help us improve the app for the future.]]></string>
+    <string name="permission_issue_desc"><![CDATA[Your Android version or your granted permissions won't allow you to make downloads away from the "Downloads" or "Documents" folders]]></string>
+    <string name="threads_number_desc"><![CDATA[Change how many downloads at a time can be running. This doesn't apply on single track downloads.]]></string>
+    <string name="not_convert"><![CDATA[Don't convert]]></string>
+    <string name="paste_fail_msg"><![CDATA[Couldn't match the URL from clipboard]]></string>
+    <string name="sdcard_not_activable_hint"><![CDATA[You won't be able to select the option for downloading to an SD until you don't select a path by clicking on the button.]]></string>
+    <string name="dont_filter_results"><![CDATA[Don't filter results]]></string>
+</resources>
