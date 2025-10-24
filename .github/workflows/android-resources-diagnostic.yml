@@ -1,0 +1,50 @@
+name: Android Resources Diagnostic
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  resources-diagnostic:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+
+      # Set up Android SDK (provides sdkmanager)
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      # Install platform (android-35) and build-tools (35.0.0) so AAPT2 links android.jar with lStar
+      - name: Install Android platform and build-tools
+        run: |
+          yes | sdkmanager --licenses
+          sdkmanager --install "platform-tools" "platforms;android-35" "build-tools;35.0.0"
+
+      - name: Make gradlew executable
+        run: chmod +x ./gradlew
+
+      # Run only the resource merge for release (faster, focused logs)
+      - name: Merge resources (release) with --info
+        run: ./gradlew :app:mergeReleaseResources --info --stacktrace
+
+      # Upload the merged values so we can inspect exactly what AAPT2 is compiling
+      - name: Upload merged values (release)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: merged-values-${{ github.sha }}
+          path: |
+            app/build/intermediates/incremental/release/mergeReleaseResources/merged.dir/values/values.xml
+            app/build/intermediates/incremental/release/mergeReleaseResources/merged.dir/values-*/values.xml
+          if-no-files-found: ignore
+          retention-days: 7
