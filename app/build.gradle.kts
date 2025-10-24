@@ -59,7 +59,7 @@ val currentVersion: Version = Version.Stable(
     versionMajor = 1,
     versionMinor = 5,
     versionPatch = 4,
-    versionBuild = 1 // increase when you publish a rebuild without changing X.Y.Z
+    versionBuild = 1 
 )
 
 val keystorePropertiesFile = rootProject.file("keystore.properties")
@@ -189,9 +189,27 @@ android {
     // Consolidated packaging rules
     packaging {
         resources {
-            // pickFirst to avoid conflicts under META-INF when merging dependencies
+            // avoid conflicts under META-INF when merging dependencies
             pickFirsts += "META-INF/**"
             excludes += "META-INF/*.kotlin_module"
+
+            // Prefer app's launcher icons over any library duplicates
+            pickFirsts += listOf(
+                "mipmap-anydpi-v26/ic_launcher.xml",
+                "mipmap-anydpi-v26/ic_launcher_round.xml",
+                "mipmap-hdpi/ic_launcher.png",
+                "mipmap-hdpi/ic_launcher_round.png",
+                "mipmap-mdpi/ic_launcher.png",
+                "mipmap-mdpi/ic_launcher_round.png",
+                "mipmap-xhdpi/ic_launcher.png",
+                "mipmap-xhdpi/ic_launcher_round.png",
+                "mipmap-xxhdpi/ic_launcher.png",
+                "mipmap-xxhdpi/ic_launcher_round.png",
+                "mipmap-xxxhdpi/ic_launcher.png",
+                "mipmap-xxxhdpi/ic_launcher_round.png",
+                "mipmap/ic_launcher.png",
+                "mipmap/ic_launcher_round.png"
+            )
         }
         jniLibs.useLegacyPackaging = true
     }
