@@ -20,7 +20,7 @@ jobs:
           java-version: '21'
           distribution: 'temurin'
 
-      # Set up Android SDK (provides sdkmanager)
+      # Set up Android SDK (provides 'sdkmanager' on PATH)
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
 
@@ -30,8 +30,19 @@ jobs:
           yes | sdkmanager --licenses
           sdkmanager --install "platform-tools" "platforms;android-35" "build-tools;35.0.0"
 
+      # Quick environment introspection
+      - name: Print Android SDK info
+        run: |
+          echo "ANDROID_SDK_ROOT=${ANDROID_SDK_ROOT}"
+          sdkmanager --list | head -n 100
+          ls -la "${ANDROID_SDK_ROOT}/platforms/android-35" || true
+
       - name: Make gradlew executable
         run: chmod +x ./gradlew
+
+      # Print what Gradle thinks about compileSdk
+      - name: Print Gradle project properties (compileSdk)
+        run: ./gradlew :app:properties | grep -i "compileSdk" || true
 
       # Run only the resource merge for release (faster, focused logs)
       - name: Merge resources (release) with --info
