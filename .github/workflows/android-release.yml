@@ -11,10 +11,6 @@ on:
         description: "Optional release name (used only if publish_release=true). Defaults to the ref name."
         required: false
         type: string
-      debug_resources:
-        description: "Run :app:mergeReleaseResources --info (diagnostic) before assembling?"
-        type: boolean
-        default: false
   push:
     tags:
       - 'v*.*.*'
@@ -36,11 +32,9 @@ jobs:
           java-version: '21'
           distribution: 'temurin'
 
-      # Set up Android SDK + cmdline-tools (provides 'sdkmanager' on PATH)
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
 
-      # Accept licenses and install platform 35 + build-tools 35.0.0
       - name: Install Android platform and build-tools
         run: |
           yes | sdkmanager --licenses
@@ -62,22 +56,6 @@ jobs:
 
       - name: Make gradlew executable
         run: chmod +x ./gradlew
-
-      # Optional diagnostic step to isolate resource issues
-      - name: Merge resources (diagnostic)
-        if: ${{ inputs.debug_resources == 'true' }}
-        run: ./gradlew :app:mergeReleaseResources --info --stacktrace
-
-      - name: Upload merged values (diagnostic)
-        if: ${{ always() && inputs.debug_resources == 'true' }}
-        uses: actions/upload-artifact@v4
-        with:
-          name: merged-values-${{ github.sha }}
-          path: |
-            app/build/intermediates/incremental/release/mergeReleaseResources/merged.dir/values/values.xml
-            app/build/intermediates/incremental/release/mergeReleaseResources/merged.dir/values-*/values.xml
-          if-no-files-found: ignore
-          retention-days: 7
 
       - name: Build with Gradle (Clean + Assemble)
         run: ./gradlew clean :app:assembleRelease
