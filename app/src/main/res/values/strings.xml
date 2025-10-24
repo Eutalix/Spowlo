@@ -1,7 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources
     xmlns:tools="http://schemas.android.com/tools"
-    xmlns:xliff="urn:oasis:names:tc:xliff:document:1.2">
+    xmlns:xliff="urn:oasis:names:tc:xliff:document:1.2"
+    xmlns:ns1="http://schemas.android.com/tools"
+    xmlns:ns2="urn:oasis:names:tc:xliff:document:1.2">
 
     <string name="app_name" translatable="false">Spowlo</string>
     <string name="follow_system">Follow system</string>
@@ -372,6 +374,5 @@ This doesn't make effect on the searcher page because the app already uses exten
     <string name="artist_top_albums">Top Albums</string>
     <string name="uncomplete_playlist">Right now Spowlo may not show all songs due to the lack of pagination, but when trying to download the full playlist, all the songs will be downloaded. This is already fixed in the upcoming Spowlo 2.0.0</string>
 
-    <!-- Added before: initialization toast -->
     <string name="app_is_initializing">App is initializing, please wait a moment…</string>
 </resources>
