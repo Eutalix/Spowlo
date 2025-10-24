@@ -10,7 +10,7 @@
     <string name="on">On</string>
     <string name="off">Off</string>
     <string name="share_fail_msg">Unable to match URL from shared content</string>
-    <string name="paste_fail_msg">Couldn't match the URL from clipboard</string>
+    <string name="paste_fail_msg"><![CDATA[Couldn't match the URL from clipboard]]></string>
     <string name="paste_msg">URL pasted from clipboard</string>
     <string name="filesize_mb">%.2f MB</string>
     <string name="filesize_gb">%.2f GB</string>
@@ -66,7 +66,7 @@
     <string name="print_details">Detailed console output</string>
     <string name="print_details_desc">Show the console log</string>
     <string name="permission_issue">Directories not supported</string>
-    <string name="permission_issue_desc">Your Android version or your granted permissions won't allow you to make downloads away from the "Downloads" or "Documents" folders</string>
+    <string name="permission_issue_desc">Your Android version or your granted permissions won't allow you to make downloads away from the &quot;Downloads&quot; or &quot;Documents&quot; folders</string>
     <string name="audio_directory">Download location</string>
     <string name="sdcard_directory">SD Cards downloads directory</string>
     <string name="sdcard_not_activable_hint">You won't be able to select the option for downloading to an SD until you don't select a path by clicking on the button.</string>
@@ -159,8 +159,8 @@
     <string name="clear_all_cookies">Delete all the cookies</string>
     <string name="cookies_desc">Use Netscape formatted cookies for downloads</string>
     <string name="cookies_file_name" translatable="false">cookies.txt</string>
-    <string name="cookies_usage_msg">Downloading songs with high quality requires YT Music account authentication information. Click "Generate new cookies", enter the URL of the website and then log in with your account in the browser page, the app will generate it for you.</string>
-    <string name="remove_cookie_profile_desc">Remove cookies for "%1$s"?</string>
+    <string name="cookies_usage_msg">Downloading songs with high quality requires YT Music account authentication information. Click &quot;Generate new cookies&quot;, enter the URL of the website and then log in with your account in the browser page, the app will generate it for you.</string>
+    <string name="remove_cookie_profile_desc">Remove cookies for &quot;%1$s&quot;?</string>
     <string name="clear_all_cookies_desc">Delete all the cookies stored in the app?</string>
     <string name="download_lyrics">Download Lyrics</string>
     <string name="download_lyrics_desc">Fetch and save lyrics</string>
@@ -177,7 +177,7 @@
     <string name="app_up_to_date">The app is already up to date</string>
     <string name="update_channel_desc">Install pre-release builds to preview new features and changes.
 
-There will be some instability in these versions, so please don't hesitate to give us feedback if you experience any problems to help us improve the app for the future.</string>
+This will have some instability in these versions, so please don't hesitate to give us feedback if you experience any problems to help us improve the app for the future.</string>
     <string name="updates_channels">Updates channels</string>
     <string name="updates_channels_desc">Auto app updating, updating channel</string>
     <string name="share">Share</string>
@@ -194,7 +194,7 @@ There will be some instability in these versions, so please don't hesitate to gi
     <string name="documentation_info">Please, know that this pages will be changed by FAQs and the actual full markdown files will be replaced in a future by the mentioned before.</string>
     <string name="delete_info">Delete song from the history</string>
     <string name="remove_song">Do you want to remove this song?</string>
-    <string name="remove_song_info">You are going to delete "%1$s" by "%2$s".</string>
+    <string name="remove_song_info">You are going to delete &quot;%1$s&quot; by &quot;%2$s&quot;.</string>
     <string name="delete_file">Delete file from system</string>
     <string name="are_you_sure">Are you sure?</string>
     <string name="spotify_link">Spotify link</string>
@@ -305,6 +305,7 @@ There will be some instability in these versions, so please don't hesitate to gi
     <string name="font_size">Font size</string>
     <string name="channel_name">Download</string>
     <string name="service_channel_name">Download Starting</string>
+    <string name="service_title">Spowlo is downloading...</string>
     <string name="channel_description">Show up your downloads on notification centre</string>
     <string name="service_title">Spowlo is downloading...</string>
     <string name="execute_parallel_download">Executing parallel download</string>
@@ -318,7 +319,7 @@ There will be some instability in these versions, so please don't hesitate to gi
     <string name="use_notifications_desc">Pop up notifications with the actual downloads progress</string>
     <string name="agree">Agree</string>
     <string name="spotify_api_info">Spotify API</string>
-    <string name="spotify_api_info_description">This Spotify credentials can be used for having more closer and precise results to the songs requested in the main downloader page of the app. 
+    <string name="spotify_api_info_description">This Spotify credentials can be used for having more closer and precise results to the songs requested in the main downloader page of the app.   
 
 This doesn't make effect on the searcher page because the app already uses extended-quota API credentials provided by Spotify.</string>
     <string name="parallel_download">Parallel download</string>
@@ -334,7 +335,7 @@ This doesn't make effect on the searcher page because the app already uses exten
     <string name="albums">Albums</string>
     <string name="see_album">See album</string>
     <string name="updates_blocked">SpotDL updates blocked</string>
-    <string name="updates_blocked_description">We have blocked the SpotDL updates. This is because we can be focused on the next version of Spowlo, the 2.0.0 (will come with big changes)!</string>
+    <string name="updates_blocked_description">SpotDL updates blocked because we are focused on the next version of Spowlo, 2.0.0 (will come with big changes)!</string>
     <string name="what_like_download">What would you like to download?</string>
     <string name="results">results</string>
     <string name="paste_report_github">Paste the copied report in the marked text box in GitHub</string>
@@ -347,31 +348,6 @@ This doesn't make effect on the searcher page because the app already uses exten
     <string name="split_playlist_desc">Make the downloader split your downloads folder into folders with the name of the playlist</string>
     <string name="split_by_main_artist">Split by main artist</string>
     <string name="split_by_main_artist_desc">The downloader splits you downloads depending on the main artist of the song</string>
-    <string name="mods_downloader_banned">The mods downloader has been deleted since Firebase (a Google hosting service) has disabled APKs downloading in the free version of the same. Please, consider using xManager as an alternative.</string>
-    <string name="lyric_providers">Lyric Providers</string>
-    <string name="lyric_providers_desc">Choose from where you want to download the lyrics</string>
-    <string name="sponsorblock">SponsorBlock</string>
-    <string name="sponsorblock_desc">Use SponsorBlock along with YouTube and/or YouTube Music providers</string>
-    <string name="enable_notifications">Enable notifications?</string>
-    <string name="enable_notifications_desc">Spowlo needs your permission to post notifications about download status</string>
-    <string name="continue_">Continue</string>
-    <string name="only_verified_results">Use only verified results</string>
-    <string name="only_verified_results_desc">Download only verified results, only works in select providers</string>
-    <string name="skip_explict">Skip explicit songs</string>
-    <string name="skip_explict_desc">Skip explicit songs while downloading</string>
-    <string name="generate_lrc">Generate lrc file</string>
-    <string name="generate_lrc_desc">Generate lrc file for the downloaded songs if found. Requires 'Synced' lyric provider to be enabled.</string>
-    <string name="skip_album_art">Skip album art</string>
-    <string name="skip_album_art_desc">Skip downloading album art for meta operation</string>
-    <string name="output_format">Output format</string>
-    <string name="output_format_desc">Specify the downloaded file name format</string>
-    <string name="available_output_formats">Available output formats values</string>
-    <string name="incognito_mode">Incognito mode</string>
-    <string name="incognito_mode_desc">Disable download history</string>
-    <string name="artist_followers">Followers</string>
-    <string name="artist_popularity">Popularity</string>
-    <string name="artist_top_tracks">Top Tracks</string>
-    <string name="artist_top_albums">Top Albums</string>
     <string name="uncomplete_playlist">Right now Spowlo may not show all songs due to the lack of pagination, but when trying to download the full playlist, all the songs will be downloaded. This is already fixed in the upcoming Spowlo 2.0.0</string>
 
     <string name="app_is_initializing">App is initializing, please wait a moment…</string>

@@ -36,7 +36,7 @@
     <string name="network_settings_desc">Cambia tu configuración de internet</string>
     <string name="lite_description">Una versión ligera de Spotify sin anuncios y con saltos ilimitados.</string>
     <string name="multiselect_item_count">%1$d canción(es)</string>
-    <string name="are_you_sure">Estás seguro\?</string>
+    <string name="are_you_sure">¿Estás seguro?</string>
     <string name="battery_configuration_desc">Activa el uso de la aplicación en segundo plano para asegurarse de que todo funciona correctamente.</string>
     <string name="settings_before_download_text">Ajusta tu descarga</string>
     <string name="appearance">Apariencia</string>
@@ -75,7 +75,7 @@
     <string name="print_details">Salida detallada de la consola</string>
     <string name="close">Cerrar</string>
     <string name="both">Ambos</string>
-    <string name="threads_number_desc">"Cambie la cantidad de descargas que se pueden ejecutar a la vez.  Esto no se aplica a las descargas de una sola pista."</string>
+    <string name="threads_number_desc">Cambie la cantidad de descargas que se pueden ejecutar a la vez. Esto no se aplica a las descargas de una sola pista.</string>
     <string name="copy_error_report">Copiar informe de errores</string>
     <string name="copy_log">Copiar registro completo</string>
     <string name="dismiss">Despedir</string>
@@ -88,14 +88,14 @@
     <string name="song_disc_number">Número de discos</string>
     <string name="clear_database">Limpiar base de datos</string>
     <string name="channel_name">Descargar</string>
-    <string name="clear_all_cookies_desc">¿Eliminar todas las cookies almacenadas en la aplicación\?</string>
+    <string name="clear_all_cookies_desc">¿Eliminar todas las cookies almacenadas en la aplicación?</string>
     <string name="advanced_features">Características avanzadas</string>
     <string name="downloader_settings_desc">Cambia configuraciones más avanzadas de spotDL y descargas paralelas</string>
     <string name="agree">Aceptar</string>
     <string name="pre_configure_download">Configurar descarga</string>
     <string name="settings_before_download">Configure antes de descargar</string>
     <string name="audio_format_desc">Elige el formato de audio en el que quieres guardar tus descargas</string>
-    <string name="remove_song">¿Quieres eliminar esta canción\?</string>
+    <string name="remove_song">¿Quieres eliminar esta canción?</string>
     <string name="remove_template">Eliminar plantilla</string>
     <string name="share_fail_msg">No se ha podido encontrar el URL del contenido compartido</string>
     <string name="paste_msg">URL pegado del portapapeles</string>
@@ -147,8 +147,8 @@
     <string name="generate_new_cookies">Generar nuevas cookies</string>
     <string name="export_to_clipboard">Exportar cookies al portapapeles</string>
     <string name="cookies_desc">Usa cookies con formato Netscape para las descargas</string>
-    <string name="cookies_usage_msg">La descarga de canciones en alta calidad requiere información de autenticación de la cuenta de YT Music. Haz clic en \"Generar nuevas cookies\", ingresa la URL del sitio web y luego inicia sesión con tu cuenta en la página del navegador, la aplicación la generará por ti.</string>
-    <string name="remove_cookie_profile_desc">¿Eliminar cookies para \"%1$s\"?</string>
+    <string name="cookies_usage_msg">La descarga de canciones en alta calidad requiere información de autenticación de la cuenta de YT Music. Haz clic en &quot;Generar nuevas cookies&quot;, ingresa la URL del sitio web y luego inicia sesión con tu cuenta en la página del navegador, la aplicación la generará por ti.</string>
+    <string name="remove_cookie_profile_desc">¿Eliminar cookies para &quot;%1$s&quot;?</string>
     <string name="download_lyrics_desc">Obtener y guardar letras</string>
     <string name="downloader">Descargador</string>
     <string name="searcher">Búsqueda</string>
@@ -168,7 +168,7 @@
     <string name="markdown_viewer">Visor de Markdown</string>
     <string name="documentation_desc">Lee la documentación oficial de spotDL</string>
     <string name="documentation_info">Ten en cuenta que estas páginas serán cambiadas por preguntas frecuentes y los archivos markdown completos actuales serán reemplazados en un futuro por lo mencionado anteriormente.</string>
-    <string name="remove_song_info">Vas a eliminar \"%1$s\" de \"%2$s\".</string>
+    <string name="remove_song_info">Vas a eliminar &quot;%1$s&quot; de &quot;%2$s&quot;.</string>
     <string name="spotify_link">Enlace de Spotify</string>
     <string name="link_copied">¡Enlace copiado!</string>
     <string name="delete_multiple_items_msg">Estás a punto de eliminar %1$d elemento(s) de tu historial de descargas. ¿Quieres continuar?</string>
@@ -221,7 +221,9 @@
     <string name="log_copied">El registro ha sido copiado al portapapeles</string>
     <string name="use_notifications_desc">Muestra notificaciones emergentes con el progreso actual de las descargas</string>
     <string name="spotify_api_info">API de Spotify</string>
-    <string name="spotify_api_info_description">Estas credenciales de Spotify se pueden usar para tener resultados más cercanos y precisos a las canciones solicitadas en la página principal del descargador de la aplicación. \n\nEsto no afecta la página de búsqueda porque la aplicación ya utiliza credenciales de API de cuota extendida proporcionadas por Spotify.</string>
+    <string name="spotify_api_info_description">Estas credenciales de Spotify se pueden usar para tener resultados más cercanos y precisos a las canciones solicitadas en la página principal del descargador de la aplicación. 
+
+Esto no afecta la página de búsqueda porque la aplicación ya utiliza credenciales de API de cuota extendida proporcionadas por Spotify.</string>
     <string name="parallel_download">Descarga paralela</string>
     <string name="pre_configure_download_desc">Abrir el diálogo de configuración antes de cada descarga</string>
     <string name="spotdl_update_failed">La actualización de spotDL falló.</string>
@@ -256,7 +258,7 @@
     <string name="skip_explict">Saltar canciones explícitas</string>
     <string name="skip_explict_desc">Saltar canciones explícitas al descargar</string>
     <string name="generate_lrc">Generar archivo lrc</string>
-    <string name="generate_lrc_desc">Genera un archivo lrc para las canciones descargadas si se encuentra. Requiere que el proveedor de letras \'Synced\' esté habilitado.</string>
+    <string name="generate_lrc_desc">Genera un archivo lrc para las canciones descargadas si se encuentra. Requiere que el proveedor de letras 'Synced' esté habilitado.</string>
     <string name="skip_album_art">Saltar carátula del álbum</string>
     <string name="skip_album_art_desc">Saltar la descarga de la carátula del álbum para la operación de metadatos</string>
     <string name="output_format">Formato de salida</string>
@@ -269,7 +271,5 @@
     <string name="artist_top_tracks">Pistas principales</string>
     <string name="artist_top_albums">Álbumes principales</string>
     <string name="uncomplete_playlist">En este momento, Spowlo puede no mostrar todas las canciones debido a la falta de paginación, pero al intentar descargar la lista de reproducción completa, se descargarán todas las canciones. Esto ya está solucionado en el próximo Spowlo 2.0.0</string>
-
-    <!-- ADDED: New string for the initialization toast -->
     <string name="app_is_initializing">La aplicación se está inicializando, por favor espere un momento…</string>
 </resources>
