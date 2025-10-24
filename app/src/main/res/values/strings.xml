@@ -4,7 +4,7 @@
     <string name="on">On</string>
     <string name="off">Off</string>
     <string name="share_fail_msg">Unable to match URL from shared content</string>
-    <string name="paste_fail_msg">Couldn\'t match the URL from clipboard</string>
+    <string name="paste_fail_msg">Couldn&#39;t match the URL from clipboard</string>
     <string name="paste_msg">URL pasted from clipboard</string>
     <string name="filesize_mb">%.2f MB</string>
     <string name="filesize_gb">%.2f GB</string>
@@ -26,6 +26,10 @@
     <string name="lyrics">Lyrics</string>
     <string name="app_update_failed">An error happened while trying to update the app.</string>
     <string name="update">Update</string>
+
+    <!-- ADDED: default translation for 'error' to match values-es -->
+    <string name="error">Error</string>
+
     <string name="permission_denied">Permission denied</string>
     <string name="unknown_error">An unknown error occurred.</string>
     <string name="error_copied">The error output has been copied to the clipboard.</string>
@@ -56,21 +60,21 @@
     <string name="print_details">Detailed console output</string>
     <string name="print_details_desc">Show the console log</string>
     <string name="permission_issue">Directories not supported</string>
-    <string name="permission_issue_desc">Your Android version or your granted permissions won\'t allow you to make downloads away from the \"Downloads\" or \"Documents\" folders</string>
+    <string name="permission_issue_desc">Your Android version or your granted permissions won&#39;t allow you to make downloads away from the &quot;Downloads&quot; or &quot;Documents&quot; folders</string>
     <string name="audio_directory">Download location</string>
     <string name="sdcard_directory">SD Cards downloads directory</string>
-    <string name="sdcard_not_activable_hint">You won\'t be able to select the option for downloading to an SD until you don\'t select a path by clicking on the button.</string>
+    <string name="sdcard_not_activable_hint">You won&#39;t be able to select the option for downloading to an SD until you don&#39;t select a path by clicking on the button.</string>
     <string name="dark_theme">Dark theme</string>
     <string name="language">Language</string>
     <string name="dynamic_color">Dynamic colors (Monet)</string>
-    <string name="dynamic_color_desc">Follow your wallpaper\'s colors</string>
+    <string name="dynamic_color_desc">Follow your wallpaper&#39;s colors</string>
     <string name="display">Appearance</string>
     <string name="audio_format">Format</string>
     <string name="audio_format_desc">Choose the audio format in that you want to save your downloads</string>
     <string name="audio_quality">Quality</string>
     <string name="audio_quality_desc">Choose in what quality you want to download the songs</string>
     <string name="audio">Audio</string>
-    <string name="url_empty">There\'s no URL to download</string>
+    <string name="url_empty">There&#39;s no URL to download</string>
     <string name="fetch_info_error_msg">An error occurred while trying to fetch the song info</string>
     <string name="download_error_msg">An error occurred while trying to download the song</string>
     <string name="download_finish_notification">The download has finished</string>
@@ -123,7 +127,7 @@
     <string name="regular">Regular Mod</string>
     <string name="regular_cloned_description">A Spotify-like mod with unlimited skips, play on-demand, ad-free and newer features but cloned. This means a separated package/app from original, so you can have original Spotify and mod at the same time.</string>
     <string name="amoled_description">"Same features as regular mod but this one has AMOLED theme. "</string>
-    <string name="amoled_cloned_description">Same features as Amoled mod but it\'s cloned.</string>
+    <string name="amoled_cloned_description">Same features as Amoled mod but it&#39;s cloned.</string>
     <string name="lite_description">"A lightweight version of Spotify with no ads and unlimited skips. "</string>
     <string name="latest_version">Latest version</string>
     <string name="error_checking_for_updates">An error occurred while searching for updates</string>
@@ -153,8 +157,8 @@
     <string name="clear_all_cookies">Delete all the cookies</string>
     <string name="cookies_desc">Use Netscape formatted cookies for downloads</string>
     <string name="cookies_file_name" translatable="false">cookies.txt</string>
-    <string name="cookies_usage_msg">Downloading songs with high quality requires YT Music account authentication information. Click \"Generate new cookies\", enter the URL of the website and then log in with your account in the browser page, the app will generate it for you.</string>
-    <string name="remove_cookie_profile_desc">Remove cookies for \"%1$s\"?</string>
+    <string name="cookies_usage_msg">Downloading songs with high quality requires YT Music account authentication information. Click &quot;Generate new cookies&quot;, enter the URL of the website and then log in with your account in the browser page, the app will generate it for you.</string>
+    <string name="remove_cookie_profile_desc">Remove cookies for &quot;%1$s&quot;?</string>
     <string name="clear_all_cookies_desc">Delete all the cookies stored in the app?</string>
     <string name="download_lyrics">Download Lyrics</string>
     <string name="download_lyrics_desc">Fetch and save lyrics</string>
@@ -169,7 +173,7 @@
     <string name="pre_release_channel">Beta channel</string>
     <string name="check_for_updates">Check for updates</string>
     <string name="app_up_to_date">The app is already up to date</string>
-    <string name="update_channel_desc">Install pre-release builds to preview new features and changes.\n\nThere will be some instability in these versions, so please don\'t hesitate to give us feedback if you experience any problems to help us improve the app for the future.</string>
+    <string name="update_channel_desc">Install pre-release builds to preview new features and changes.&#10;&#10;There will be some instability in these versions, so please don&#39;t hesitate to give us feedback if you experience any problems to help us improve the app for the future.</string>
     <string name="updates_channels">Updates channels</string>
     <string name="updates_channels_desc">Auto app updating, updating channel</string>
     <string name="share">Share</string>
@@ -186,7 +190,7 @@
     <string name="documentation_info">Please, know that this pages will be changed by FAQs and the actual full markdown files will be replaced in a future by the mentioned before.</string>
     <string name="delete_info">Delete song from the history</string>
     <string name="remove_song">Do you want to remove this song?</string>
-    <string name="remove_song_info">You are going to delete \"%1$s\" by \"%2$s\".</string>
+    <string name="remove_song_info">You are going to delete &quot;%1$s&quot; by &quot;%2$s&quot;.</string>
     <string name="delete_file">Delete file from system</string>
     <string name="are_you_sure">Are you sure?</string>
     <string name="spotify_link">Spotify link</string>
@@ -248,11 +252,11 @@
     <string name="la_nn" translatable="false">Nynorsk</string>
     <string name="la_pa" translatable="false">ਪੰਜਾਬੀ</string>
     <string name="update_available">A new update is available!</string>
-    <string name="dont_filter_results">Don\'t filter results</string>
+    <string name="dont_filter_results">Don&#39;t filter results</string>
     <string name="dont_filter_results_desc">Do not filter searching results in the available platforms.</string>
     <string name="audio_provider">Audio Providers</string>
     <string name="audio_provider_desc">Choose from where you want to download the songs</string>
-    <string name="api_call_failed">Calling the MODs API wasn\'t successful</string>
+    <string name="api_call_failed">Calling the MODs API wasn&#39;t successful</string>
     <string name="mods_advertisement">This mods are hosted by me. If you cannot download them, please, report it in the Telegram chatroom if possible!</string>
     <string name="spotDl_uptodate">You are already on the latest spotDL version</string>
     <string name="geo_bypass">Geo bypass</string>
@@ -264,7 +268,7 @@
     <string name="page_loading">Loading the page...</string>
     <string name="not_specified">Not specified</string>
     <string name="default_option">Default</string>
-    <string name="not_convert">Don\'t convert</string>
+    <string name="not_convert">Don&#39;t convert</string>
     <string name="searching_error">An error occurred while searching</string>
     <string name="search">Type something on the text box for searching through Spotify!</string>
     <string name="err_act_reload">Reload the page</string>
@@ -286,7 +290,7 @@
     <string name="loudness">Loudness</string>
     <string name="tempo">Tempo</string>
     <string name="threads">Threads</string>
-    <string name="threads_number_desc">Change how many downloads at a time can be running. This doesn\'t apply on single track downloads.</string>
+    <string name="threads_number_desc">Change how many downloads at a time can be running. This doesn&#39;t apply on single track downloads.</string>
     <string name="threads_number">Number of threads</string>
     <string name="download_log">Download log</string>
     <string name="copy_log">Copy full log</string>
@@ -314,7 +318,7 @@
     <string name="use_notifications_desc">Pop up notifications with the actual downloads progress</string>
     <string name="agree">Agree</string>
     <string name="spotify_api_info">Spotify API</string>
-    <string name="spotify_api_info_description">This Spotify credentials can be used for having more closer and precise results to the songs requested in the main downloader page of the app. \n\nThis doesn\'t make effect on the searcher page because the app already uses extended-quota API credentials provided by Spotify.</string>
+    <string name="spotify_api_info_description">This Spotify credentials can be used for having more closer and precise results to the songs requested in the main downloader page of the app. &#10;&#10;This doesn&#39;t make effect on the searcher page because the app already uses extended-quota API credentials provided by Spotify.</string>
     <string name="parallel_download">Parallel download</string>
     <string name="tracks">Tracks</string>
     <string name="playlists">Playlists</string>
@@ -354,7 +358,7 @@
     <string name="skip_explict">Skip explicit songs</string>
     <string name="skip_explict_desc">Skip explicit songs while downloading</string>
     <string name="generate_lrc">Generate lrc file</string>
-    <string name="generate_lrc_desc">Generate lrc file for the downloaded songs if found. Requires \'Synced\' lyric provider to be enabled.</string>
+    <string name="generate_lrc_desc">Generate lrc file for the downloaded songs if found. Requires &#39;Synced&#39; lyric provider to be enabled.</string>
     <string name="skip_album_art">Skip album art</string>
     <string name="skip_album_art_desc">Skip downloading album art for meta operation</string>
     <string name="output_format">Output format</string>
@@ -368,6 +372,6 @@
     <string name="artist_top_albums">Top Albums</string>
     <string name="uncomplete_playlist">Right now Spowlo may not show all songs due to the lack of pagination, but when trying to download the full playlist, all the songs will be downloaded. This is already fixed in the upcoming Spowlo 2.0.0</string>
 
-    <!-- ADDED: New string for the initialization toast -->
+    <!-- New string already present -->
     <string name="app_is_initializing">App is initializing, please wait a moment…</string>
 </resources>
