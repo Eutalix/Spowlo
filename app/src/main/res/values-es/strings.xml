@@ -34,7 +34,7 @@
     <string name="add">Añadir</string>
     <string name="filesize_mb">%.2f MB</string>
     <string name="network_settings_desc">Cambia tu configuración de internet</string>
-    <string name="lite_description">"Una versión ligera de Spotify sin anuncios y con saltos ilimitados. "</string>
+    <string name="lite_description">Una versión ligera de Spotify sin anuncios y con saltos ilimitados.</string>
     <string name="multiselect_item_count">%1$d canción(es)</string>
     <string name="are_you_sure">Estás seguro\?</string>
     <string name="battery_configuration_desc">Activa el uso de la aplicación en segundo plano para asegurarse de que todo funciona correctamente.</string>
