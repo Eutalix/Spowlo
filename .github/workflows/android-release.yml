@@ -60,18 +60,45 @@ jobs:
       - name: Make gradlew executable
         run: chmod +x ./gradlew
 
-      - name: Build with Gradle (Clean + Assemble)
-        run: ./gradlew clean :app:assembleRelease
+      # Build with detailed logs
+      - name: Build with Gradle (Clean + Assemble) - with stacktrace
+        run: ./gradlew clean :app:assembleRelease --stacktrace --info
 
-      # NEW: Always upload APK as artifact so you can download it from the workflow run
+      # Always upload APK as artifact so you can download and test it from the workflow run
       - name: Upload APK artifact
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: Spowlo-APK-${{ github.ref_name || github.sha }}
           path: app/build/outputs/apk/release/*.apk
-          if-no-files-found: error
+          if-no-files-found: warn
           retention-days: 7
           compression-level: 6
+
+      # Upload Gradle Problems Report (AGP problems)
+      - name: Upload Gradle problems report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gradle-problems-report-${{ github.ref_name || github.sha }}
+          path: |
+            build/reports/problems/**
+            **/build/reports/problems/**
+          if-no-files-found: ignore
+          retention-days: 7
+
+      # Upload general build logs that can help (resource merge/aapt, etc.)
+      - name: Upload packaging/build logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-logs-${{ github.ref_name || github.sha }}
+          path: |
+            app/build/outputs/logs/**
+            **/build/outputs/logs/**
+            app/build/intermediates/**/merged.dir/**/values.xml
+          if-no-files-found: ignore
+          retention-days: 7
 
       # Create a GitHub Release only when:
       # - push event with a tag (vX.Y.Z), OR
