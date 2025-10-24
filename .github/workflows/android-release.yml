@@ -32,8 +32,12 @@ jobs:
           java-version: '21'
           distribution: 'temurin'
 
-      # Install Android SDK platform 35 and build-tools 35.0.0 to ensure AAPT links against the right android.jar
-      - name: Set up Android SDK (platform 35 + build-tools 35.0.0)
+      # Set up Android SDK + cmdline-tools (provides 'sdkmanager' on PATH)
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      # Accept licenses and install platform 35 + build-tools 35.0.0
+      - name: Install Android platform and build-tools
         run: |
           yes | sdkmanager --licenses
           sdkmanager --install "platform-tools" "platforms;android-35" "build-tools;35.0.0"
@@ -58,7 +62,6 @@ jobs:
       - name: Build with Gradle (Clean + Assemble)
         run: ./gradlew clean :app:assembleRelease
 
-      # Always upload APK as artifact so you can download and test it from the workflow run
       - name: Upload APK artifact
         if: always()
         uses: actions/upload-artifact@v4
@@ -69,9 +72,6 @@ jobs:
           retention-days: 7
           compression-level: 6
 
-      # Create a GitHub Release only when:
-      # - push event with a tag (vX.Y.Z), OR
-      # - workflow_dispatch with publish_release=true
       - name: Create GitHub Release
         if: >
           (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')) ||
