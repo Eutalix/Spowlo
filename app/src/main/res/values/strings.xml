@@ -1,4 +1,8 @@
-<resources>
+<?xml version="1.0" encoding="utf-8"?>
+<resources
+    xmlns:tools="http://schemas.android.com/tools"
+    xmlns:xliff="urn:oasis:names:tc:xliff:document:1.2">
+
     <string name="app_name" translatable="false">Spowlo</string>
     <string name="follow_system">Follow system</string>
     <string name="on">On</string>
@@ -27,7 +31,7 @@
     <string name="app_update_failed">An error happened while trying to update the app.</string>
     <string name="update">Update</string>
 
-    <!-- default for ES 'error' -->
+    <!-- Default translation for 'error' -->
     <string name="error">Error</string>
 
     <string name="permission_denied">Permission denied</string>
@@ -121,10 +125,8 @@
     <string name="copied_to_clipboard">Copied to clipboard</string>
     <string name="regular_cloned">Regular Mod Cloned</string>
     <string name="amoled">AMOLED Mod</string>
-    <!-- removed superfluous quotes -->
     <string name="amoled_description">Same features as regular mod but this one has AMOLED theme.</string>
     <string name="amoled_cloned">AMOLED Cloned Mod</string>
-    <!-- removed superfluous quotes -->
     <string name="lite">Spotify Lite Mod</string>
     <string name="lite_description">A lightweight version of Spotify with no ads and unlimited skips.</string>
     <string name="latest_version">Latest version</string>
@@ -199,10 +201,6 @@ There will be some instability in these versions, so please don't hesitate to gi
     <string name="github_logo">GitHub logo</string>
     <string name="github">GitHub</string>
     <string name="head_developer">Head developer</string>
-    <string name="contributors">Contributors</string>
-    <string name="contributor_avatar">Contributor avatar</string>
-    <string name="social_logo">Social network icon</string>
-    <string name="version">App version</string>
     <string name="source_code">Source code</string>
     <string name="check_source_code">Check the Spowlo source code in GitHub!</string>
     <string name="telegram_channel">Telegram channel</string>
@@ -217,7 +215,40 @@ There will be some instability in these versions, so please don't hesitate to gi
     <string name="library_settings">SpotDL library settings</string>
     <string name="translate">Translate the app!</string>
     <string name="translate_desc">Help translating the app to your language in Hosted Weblate!</string>
-    <!-- language codes omitted for brevity; keep as-is -->
+    <string name="la_nb" translatable="false">Bokmål</string>
+    <string name="la_cs" translatable="false">Čeština</string>
+    <string name="la_de" translatable="false">Deutsch</string>
+    <string name="la_zh_CN" translatable="false">简体中文</string>
+    <string name="la_en_US" translatable="false">English</string>
+    <string name="la_fr" translatable="false">Français</string>
+    <string name="la_da" translatable="false">Dansk</string>
+    <string name="la_es" translatable="false">Español</string>
+    <string name="la_tr" translatable="false">Türkçe</string>
+    <string name="la_ru" translatable="false">Русский</string>
+    <string name="la_ar" translatable="false">عربي</string>
+    <string name="la_uk" translatable="false">Українська</string>
+    <string name="la_in" translatable="false">Indonesia</string>
+    <string name="la_fa" translatable="false">فارسی</string>
+    <string name="la_fil" translatable="false">Filipino</string>
+    <string name="la_it" translatable="false">Italiano</string>
+    <string name="la_nl" translatable="false">Nederlands</string>
+    <string name="la_pt_BR" translatable="false">Português Brasileiro</string>
+    <string name="la_ja" translatable="false">日本語</string>
+    <string name="la_pl" translatable="false">Polski</string>
+    <string name="la_hu" translatable="false">Magyar</string>
+    <string name="la_be" translatable="false">беларуская</string>
+    <string name="la_ms" translatable="false">Melayu</string>
+    <string name="la_zh_TW" translatable="false">繁體中文</string>
+    <string name="la_vi" translatable="false">Tiếng Việt</string>
+    <string name="la_hr" translatable="false">Hrvatski</string>
+    <string name="la_eu" translatable="false">Euskara</string>
+    <string name="la_hi" translatable="false">हिन्दी</string>
+    <string name="la_ml" translatable="false">മലയാളം</string>
+    <string name="la_si" translatable="false">සිංහල</string>
+    <string name="la_sr" translatable="false">Српски</string>
+    <string name="la_az" translatable="false">Azərbaycanca</string>
+    <string name="la_nn" translatable="false">Nynorsk</string>
+    <string name="la_pa" translatable="false">ਪੰਜਾਬੀ</string>
     <string name="update_available">A new update is available!</string>
     <string name="dont_filter_results">Don't filter results</string>
     <string name="dont_filter_results_desc">Do not filter searching results in the available platforms.</string>
@@ -340,5 +371,7 @@ This doesn't make effect on the searcher page because the app already uses exten
     <string name="artist_top_tracks">Top Tracks</string>
     <string name="artist_top_albums">Top Albums</string>
     <string name="uncomplete_playlist">Right now Spowlo may not show all songs due to the lack of pagination, but when trying to download the full playlist, all the songs will be downloaded. This is already fixed in the upcoming Spowlo 2.0.0</string>
+
+    <!-- Added before: initialization toast -->
     <string name="app_is_initializing">App is initializing, please wait a moment…</string>
 </resources>
