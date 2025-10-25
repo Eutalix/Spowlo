@@ -77,18 +77,58 @@ jobs:
           find app/build -type f -name values.xml -path "*merged.dir*" -exec dirname {} \; | sort -u || true
           echo "Done listing. (If nothing printed above, the merged values files were not produced at the expected locations.)"
 
+      - name: Collect merged values into a deterministic folder (for upload)
+        if: always()
+        run: |
+          echo "Preparing merged-values/ directory for upload..."
+          rm -rf merged-values
+          mkdir -p merged-values/values
+
+          # try multiple common patterns (AGP/Gradle variations). Copy any found values.xml into merged-values/values/
+          echo "Searching common AGP output locations and copying found values.xml into merged-values/values/ ..."
+          set -o pipefail || true
+          find app/build -type f -name values.xml \
+            -path "*/merged.dir/*/values*/values.xml" -o \
+            -path "*/merged_res/*/values*/values.xml" -o \
+            -path "*/intermediates/**/merged.dir/*/values*/values.xml" -o \
+            -path "*/merge*/merge*/merged.dir/*/values*/values.xml" -o \
+            -path "*/outputs/*/values*/values.xml" \
+            -print 2>/dev/null | while read -r f; do
+              echo " -> found: $f"
+              # create unique filename to avoid collisions (use path-safe replacement)
+              safe=$(echo "$f" | tr '/' '_' | sed 's/[^A-Za-z0-9_.-]/_/g')
+              cp -v "$f" "merged-values/values/${safe}"
+            done || true
+
+          # Also try some looser globs (best-effort)
+          shopt -s nullglob 2>/dev/null || true
+          for g in app/build/**/values*/values.xml app/build/**/merged_res/**/values*/values.xml app/build/**/intermediates/**/values*/values.xml; do
+            for f in $g; do
+              if [ -f "$f" ]; then
+                echo " -> found (glob): $f"
+                safe=$(echo "$f" | tr '/' '_' | sed 's/[^A-Za-z0-9_.-]/_/g')
+                cp -v "$f" "merged-values/values/${safe}"
+              fi
+            done
+          done
+
+          echo "Final contents of merged-values/values/:"
+          ls -la merged-values/values || true
+
       - name: Upload merged values (release)
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: merged-values-${{ github.sha }}
+          # Upload the deterministic folder we created; this guarantees the artifact will contain files if any were found.
           path: |
-            # several robust globs to match common AGP/Gradle output layouts
+            merged-values/**
+            # keep the original globs as fallback (ignored if no files)
             app/build/**/merged.dir/**/values*/values.xml
             app/build/**/merged_res/**/values*/values.xml
             app/build/**/merge**Resources/**/merged.dir/**/values*/values.xml
             app/build/**/intermediates/**/merged.dir/**/values*/values.xml
-          if-no-files-found: ignore
+          if-no-files-found: warn
           retention-days: 7
           compression-level: 6
           overwrite: false
