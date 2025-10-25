@@ -115,6 +115,12 @@ jobs:
           echo "Final contents of merged-values/values/:"
           ls -la merged-values/values || true
 
+      - name: Debug file location
+        if: always()
+        run: |
+          echo "Listing merged-values directory recursively (debug)..."
+          ls -R merged-values || true
+
       - name: Upload merged values (release)
         if: always()
         uses: actions/upload-artifact@v4
