@@ -20,23 +20,19 @@ jobs:
           java-version: '21'
           distribution: 'temurin'
 
-      # Set up Android SDK (provides 'sdkmanager' on PATH)
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
 
-      # Install platform (android-35) and build-tools (35.0.0) so AAPT2 links android.jar with lStar
       - name: Install Android platform and build-tools
         run: |
           yes | sdkmanager --licenses
           sdkmanager --install "platform-tools" "platforms;android-35" "build-tools;35.0.0"
 
-      # Provide CLIENT_ID / CLIENT_SECRET for modules that read local.properties
       - name: Configure Build Properties
         run: |
           echo "CLIENT_ID=${{ secrets.CLIENT_ID || 'PLACEHOLDER' }}" >> local.properties
           echo "CLIENT_SECRET=${{ secrets.CLIENT_SECRET || 'PLACEHOLDER' }}" >> local.properties
 
-      # Quick environment introspection
       - name: Print Android SDK info
         run: |
           echo "ANDROID_SDK_ROOT=${ANDROID_SDK_ROOT}"
@@ -46,11 +42,9 @@ jobs:
       - name: Make gradlew executable
         run: chmod +x ./gradlew
 
-      # Print compileSdk seen by Gradle
       - name: Print Gradle project properties (compileSdk)
         run: ./gradlew :app:properties | grep -i "compileSdk" || true
 
-      # Pre-scan for raw '{str}' placeholders in app resources (should be none)
       - name: Grep '{str}' in app resources
         run: |
           echo "Scanning app/src/main/res for >{str}< ..."
@@ -60,29 +54,46 @@ jobs:
             echo "No raw {str} found in app resources."
           fi
 
-      # Scan Gradle transformed values for '{str}' (library-provided)
-      - name: Grep '{str}' in Gradle transformed values
+      - name: Grep '{str}' in Gradle transformed values (best-effort, may be large)
         run: |
-          echo "Scanning Gradle caches for library values containing {str} (optional)..."
+          echo "Scanning Gradle caches for library values containing {str} (this can be large)..."
           grep -R --line-number "{str}" ~/.gradle/caches 2>/dev/null | head -n 200 || true
 
-      # Merge resources in release with --debug and --stacktrace to capture full AAPT2 paths
       - name: Merge resources (release) with --debug and --stacktrace
         run: ./gradlew :app:mergeReleaseResources --debug --stacktrace
 
-      # Upload the merged values so we can inspect exactly what AAPT2 compiled
+      - name: List merged values files (diagnostic)
+        if: always()
+        run: |
+          echo "Searching for merged 'values.xml' files under app/build (merged.dir / merged_res / incremental)..."
+          echo "--- find matches ---"
+          # common locations used by different Gradle/AGP versions
+          find app/build -type f -name values.xml -path "*merged.dir*" -print || true
+          find app/build -type f -path "*/merged.dir/*/values*/values.xml" -print || true
+          find app/build -type f -path "*/merged_res/*/values*/values.xml" -print || true
+          find app/build -type f -name values.xml -path "*/merge*/merge*/merged.dir/*" -print || true
+          echo "--- list directories around matches ---"
+          # list parent directories for easier debugging in the logs
+          find app/build -type f -name values.xml -path "*merged.dir*" -exec dirname {} \; | sort -u || true
+          echo "Done listing. (If nothing printed above, the merged values files were not produced at the expected locations.)"
+
       - name: Upload merged values (release)
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: merged-values-${{ github.sha }}
           path: |
-            app/build/intermediates/incremental/release/mergeReleaseResources/merged.dir/values/values.xml
-            app/build/intermediates/incremental/release/mergeReleaseResources/merged.dir/values-*/values.xml
+            # several robust globs to match common AGP/Gradle output layouts
+            app/build/**/merged.dir/**/values*/values.xml
+            app/build/**/merged_res/**/values*/values.xml
+            app/build/**/merge**Resources/**/merged.dir/**/values*/values.xml
+            app/build/**/intermediates/**/merged.dir/**/values*/values.xml
           if-no-files-found: ignore
           retention-days: 7
+          compression-level: 6
+          overwrite: false
+          include-hidden-files: false
 
-      # Upload Gradle daemon and build logs to help spot the exact file/line
       - name: Upload Gradle daemon/build logs
         if: always()
         uses: actions/upload-artifact@v4
@@ -91,5 +102,6 @@ jobs:
           path: |
             ~/.gradle/daemon/*/daemon-*.out.log
             **/build/outputs/logs/**
+            merge-debug.log
           if-no-files-found: ignore
           retention-days: 7
