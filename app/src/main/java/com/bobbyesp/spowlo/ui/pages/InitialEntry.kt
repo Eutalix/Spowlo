@@ -2,6 +2,7 @@ package com.bobbyesp.spowlo.ui.pages
 
 import android.Manifest
 import android.os.Build
+import android.util.Log
 import androidx.compose.animation.ExperimentalAnimationApi
 import androidx.compose.animation.core.MutableTransitionState
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
@@ -25,7 +26,7 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import androidx.navigation.navOptions
 import androidx.navigation.navigation
-import com.bobbyesp.library.domain.UpdateStatus
+import com.bobbyesp.library.data.remote.SpotDLDependencyUpdater
 import com.bobbyesp.spowlo.App
 import com.bobbyesp.spowlo.R
 import com.bobbyesp.spowlo.features.spotify_api.data.remote.SpotifyApiRequests
@@ -63,10 +64,9 @@ import com.bobbyesp.spowlo.ui.pages.settings.downloader.DownloaderSettingsPage
 import com.bobbyesp.spowlo.ui.pages.settings.general.GeneralSettingsPage
 import com.bobbyesp.spowlo.ui.pages.settings.spotify.SpotifySettingsPage
 import com.bobbyesp.spowlo.ui.pages.settings.updater.UpdaterPage
-import com.bobbyesp.spowlo.utils.PreferencesUtil.getString
-import com.bobbyesp.spowlo.utils.SPOTDL
+import com.bobbyesp.spowlo.utils.DEPENDENCIES_INITIALIZED
+import com.bobbyesp.spowlo.utils.PreferencesUtil
 import com.bobbyesp.spowlo.utils.ToastUtil
-import com.bobbyesp.spowlo.utils.UpdateUtil
 import com.google.accompanist.navigation.material.ExperimentalMaterialNavigationApi
 import com.google.accompanist.navigation.material.rememberBottomSheetNavigator
 import com.google.accompanist.permissions.ExperimentalPermissionsApi
@@ -74,8 +74,9 @@ import com.google.accompanist.permissions.PermissionStatus
 import com.google.accompanist.permissions.rememberPermissionState
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import java.util.concurrent.TimeUnit
 
-private const val TAG = "InitialEntry"
+private const val TAG = "SpowloDebug"
 
 @OptIn(
     ExperimentalAnimationApi::class,
@@ -200,7 +201,6 @@ fun InitialEntry(
             slideInVerticallyComposable(Route.PLAYLIST_METADATA_PAGE) {
                 PlaylistMetadataPage(
                     onBackPressed,
-                    //TODO: ADD THE ABILITY TO PASS JUST SONGS AND NOT GET THEM FROM THE MUTABLE STATE
                 )
             }
             animatedComposable(Route.MODS_DOWNLOADER) {
@@ -327,16 +327,70 @@ fun InitialEntry(
         }
     }
 
+    // AUTO-UPDATE LOGIC (Unified & Safe)
     LaunchedEffect(Unit) {
-        if (SPOTDL.getString().isNotEmpty()) return@LaunchedEffect
-        kotlin.runCatching {
-            withContext(Dispatchers.IO) {
-                val result = UpdateUtil.updateSpotDL()
-                if (result == UpdateStatus.DONE) {
-                    ToastUtil.makeToastSuspend(
-                        App.context.getString(R.string.spotdl_update_success)
-                            .format(SPOTDL.getString())
-                    )
+        withContext(Dispatchers.IO) {
+            val isInitialized = PreferencesUtil.getValue(DEPENDENCIES_INITIALIZED)
+            val currentVersion = SpotDLDependencyUpdater.getLocalSpotDLVersion(context)
+            
+            Log.d(TAG, ">>> InitialEntry: isInitialized=$isInitialized, currentVersion=$currentVersion")
+            
+            if (!isInitialized || currentVersion == "0.0.0") {
+                withContext(Dispatchers.Main) {
+                    ToastUtil.makeToast("Initializing critical dependencies... Please wait.")
+                }
+                runCatching {
+                    SpotDLDependencyUpdater.updateVolatileDependencies(context)
+                    
+                    // DOUBLE CHECK: Did it actually work?
+                    val checkVersion = SpotDLDependencyUpdater.getLocalSpotDLVersion(context)
+                    Log.d(TAG, ">>> InitialEntry: Post-install check version=$checkVersion")
+                    if (checkVersion != "0.0.0") {
+                        PreferencesUtil.updateValue(DEPENDENCIES_INITIALIZED, true)
+                        // Trigger ViewModel refresh if necessary
+                        downloaderViewModel.refreshDependencyState()
+                        withContext(Dispatchers.Main) {
+                            ToastUtil.makeToast("Initialization complete!")
+                        }
+                    } else {
+                        // Failed to verify install
+                        throw Exception("Verification failed")
+                    }
+                }.onFailure {
+                    it.printStackTrace()
+                    withContext(Dispatchers.Main) {
+                        ToastUtil.makeToast("Initialization failed. Please check internet and try settings.")
+                    }
+                }
+            } else {
+                // Regular Check based on Frequency
+                val freq = PreferencesUtil.getUpdateFrequency()
+                if (freq != PreferencesUtil.FREQ_DISABLED) {
+                    val lastCheck = PreferencesUtil.getLastUpdateCheck()
+                    val now = System.currentTimeMillis()
+                    val daysDiff = TimeUnit.MILLISECONDS.toDays(now - lastCheck)
+
+                    val shouldCheck = when (freq) {
+                        PreferencesUtil.FREQ_DAILY -> daysDiff >= 1
+                        PreferencesUtil.FREQ_WEEKLY -> daysDiff >= 7
+                        PreferencesUtil.FREQ_MONTHLY -> daysDiff >= 30
+                        else -> false
+                    }
+                    
+                    Log.d(TAG, ">>> InitialEntry: Checking updates? $shouldCheck (Diff: $daysDiff days)")
+
+                    if (shouldCheck) {
+                        runCatching {
+                            if (SpotDLDependencyUpdater.areUpdatesAvailable(context)) {
+                                // Silent auto-update
+                                SpotDLDependencyUpdater.updateVolatileDependencies(context)
+                                withContext(Dispatchers.Main) {
+                                    ToastUtil.makeToast("Dependencies updated in background.")
+                                }
+                            }
+                            PreferencesUtil.setLastUpdateCheck(now)
+                        }
+                    }
                 }
             }
         }

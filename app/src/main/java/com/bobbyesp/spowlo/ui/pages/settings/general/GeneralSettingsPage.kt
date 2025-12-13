@@ -2,11 +2,18 @@ package com.bobbyesp.spowlo.ui.pages.settings.general
 
 import android.Manifest
 import android.os.Build
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.CheckCircle
 import androidx.compose.material.icons.outlined.Construction
 import androidx.compose.material.icons.outlined.History
 import androidx.compose.material.icons.outlined.HistoryToggleOff
@@ -15,67 +22,67 @@ import androidx.compose.material.icons.outlined.NotificationsActive
 import androidx.compose.material.icons.outlined.NotificationsOff
 import androidx.compose.material.icons.outlined.Print
 import androidx.compose.material.icons.outlined.PrintDisabled
+import androidx.compose.material.icons.outlined.Settings
+import androidx.compose.material.icons.outlined.Sync
+import androidx.compose.material.icons.outlined.Warning
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.rememberTopAppBarState
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import com.bobbyesp.library.SpotDL
+import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.bobbyesp.spowlo.App
 import com.bobbyesp.spowlo.R
 import com.bobbyesp.spowlo.ui.common.booleanState
 import com.bobbyesp.spowlo.ui.components.BackButton
 import com.bobbyesp.spowlo.ui.components.LargeTopAppBar
 import com.bobbyesp.spowlo.ui.components.PreferenceSubtitle
+import com.bobbyesp.spowlo.ui.components.SingleChoiceItem
 import com.bobbyesp.spowlo.ui.components.settings.ElevatedSettingsCard
 import com.bobbyesp.spowlo.ui.components.settings.SettingsItemNew
 import com.bobbyesp.spowlo.ui.components.settings.SettingsSwitch
 import com.bobbyesp.spowlo.ui.dialogs.NotificationPermissionDialog
-import com.bobbyesp.spowlo.ui.dialogs.bottomsheets.getString
 import com.bobbyesp.spowlo.utils.CONFIGURE
 import com.bobbyesp.spowlo.utils.DEBUG
 import com.bobbyesp.spowlo.utils.INCOGNITO_MODE
 import com.bobbyesp.spowlo.utils.NOTIFICATION
 import com.bobbyesp.spowlo.utils.NotificationsUtil
 import com.bobbyesp.spowlo.utils.PreferencesUtil
-import com.bobbyesp.spowlo.utils.PreferencesUtil.getString
 import com.bobbyesp.spowlo.utils.PreferencesUtil.updateBoolean
-import com.bobbyesp.spowlo.utils.SPOTDL
 import com.bobbyesp.spowlo.utils.ToastUtil
-import com.bobbyesp.spowlo.utils.UpdateUtil
 import com.google.accompanist.permissions.ExperimentalPermissionsApi
 import com.google.accompanist.permissions.PermissionStatus
 import com.google.accompanist.permissions.rememberPermissionState
 import kotlinx.coroutines.DelicateCoroutinesApi
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.GlobalScope
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 
 @OptIn(ExperimentalMaterial3Api::class, DelicateCoroutinesApi::class, ExperimentalPermissionsApi::class)
 @Composable
 fun GeneralSettingsPage(
     onBackPressed: () -> Unit,
+    viewModel: GeneralSettingsViewModel = hiltViewModel()
 ) {
     val context = LocalContext.current
-    val scope = rememberCoroutineScope()
-    val hapticFeedback = LocalHapticFeedback.current
-
+    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior(
         rememberTopAppBarState(),
         canScroll = { true })
@@ -85,15 +92,6 @@ fun GeneralSettingsPage(
     var useNotifications by remember {
         mutableStateOf(
             PreferencesUtil.getValue(NOTIFICATION)
-        )
-    }
-    var isUpdatingLib by remember { mutableStateOf(false) }
-
-    val loadingString = App.context.getString(R.string.loading)
-
-    var spotDLVersion by remember {
-        mutableStateOf(
-            loadingString
         )
     }
 
@@ -120,20 +118,7 @@ fun GeneralSettingsPage(
             else isNotificationPermissionGranted = true
         } else null
 
-    //create a non-blocking coroutine to get the version
-    LaunchedEffect(Unit) {
-        GlobalScope.launch {
-            try {
-                withContext(Dispatchers.IO) {
-                    spotDLVersion = SpotDL.getInstance().version(appContext = App.context)
-                        ?: getString(R.string.unknown)
-                }
-            } catch (e: Exception) {
-                spotDLVersion = e.message ?: e.toString()
-            }
-
-        }
-    }
+    var showFreqDialog by remember { mutableStateOf(false) }
 
     Scaffold(modifier = Modifier
         .fillMaxSize()
@@ -154,71 +139,82 @@ fun GeneralSettingsPage(
                     .padding(it)
                     .padding(horizontal = 20.dp, vertical = 10.dp)
             ) {
-                /* item {
-                    WarningCard(
-                        modifier = Modifier.padding(vertical = 10.dp),
-                        title = stringResource(id = R.string.updates_blocked),
-                        warningText = stringResource(
-                            id = R.string.updates_blocked_description
-                        )
-                    )
-                } */
+                
                 item {
                     ElevatedSettingsCard {
-                        SettingsItemNew(
-                            onClick = {
-                                /*val spotDLNewVersion = SpotDL.getInstance().version(appContext = App.context) ?: getString(R.string.unknown)
-                                var spotDLVersion = SPOTDL.getString()
-                                if (spotDLNewVersion != spotDLVersion) {
-                                    scope.launch {
-                                        runCatching {
-                                            isUpdatingLib = true
-                                            UpdateUtil.updateSpotDL()
-                                            spotDLVersion = SPOTDL.getString()
-                                        }.onFailure { e ->
-                                            e.printStackTrace()
-                                            ToastUtil.makeToastSuspend(App.context.getString(R.string.spotdl_update_failed))
-                                        }.onSuccess {
-                                            ToastUtil.makeToastSuspend(
-                                                App.context.getString(R.string.spotdl_update_success)
-                                                    .format(spotDLVersion)
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            // Main Update Action
+                            SettingsItemNew(
+                                modifier = Modifier.weight(1f),
+                                onClick = {
+                                    if (uiState.status != GeneralSettingsViewModel.UpdateStatus.Updating) {
+                                        viewModel.performUpdate()
+                                    }
+                                    if (uiState.status == GeneralSettingsViewModel.UpdateStatus.Error || uiState.status == GeneralSettingsViewModel.UpdateStatus.Updated) {
+                                        if (uiState.updateLog.isNotEmpty()) ToastUtil.makeToastSuspend(uiState.updateLog)
+                                    }
+                                },
+                                title = {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Text(
+                                            text = stringResource(id = R.string.spotdl_version),
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                        if (uiState.updateAvailable) {
+                                            Spacer(modifier = Modifier.width(8.dp))
+                                            Icon(
+                                                imageVector = Icons.Outlined.Warning,
+                                                contentDescription = "Update Available",
+                                                tint = MaterialTheme.colorScheme.error,
+                                                modifier = Modifier.size(16.dp)
                                             )
                                         }
                                     }
-                                } else {
-                                    ToastUtil.makeToast(App.context.getString(R.string.spotDl_uptodate))
-                                }*/
-                                scope.launch {
-                                    runCatching {
-                                        isUpdatingLib = true
-                                        UpdateUtil.updateSpotDL()
-                                        spotDLVersion = SPOTDL.getString()
-                                    }.onFailure { e ->
-                                        e.printStackTrace()
-                                        ToastUtil.makeToastSuspend(App.context.getString(R.string.spotdl_update_failed))
-                                    }.onSuccess {
-                                        ToastUtil.makeToastSuspend(
-                                            App.context.getString(R.string.spotdl_update_success)
-                                                .format(spotDLVersion)
-                                        )
+                                },
+                                icon = when(uiState.status) {
+                                    GeneralSettingsViewModel.UpdateStatus.Updating -> Icons.Outlined.Sync 
+                                    GeneralSettingsViewModel.UpdateStatus.Updated -> Icons.Outlined.CheckCircle
+                                    else -> Icons.Outlined.Info
+                                },
+                                description = {
+                                    when (uiState.status) {
+                                        GeneralSettingsViewModel.UpdateStatus.Updating -> Text("Updating dependencies...")
+                                        GeneralSettingsViewModel.UpdateStatus.Updated -> Text(uiState.currentVersion, color = MaterialTheme.colorScheme.primary)
+                                        GeneralSettingsViewModel.UpdateStatus.Error -> Text("Error: Tap to see log", color = MaterialTheme.colorScheme.error)
+                                        else -> {
+                                            if (uiState.updateAvailable) {
+                                                Text("Update available", color = MaterialTheme.colorScheme.error)
+                                            } else {
+                                                Text(uiState.currentVersion)
+                                            }
+                                        }
                                     }
-                                }
-                            },
-                            title = {
-                                Text(
-                                    text = stringResource(id = R.string.spotdl_version),
-                                    fontWeight = FontWeight.Bold
+                                },
+                                highlightIcon = uiState.updateAvailable
+                            )
+
+                            // Settings Gear for Frequency
+                            IconButton(
+                                onClick = { showFreqDialog = true },
+                                modifier = Modifier.padding(end = 8.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Outlined.Settings,
+                                    contentDescription = "Update Settings",
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
-                            },
-                            icon = Icons.Outlined.Info,
-                            description = { Text(text = spotDLVersion) }
-                        )
+                            }
+                        }
                     }
                 }
 
                 item {
                     PreferenceSubtitle(text = stringResource(id = R.string.general_settings))
                 }
+                
                 item{
                     SettingsSwitch(
                         onCheckedChange = {
@@ -317,6 +313,18 @@ fun GeneralSettingsPage(
             }
         }
     )
+    
+    if (showFreqDialog) {
+        UpdateFrequencyDialog(
+            currentFreq = viewModel.getFrequency(),
+            onDismiss = { showFreqDialog = false },
+            onSelect = { freq ->
+                viewModel.setFrequency(freq)
+                showFreqDialog = false
+            }
+        )
+    }
+
     if (showNotificationDialog) {
         NotificationPermissionDialog(onDismissRequest = {
             showNotificationDialog = false
@@ -327,4 +335,27 @@ fun GeneralSettingsPage(
             showNotificationDialog = false
         })
     }
+}
+
+@Composable
+fun UpdateFrequencyDialog(
+    currentFreq: Int,
+    onDismiss: () -> Unit,
+    onSelect: (Int) -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Update Frequency") },
+        text = {
+            Column {
+                SingleChoiceItem(text = "Daily (Default)", selected = currentFreq == PreferencesUtil.FREQ_DAILY) { onSelect(PreferencesUtil.FREQ_DAILY) }
+                SingleChoiceItem(text = "Weekly", selected = currentFreq == PreferencesUtil.FREQ_WEEKLY) { onSelect(PreferencesUtil.FREQ_WEEKLY) }
+                SingleChoiceItem(text = "Monthly", selected = currentFreq == PreferencesUtil.FREQ_MONTHLY) { onSelect(PreferencesUtil.FREQ_MONTHLY) }
+                SingleChoiceItem(text = "Disabled", selected = currentFreq == PreferencesUtil.FREQ_DISABLED) { onSelect(PreferencesUtil.FREQ_DISABLED) }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) { Text("Cancel") }
+        }
+    )
 }

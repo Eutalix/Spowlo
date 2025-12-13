@@ -26,6 +26,7 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
+// Existing Constants
 const val SPOTDL = "spotDL_Init"
 const val DEBUG = "debug"
 const val CONFIGURE = "configure"
@@ -80,6 +81,11 @@ const val CELLULAR_DOWNLOAD = "cellular_download"
 private const val HIGH_CONTRAST = "high_contrast"
 const val FORMAT_SELECTION = "format_selection"
 
+// New Constants for Unified Updater
+const val UPDATE_FREQUENCY = "update_frequency"
+const val LAST_UPDATE_CHECK_TIME = "last_update_check_time"
+const val DEPENDENCIES_INITIALIZED = "dependencies_initialized" // NEW FLAG
+
 const val SYSTEM_DEFAULT = 0
 
 //UPDATE CHANNELS
@@ -110,19 +116,8 @@ private val BooleanPreferenceDefaults =
         SPOTDL_UPDATE to true,
         SKIP_INFO_FETCH to false,
         NOTIFICATION to false,
+        DEPENDENCIES_INITIALIZED to false // Default false
     )
-
-private val IntPreferenceDefaults = mapOf(
-    TEMPLATE_ID to 0,
-    LANGUAGE to SYSTEM_DEFAULT,
-    PALETTE_STYLE to 0,
-    DARK_THEME_VALUE to DarkThemePreference.FOLLOW_SYSTEM,
-    WELCOME_DIALOG to 1,
-    AUDIO_FORMAT to 6,
-    AUDIO_QUALITY to 17,
-    UPDATE_CHANNEL to STABLE,
-    THREADS to 1,
-)
 
 val palettesMap = mapOf(
     0 to PaletteStyle.TonalSpot,
@@ -140,7 +135,26 @@ val outputFormatList =
     listOf("{artist}", "{album}", "{album-artist}", "{genre}", "{year}", "{list-name}")
 
 object PreferencesUtil {
+    // Constants exposed here
+    const val FREQ_DAILY = 0
+    const val FREQ_WEEKLY = 1
+    const val FREQ_MONTHLY = 2
+    const val FREQ_DISABLED = -1
+
     private val kv = MMKV.defaultMMKV()
+
+    private val IntPreferenceDefaults = mapOf(
+        TEMPLATE_ID to 0,
+        LANGUAGE to SYSTEM_DEFAULT,
+        PALETTE_STYLE to 0,
+        DARK_THEME_VALUE to DarkThemePreference.FOLLOW_SYSTEM,
+        WELCOME_DIALOG to 1,
+        AUDIO_FORMAT to 6,
+        AUDIO_QUALITY to 17,
+        UPDATE_CHANNEL to STABLE,
+        THREADS to 1,
+        UPDATE_FREQUENCY to FREQ_DAILY
+    )
 
     fun String.getInt(default: Int = IntPreferenceDefaults.getOrElse(this) { 0 }): Int =
         kv.decodeInt(this, default)
@@ -161,6 +175,13 @@ object PreferencesUtil {
     fun getValue(key: String): Boolean = key.getBoolean()
     fun encodeString(key: String, string: String) = key.updateString(string)
     fun containsKey(key: String) = kv.containsKey(key)
+
+    // New Updater Methods
+    fun setLastUpdateCheck(time: Long) = kv.encode(LAST_UPDATE_CHECK_TIME, time)
+    fun getLastUpdateCheck(): Long = kv.decodeLong(LAST_UPDATE_CHECK_TIME, 0L)
+    
+    fun setUpdateFrequency(freq: Int) = kv.encode(UPDATE_FREQUENCY, freq)
+    fun getUpdateFrequency(): Int = kv.decodeInt(UPDATE_FREQUENCY, FREQ_DAILY)
 
     fun getExtraDirectory(): String = EXTRA_DIRECTORY.getString()
 
@@ -224,9 +245,8 @@ object PreferencesUtil {
     }
 
     fun isNetworkAvailableForDownload() =
-        !App.connectivityManager.isActiveNetworkMetered //CELLULAR_DOWNLOAD.getBoolean() ||
+        !App.connectivityManager.isActiveNetworkMetered
 
-    //check if the phone is connected to a network source (wifi or mobile data)
     fun isNetworkAvailable() = App.connectivityManager.activeNetworkInfo?.isConnected == true
 
     fun isAutoUpdateEnabled() = AUTO_UPDATE.getBoolean(!isFDroidBuild())
@@ -350,5 +370,4 @@ data class DarkThemePreference(
             else -> stringResource(R.string.off)
         }
     }
-
 }
