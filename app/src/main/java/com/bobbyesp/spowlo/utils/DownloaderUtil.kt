@@ -8,15 +8,10 @@ import com.bobbyesp.library.SpotDL
 import com.bobbyesp.library.SpotDLRequest
 import com.bobbyesp.library.domain.model.SpotifySong
 import com.bobbyesp.library.util.exceptions.CanceledException
+import com.bobbyesp.spowlo.App
 import com.bobbyesp.spowlo.App.Companion.audioDownloadDir
 import com.bobbyesp.spowlo.App.Companion.context
 import com.bobbyesp.spowlo.Downloader
-import com.bobbyesp.spowlo.Downloader.onProcessEnded
-import com.bobbyesp.spowlo.Downloader.onProcessStarted
-import com.bobbyesp.spowlo.Downloader.onTaskEnded
-import com.bobbyesp.spowlo.Downloader.onTaskError
-import com.bobbyesp.spowlo.Downloader.onTaskStarted
-import com.bobbyesp.spowlo.Downloader.toNotificationId
 import com.bobbyesp.spowlo.R
 import com.bobbyesp.spowlo.database.DownloadedSongInfo
 import com.bobbyesp.spowlo.ui.pages.settings.cookies.Cookie
@@ -28,8 +23,7 @@ import com.bobbyesp.spowlo.utils.PreferencesUtil.getString
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
-import kotlinx.serialization.json.Json
-import java.util.UUID
+import kotlin.math.roundToInt
 
 object DownloaderUtil {
 
@@ -38,13 +32,6 @@ object DownloaderUtil {
 
     private const val TAG = "DownloaderUtil"
 
-    private val jsonFormat = Json {
-        ignoreUnknownKeys = true
-    }
-
-    val settings = PreferencesUtil
-
-    //SONGS FLOW
     private val mutableSongsState = MutableStateFlow(listOf<SpotifySong>())
     val songsState = mutableSongsState.asStateFlow()
 
@@ -86,7 +73,7 @@ object DownloaderUtil {
     private fun StringBuilder.buildPathExtensions(downloadPreferences: DownloadPreferences) {
         when {
             downloadPreferences.outputFormat.isNotEmpty() -> {
-                    this.append("/").append(downloadPreferences.outputFormat)
+                this.append("/").append(downloadPreferences.outputFormat)
             }
             else -> return
         }
@@ -131,7 +118,7 @@ object DownloaderUtil {
                     val secure = getLong(getColumnIndexOrThrow(CookieScheme.SECURE)) == 1L
                     val hostKey = getString(getColumnIndexOrThrow(CookieScheme.HOST))
 
-                    val host = if (hostKey[0] != '.') ".$hostKey" else hostKey
+                    val host = if (hostKey.isNotEmpty() && hostKey[0] != '.') ".$hostKey" else hostKey
                     cookieList.add(
                         Cookie(
                             domain = host,
@@ -151,46 +138,17 @@ object DownloaderUtil {
             }.toString()
         }
     }
-
-    //Get a random UUID and return it as a string
-    private fun getRandomUUID(): String {
-        return UUID.randomUUID().toString()
+    
+    fun updateSongsState(songs: List<SpotifySong>) {
+        mutableSongsState.update { songs }
     }
 
-    //Use cookies from the database
     private fun SpotDLRequest.useCookies(): SpotDLRequest = this.apply {
         if (PreferencesUtil.getValue(COOKIES)) {
-            addOption(
-                "--cookie-file", context.getCookiesFile().absolutePath
-            )
+            addOption("--cookie-file", context.getCookiesFile().absolutePath)
         }
     }
 
-    @CheckResult
-    private fun getSongInfo(
-        url: String? = null,
-    ): Result<List<SpotifySong>> = kotlin.runCatching {
-        val response: List<SpotifySong> = SpotDL.getInstance().getSongInfo(url ?: "")
-        mutableSongsState.update {
-            response
-        }
-        response
-    }
-
-    @CheckResult
-    fun fetchSongInfoFromUrl(
-        url: String
-    ): Result<List<SpotifySong>> = kotlin.run {
-        getSongInfo(url)
-    }
-
-    fun updateSongsState(songs: List<SpotifySong>) {
-        mutableSongsState.update {
-            songs
-        }
-    }
-
-    //get the audio format
     private fun SpotDLRequest.addAudioFormat(): SpotDLRequest = this.apply {
         when (PreferencesUtil.getAudioFormat()) {
             0 -> addOption("--format", "mp3")
@@ -198,12 +156,11 @@ object DownloaderUtil {
             2 -> addOption("--format", "ogg")
             3 -> addOption("--format", "opus")
             4 -> addOption("--format", "m4a")
-            5 -> addOption("--format", "m4a")
-            6 -> null
+            5 -> addOption("--format", "wav")
+            6 -> Unit
         }
     }
 
-    //get the audio quality
     private fun SpotDLRequest.addAudioQuality(): SpotDLRequest = this.apply {
         when (PreferencesUtil.getAudioQuality()) {
             0 -> addOption("--bitrate", "auto")
@@ -231,101 +188,49 @@ object DownloaderUtil {
         this.apply {
             if (downloadPreferences.audioProviders.isNotEmpty()) {
                 addOption("--audio")
-                if (downloadPreferences.audioProviders.contains("YouTube")) {
-                    addOption("youtube")
-                }
-
-                if (downloadPreferences.audioProviders.contains("YouTube Music")) {
-                    addOption("youtube-music")
-                }
-
-                if (downloadPreferences.audioProviders.contains("Soundcloud")) {
-                    addOption("soundcloud")
-                }
-
-                if (downloadPreferences.audioProviders.contains("Bandcamp")) {
-                    addOption("bandcamp")
-                }
-
-                if (downloadPreferences.audioProviders.contains("Piped")) {
-                    addOption("piped")
-                }
+                if (downloadPreferences.audioProviders.contains("YouTube")) addOption("youtube")
+                if (downloadPreferences.audioProviders.contains("YouTube Music")) addOption("youtube-music")
+                if (downloadPreferences.audioProviders.contains("Soundcloud")) addOption("soundcloud")
+                if (downloadPreferences.audioProviders.contains("Bandcamp")) addOption("bandcamp")
+                if (downloadPreferences.audioProviders.contains("Piped")) addOption("piped")
             }
         }
 
-    //HERE GOES ALL THE DOWNLOADER OPTIONS
-    private fun commonRequest(
-        downloadPreferences: DownloadPreferences,
+    private fun createDownloadRequest(
         url: String,
-        request: SpotDLRequest,
-        pathBuilder: StringBuilder
+        downloadPreferences: DownloadPreferences,
     ): SpotDLRequest {
+        val request = SpotDLRequest()
+        val pathBuilder = StringBuilder()
+
         with(downloadPreferences) {
             request.apply {
                 addOption("download", url)
 
                 pathBuilder.append(audioDownloadDir)
-
                 pathBuilder.buildPathExtensions(downloadPreferences)
 
-                Log.d(TAG, "downloadSong: $pathBuilder")
+                Log.d(TAG, "Download path configured: $pathBuilder")
 
                 addOption("--output", pathBuilder.toString())
 
-                if (useCookies) {
-                    useCookies()
-                }
-
-                if (!useCaching) {
-                    addOption("--no-cache")
-                }
-
-                if (useYtMetadata) {
-                    addOption("--ytm-data")
-                }
-
-                if (dontFilter) {
-                    addOption("--dont-filter-results")
-                }
+                if (useCookies) useCookies()
+                if (useYtMetadata) addOption("--ytm-data")
+                if (dontFilter) addOption("--dont-filter-results")
 
                 if (downloadPreferences.downloadLyrics && downloadPreferences.lyricProviders.isNotEmpty()) {
                     addOption("--lyrics")
-                    if (downloadPreferences.lyricProviders.contains("Synced")) {
-                        addOption("synced")
-                    }
-
-                    if (downloadPreferences.lyricProviders.contains("Genius")) {
-                        addOption("genius")
-                    }
-
-                    if (downloadPreferences.lyricProviders.contains("Musixmatch")) {
-                        addOption("musixmatch")
-                    }
-
-                    if (downloadPreferences.lyricProviders.contains("AZLyrics")) {
-                        addOption("azlyrics")
-                    }
+                    if (downloadPreferences.lyricProviders.contains("Synced")) addOption("synced")
+                    if (downloadPreferences.lyricProviders.contains("Genius")) addOption("genius")
+                    if (downloadPreferences.lyricProviders.contains("Musixmatch")) addOption("musixmatch")
+                    if (downloadPreferences.lyricProviders.contains("AZLyrics")) addOption("azlyrics")
                 }
 
-                if (sponsorBlock) {
-                    addOption("--sponsor-block")
-                }
-
-                if (onlyVerifiedResults) {
-                    addOption("--only-verified-results")
-                }
-
-                if (skipExplicit) {
-                    addOption("--skip-explicit")
-                }
-
-                if (generateLRC) {
-                    addOption("--generate-lrc")
-                }
-
-                if (skipAlbumArt) {
-                    addOption("--skip-album-art")
-                }
+                if (sponsorBlock) addOption("--sponsor-block")
+                if (onlyVerifiedResults) addOption("--only-verified-results")
+                if (skipExplicit) addOption("--skip-explicit")
+                if (generateLRC) addOption("--generate-lrc")
+                if (skipAlbumArt) addOption("--skip-album-art")
 
                 if (preserveOriginalAudio) {
                     addOption("--bitrate", "disable")
@@ -337,7 +242,14 @@ object DownloaderUtil {
 
                 addAudioProvider(downloadPreferences)
 
-                for (s in request.buildCommand()) Log.d(TAG, s)
+                if (useSpotifyPreferences) {
+                    if (spotifyClientID.isNotEmpty() && spotifyClientSecret.isNotEmpty()) {
+                        addOption("--client-id", spotifyClientID)
+                        addOption("--client-secret", spotifyClientSecret)
+                    } else {
+                        Log.w(TAG, "Custom Spotify credentials enabled but not provided. Falling back to default.")
+                    }
+                }
             }
         }
         return request
@@ -345,74 +257,54 @@ object DownloaderUtil {
 
     @CheckResult
     fun downloadSong(
-        songInfo: SpotifySong = SpotifySong(),
+        songInfo: SpotifySong,
         taskId: String,
         downloadPreferences: DownloadPreferences,
         progressCallback: ((Float, Long, String) -> Unit)?
     ): Result<List<String>> {
-        if (songInfo == SpotifySong()) return Result.failure(Throwable(context.getString(R.string.fetch_info_error_msg)))
-        with(downloadPreferences) {
-            val url = songInfo.url
+        if (songInfo.url.isBlank()) return Result.failure(Throwable(context.getString(R.string.fetch_info_error_msg)))
 
-            val request = SpotDLRequest()
-            val pathBuilder = StringBuilder()
-            commonRequest(downloadPreferences, url, request, pathBuilder)
-                .apply {
-                    if (useSpotifyPreferences) {
-                        if (spotifyClientID.isEmpty() || spotifyClientSecret.isEmpty()) return Result.failure(
-                            Throwable("Spotify client ID or secret is empty while you have the custom credentials option enabled! \nPlease check your settings.")
-                        )
-                        addOption("--client-id", spotifyClientID)
-                        addOption("--client-secret", spotifyClientSecret)
-                    }
-                }.runCatching {
-                    SpotDL.getInstance().execute(this, taskId, callback = progressCallback)
-                }.onFailure { th ->
-                    return if (th.message?.contains("No such file or directory") == true) {
-                        th.printStackTrace()
-                        onFinishDownloading(
-                            this,
-                            songInfo = songInfo,
-                            downloadPath = buildPathForDatabase(pathBuilder.toString(), songInfo),
-                            sdcardUri = sdcardUri
-                        )
-                    } else {
-                        return Result.failure(th)
-                    }
-                }.onSuccess { response ->
-                    return when {
-                        response.output.contains("LookupError") -> Result.failure(Throwable("A LookupError occurred. The song wasn't found. Try changing the audio provider in the settings and also disabling the 'Don't filter results' and/or the 'Use only verified results' option."))
-                        response.output.contains("YT-DLP") -> Result.failure(Throwable("An error occurred to yt-dlp while downloading the song. Please, report this issue in GitHub."))
-                        response.output.contains("HTTPError") -> Result.failure(Throwable("A HTTPError occurred. Try changing providers."))
-                        response.output.contains("ReadTimeout") -> Result.failure(Throwable("A ReadTimeout occurred. Try changing providers."))
-                        response.output.contains("ValueError") -> Result.failure(Throwable("A ValueError occurred. Try changing providers."))
-                        response.output.contains("Skipping explicit song") -> Result.failure(
-                            Throwable("An explicit song has been skipped. Disable 'Skip explicit songs' in spotDL settings to download this song.")
-                        )
-
-                        else -> onFinishDownloading(
-                            this,
-                            songInfo = songInfo,
-                            downloadPath = buildPathForDatabase(pathBuilder.toString(), songInfo),
-                            sdcardUri = sdcardUri
-                        )
-
-                    }
+        val request = createDownloadRequest(songInfo.url, downloadPreferences)
+        val pathBuilder = StringBuilder().append(audioDownloadDir).also { it.buildPathExtensions(downloadPreferences) }
+        
+        return runCatching {
+            SpotDL.getInstance().execute(request, taskId, callback = progressCallback)
+        }.fold(
+            onSuccess = { response ->
+                when {
+                    response.output.contains("LookupError") -> Result.failure(Throwable("A LookupError occurred. The song wasn't found. Try changing the audio provider."))
+                    response.output.contains("YT-DLP") -> Result.failure(Throwable("An error occurred with yt-dlp while downloading. Please report this issue."))
+                    response.output.contains("HTTPError") -> Result.failure(Throwable("A HTTPError occurred. Try changing providers."))
+                    response.output.contains("ReadTimeout") -> Result.failure(Throwable("A ReadTimeout occurred. Try changing providers."))
+                    response.output.contains("ValueError") -> Result.failure(Throwable("A ValueError occurred. Try changing providers."))
+                    response.output.contains("Skipping explicit song") -> Result.failure(Throwable("An explicit song has been skipped. Disable 'Skip explicit songs' in settings to download."))
+                    else -> onFinishDownloading(
+                        preferences = downloadPreferences,
+                        songInfo = songInfo,
+                        downloadPath = buildPathForDatabase(pathBuilder.toString(), songInfo)
+                    )
                 }
-            return onFinishDownloading(
-                this,
-                songInfo = songInfo,
-                downloadPath = buildPathForDatabase(pathBuilder.toString(), songInfo),
-                sdcardUri = sdcardUri
-            )
-        }
+            },
+            onFailure = { th ->
+                th.printStackTrace()
+                if (th.message?.contains("No such file or directory") == true) {
+                    onFinishDownloading(
+                        preferences = downloadPreferences,
+                        songInfo = songInfo,
+                        downloadPath = buildPathForDatabase(pathBuilder.toString(), songInfo)
+                    )
+                } else {
+                    Result.failure(th)
+                }
+            }
+        )
     }
 
+    @CheckResult
     private fun onFinishDownloading(
         preferences: DownloadPreferences,
         songInfo: SpotifySong,
-        downloadPath: String,
-        sdcardUri: String
+        downloadPath: String
     ): Result<List<String>> = preferences.run {
         if (incognitoMode) {
             Result.success(emptyList())
@@ -456,9 +348,9 @@ object DownloaderUtil {
                     songName = songInfo.name,
                     songAuthor = songInfo.artist,
                     songUrl = songInfo.url,
-                    thumbnailUrl = songInfo.cover_url,
+                    thumbnailUrl = songInfo.cover_url ?: "",
                     songPath = filePath,
-                    songDuration = songInfo.duration,
+                    songDuration = songInfo.duration ?: 0.0,
                     extractor = "Youtube Music",
                 )
             )
@@ -473,67 +365,59 @@ object DownloaderUtil {
         return int
     }
 
-
     fun executeParallelDownload(url: String, name: String) {
         val taskId = Downloader.makeKey(url, url.reversed())
         ToastUtil.makeToastSuspend(context.getString(R.string.download_started_msg))
 
-        val pathBuilder = StringBuilder()
         val downloadPreferences = DownloadPreferences()
-        val request = commonRequest(downloadPreferences, url, SpotDLRequest(), pathBuilder).apply {
+        val request = createDownloadRequest(url, downloadPreferences).apply {
             addOption("--threads", downloadPreferences.threads.toString())
         }
 
         val isPlaylist = url.contains("playlist")
 
-        onProcessStarted()
-        onTaskStarted(url, name)
-        kotlin.runCatching {
+        Downloader.onProcessStarted()
+        Downloader.onTaskStarted(url, name)
+        
+        runCatching {
             val response = SpotDL.getInstance().execute(
                 request = request,
                 processId = taskId,
                 callback = { progress, _, text ->
                     NotificationsUtil.makeNotificationForParallelDownloads(
-                        notificationId = taskId.toNotificationId(),
+                        notificationId = taskId.hashCode(),
                         taskId = taskId,
-                        progress = progress.toInt(),
+                        progress = progress.roundToInt(),
                         text = text,
-                        extraString = name + " - " + context.getString(R.string.parallel_download),
+                        extraString = "$name - ${context.getString(R.string.parallel_download)}",
                         taskUrl = url,
                     )
                     Downloader.updateTaskOutput(
                         url = url, line = text, progress = progress, isPlaylist = isPlaylist
                     )
                 })
-            //clear all the lines that contains a "…" on it
             val finalResponse = removeDuplicateLines(clearLinesWithEllipsis(response.output))
-            onTaskEnded(url, finalResponse, name)
+            Downloader.onTaskEnded(url, finalResponse, name)
         }.onFailure {
             Log.d("Canceled?", "Exception: $it")
             it.printStackTrace()
             ToastUtil.makeToastSuspend(context.getString(R.string.download_error_msg))
             if (it is CanceledException) return@onFailure
             it.message.run {
-                if (isNullOrEmpty()) onTaskEnded(url)
-                else onTaskError(this, url)
+                if (isNullOrEmpty()) Downloader.onTaskEnded(url)
+                else Downloader.onTaskError(this, url)
             }
         }
-        onProcessEnded()
+        Downloader.onProcessEnded()
         ToastUtil.makeToastSuspend(context.getString(R.string.download_finished_msg))
     }
 
     fun clearLinesWithEllipsis(input: String): String {
-        val lines = input.split("\n")
-            .filterNot { it.contains("…") }
-            .joinToString("\n")
-        return lines
+        return input.split("\n").filterNot { it.contains("…") }.joinToString("\n")
     }
 
     fun removeDuplicateLines(input: String): String {
-        val lines = input.split("\n")
-            .distinct()
-            .joinToString("\n")
-        return lines
+        return input.split("\n").distinct().joinToString("\n")
     }
 
     fun buildPathForDatabase(path: String, songInfo: SpotifySong = SpotifySong()): String {
@@ -544,8 +428,7 @@ object DownloaderUtil {
         newPath = newPath.replace("\\{title\\}".toRegex(), songInfo.name)
         newPath = newPath.replace("\\{album-artist\\}".toRegex(), songInfo.album_artist)
         newPath = newPath.replace("\\{genre\\}".toRegex(), songInfo.genres?.joinToString() ?: "")
-        newPath = newPath.replace("\\{year\\}".toRegex(), songInfo.year.toString())
-        newPath = newPath.replace("\\{list-name\\}".toRegex(), songInfo.song_list?.toString() ?: "")
+        newPath = newPath.replace("\\{year\\}".toRegex(), songInfo.year?.toString() ?: "0")
         newPath = newPath.replace("\\{output-ext\\}".toRegex(), getExtension() ?: "")
 
         return newPath
@@ -553,20 +436,14 @@ object DownloaderUtil {
 
     fun getExtension(): String? {
         val audioFormat = PreferencesUtil.getAudioFormat()
-        if (audioFormat == 0) {
-            return "mp3"
-        } else if (audioFormat == 1) {
-            return "flac"
-        } else if (audioFormat == 2) {
-            return "ogg"
-        } else if (audioFormat == 3) {
-            return "opus"
-        } else if (audioFormat == 4) {
-            return "m4a"
-        } else if (audioFormat == 5) {
-            return "wav"
-        } else {
-            return null
+        return when (audioFormat) {
+            0 -> "mp3"
+            1 -> "flac"
+            2 -> "ogg"
+            3 -> "opus"
+            4 -> "m4a"
+            5 -> "wav"
+            else -> null
         }
     }
 }
