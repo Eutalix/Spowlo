@@ -1,29 +1,23 @@
 <div align="center">
 <img src="https://user-images.githubusercontent.com/60316747/219976475-6dd606b0-8cb8-4dee-8665-544ae4e08ff2.svg" alt="spotify" width="100" height="100"/>
 </div>
-<h1 align="center">Spowlo</h1>
+<h1 align="center">Spowlo (Community Fork)</h1>
 <div align="center">
   
-A Spotify songs downloader powered by [spotDL](https://github.com/spotDL/spotify-downloader/) made with Jetpack Compose and Material You
+A Spotify songs downloader powered by [spotDL](https://github.com/spotDL/spotify-downloader/) made with Jetpack Compose and Material You.
+
+> **Note:** This is an active fork maintained by **Eutalix**, building upon the excellent work of BobbyESP.
 
 [![Telegram Channel](https://img.shields.io/badge/Telegram-Spowlo-green?style=flat&logo=telegram)](https://t.me/spowlo_chatroom)
-![GitHub all releases](https://img.shields.io/github/downloads/BobbyESP/Spowlo/total?label=Downloads&logo=github)
-![GitHub Repo stars](https://img.shields.io/github/stars/BobbyESP/Spowlo?color=informational&label=Stars)
+![GitHub all releases](https://img.shields.io/github/downloads/Eutalix/Spowlo/total?label=Downloads&logo=github)
+![GitHub Repo stars](https://img.shields.io/github/stars/Eutalix/Spowlo?color=informational&label=Stars)
  
-   ![GitHub code size in bytes](https://img.shields.io/github/languages/code-size/BobbyESP/Spowlo?logo=github&logoColor=%23fff&style=for-the-badge)
-  ![GitHub top language](https://img.shields.io/github/languages/top/BobbyESP/Spowlo?style=for-the-badge)
+   ![GitHub code size in bytes](https://img.shields.io/github/languages/code-size/Eutalix/Spowlo?logo=github&logoColor=%23fff&style=for-the-badge)
+  ![GitHub top language](https://img.shields.io/github/languages/top/Eutalix/Spowlo?style=for-the-badge)
 </div>
 
-## ⚠️📖 Important notice
-Hello everyone,
-
-I want to share a quick update regarding the future of Spowlo. Due to ongoing challenges, including instability with SpotDL and increased personal commitments, I’m currently taking a break from maintaining the app. The changes from Spotify have also made it harder to keep things running smoothly.
-
-While this isn't a final goodbye, I will reflect and assess the best way forward.
-
-If you have any questions or concerns, feel free to reach out in our [Telegram channel](https://t.me/spowlo_chatroom).
-
-Thank you for your understanding and support!
+## 🚀 What's New?
+This fork aims to keep Spowlo alive and updated. We have introduced a **Unified Dependency Updater** that fixes the "ghost version" bugs and ensures that `spotDL` and `yt-dlp` are always using the latest and greatest versions, directly from PyPI, without needing frequent APK updates.
 
 ## 📸 Screenshots
 
@@ -56,28 +50,25 @@ Spowlo uses YT Music and YouTube to download the songs. This is because Spotify 
 
 ## ⬇️Download
 
-For most devices, it is recommended to install the **ARM64-v8a** version of the apks
+For most devices, it is recommended to install the **ARM64-v8a** version of the apks.
 
-- Download the latest stable version from [GitHub releases](https://github.com/BobbyESP/Spowlo/releases/latest)
+- Download the latest stable version from [GitHub releases](https://github.com/Eutalix/Spowlo/releases/latest)
 
-## Translation
+## 🌍 Translation
 
-We are using Hosted Weblate for the translations of the app. if you want to contribute follow [this link](https://hosted.weblate.org/engage/spowlo/) 🖇️ 
+We are currently setting up a new platform to manage translations. Stay tuned for updates! If you want to help, feel free to open an Issue or Pull Request.
 
+## 📖 Credits & Acknowledgment
 
-## 📖Credits
-Thanks to [xnetcat](https://github.com/xnetcat) for it's help with some spotDL related things!
+A massive thank you to **BobbyESP**, the original creator of Spowlo. His work on the architecture, UI, and the complex Python-Android integration laid the foundation for everything we have here. This fork exists to honor that effort and keep the project serving the community.
 
-Thanks to [Seal](https://github.com/JunkFood02/Seal) and [JunkFood02](https://github.com/JunkFood02) for some of the code of the app and UI ideas. (Without you, this app would not have existed). I learnt a lot about architectures, corroutines, Jetpack Compose...
-
-[Philipp Lackner](https://www.youtube.com/c/PhilippLackner). Infinite thanks to you, Philipp. You made me learn infinite things with just a few videos. This guy explains literally everything about what is he coding, make apps just to make the community learn, and give us some amazing utilities. Without he, probably I wouldn't started coding for Android. 
-
-[Material color utilities](https://github.com/material-foundation/material-color-utilities) for having Material You coloring support in any device.
-
-Katoka, for the app name. (Thank you! Without your moral support I couldn't have done the app hahaha)
-
-[MoureDev by Brais Moure](https://www.youtube.com/c/MouredevApps)
-
-[Programación Android by AristiDevs](https://www.youtube.com/c/AristiDevs)
+### Original Credits by BobbyESP:
+- Thanks to [xnetcat](https://github.com/xnetcat) for it's help with some spotDL related things!
+- Thanks to [Seal](https://github.com/JunkFood02/Seal) and [JunkFood02](https://github.com/JunkFood02) for some of the code of the app and UI ideas. (Without you, this app would not have existed). I learnt a lot about architectures, coroutines, Jetpack Compose...
+- [Philipp Lackner](https://www.youtube.com/c/PhilippLackner). Infinite thanks to you, Philipp. You made me learn infinite things with just a few videos.
+- [Material color utilities](https://github.com/material-foundation/material-color-utilities) for having Material You coloring support in any device.
+- Katoka, for the app name. (Thank you! Without your moral support I couldn't have done the app hahaha)
+- [MoureDev by Brais Moure](https://www.youtube.com/c/MouredevApps)
+- [Programación Android by AristiDevs](https://www.youtube.com/c/AristiDevs)
 
 And also thank you all for the internal tests of the app!

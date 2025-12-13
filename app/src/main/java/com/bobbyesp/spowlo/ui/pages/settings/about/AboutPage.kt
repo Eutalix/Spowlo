@@ -52,7 +52,9 @@ fun AboutPage(onBackPressed: () -> Unit) {
     val BobbyESPLogoUrl = "https://avatars.githubusercontent.com/u/60316747"
     val BobbyESPGHUrl = "https://github.com/BobbyESP"
 
-    val spowloRepo = "https://github.com/BobbyESP/Spowlo"
+    // --- FORK UPDATE ---
+    val spowloRepo = "https://github.com/Eutalix/Spowlo"
+    // -------------------
 
     val context = LocalContext.current
     val clipboardManager = LocalClipboardManager.current
@@ -93,11 +95,26 @@ fun AboutPage(onBackPressed: () -> Unit) {
                 )
                 HeadDeveloperComponent(
                     name = "BobbyESP",
-                    description = "A passionated teenager developer",
+                    description = "Original Creator",
                     logoUrl = BobbyESPLogoUrl,
                     githubUrl = BobbyESPGHUrl
                 )
             }
+
+            // --- MAINTAINER SECTION ---
+            item {
+                PreferenceSubtitle(
+                    modifier = Modifier.padding(bottom = 6.dp, top = 12.dp),
+                    text = "Current Maintainer" 
+                )
+                HeadDeveloperComponent(
+                    name = "Eutalix",
+                    description = "Maintaining the fork",
+                    logoUrl = "https://github.com/Eutalix.png",
+                    githubUrl = "https://github.com/Eutalix"
+                )
+            }
+            // --------------------------
 
             item {
                 PreferenceSubtitle(text = stringResource(id = R.string.contributors))
