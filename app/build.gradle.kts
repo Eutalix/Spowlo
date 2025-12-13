@@ -73,7 +73,10 @@ android {
     }
 
     val localProperties = Properties()
-    localProperties.load(FileInputStream(rootProject.file("local.properties")))
+    val localFile = rootProject.file("local.properties")
+    if (localFile.exists()) {
+        localProperties.load(FileInputStream(localFile))
+    }
 
     compileSdk = 35
     defaultConfig {
@@ -99,6 +102,9 @@ android {
                     abiFilters.add(it)
                 }
             }
+
+        // IMPORTANT: Resolve the "bundling" flavor dimension used in :library and :ffmpeg
+        missingDimensionStrategy("bundling", "bundled")
     }
     if (splitApks)
         splits {
@@ -121,12 +127,12 @@ android {
             }
             if (keystorePropertiesFile.exists())
                 signingConfig = signingConfigs.getByName("debug")
-            //add client id and secret to build config
-            buildConfigField("String", "CLIENT_ID", "\"${localProperties["CLIENT_ID"]}\"")
+            
+            buildConfigField("String", "CLIENT_ID", "\"${localProperties["CLIENT_ID"] ?: ""}\"")
             buildConfigField(
                 "String",
                 "CLIENT_SECRET",
-                "\"${localProperties["CLIENT_SECRET"]}\""
+                "\"${localProperties["CLIENT_SECRET"] ?: ""}\""
             )
             matchingFallbacks.add(0, "debug")
             matchingFallbacks.add(1, "release")
@@ -137,20 +143,24 @@ android {
             packaging {
                 resources.excludes.add("META-INF/*.kotlin_module")
             }
-            buildConfigField("String", "CLIENT_ID", "\"${localProperties["CLIENT_ID"]}\"")
+            buildConfigField("String", "CLIENT_ID", "\"${localProperties["CLIENT_ID"] ?: ""}\"")
             buildConfigField(
                 "String",
                 "CLIENT_SECRET",
-                "\"${localProperties["CLIENT_SECRET"]}\""
+                "\"${localProperties["CLIENT_SECRET"] ?: ""}\""
             )
-            System.setProperty("CLIENT_ID", "\"${localProperties["CLIENT_ID"]}\"")
-            System.setProperty("CLIENT_SECRET", "\"${localProperties["CLIENT_SECRET"]}\"")
             matchingFallbacks.add(0, "debug")
             matchingFallbacks.add(1, "release")
             applicationIdSuffix = ".debug"
             resValue("string", "app_name", "Spowlo (Debug)")
             isMinifyEnabled = false
         }
+    }
+
+    // Enforcing Java 17 Compatibility
+    compileOptions {
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
     }
 
     buildFeatures {
@@ -171,6 +181,7 @@ android {
 
     kotlinOptions {
         freeCompilerArgs = freeCompilerArgs + "-opt-in=kotlin.RequiresOptIn"
+        jvmTarget = "17"
     }
     packaging {
         resources {
@@ -183,7 +194,7 @@ android {
 }
 
 kotlin {
-    jvmToolchain(21)
+    jvmToolchain(17)
 }
 
 dependencies {
@@ -232,16 +243,17 @@ dependencies {
     implementation(libs.room.ktx)
     ksp(libs.room.compiler)
 
-    //spotDL library
-    implementation(libs.spotdl.android.library)
-    implementation(libs.spotdl.android.ffmpeg)
+    // Local modules instead of remote artifacts
+    implementation(project(":library"))
+    implementation(project(":ffmpeg"))
+    implementation(project(":common"))
 
     implementation(libs.spotify.api.android)
 
-    // okhttp
+    // OkHttp
     implementation(libs.okhttp)
     implementation(libs.bundles.ktor)
-    //MMKV
+    // MMKV
     implementation(libs.mmkv)
 
     implementation(libs.markdown)
@@ -252,7 +264,6 @@ dependencies {
     testImplementation(libs.junit4)
     androidTestImplementation(libs.androidx.test.ext)
     androidTestImplementation(libs.androidx.test.espresso.core)
-//    androidTestImplementation(libs.androidx.compose.ui.test)
 
     debugImplementation(libs.androidx.compose.ui.tooling)
 }

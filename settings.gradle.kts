@@ -6,7 +6,7 @@ pluginManagement {
         gradlePluginPortal()
         google()
         mavenCentral()
-        maven ("https://jitpack.io")
+        maven("https://jitpack.io")
     }
 }
 dependencyResolutionManagement {
@@ -17,9 +17,13 @@ dependencyResolutionManagement {
         }
         google()
         mavenCentral()
-        maven ("https://jitpack.io")
+        maven("https://jitpack.io")
     }
 }
 rootProject.name = "Spowlo"
-include (":app")
+include(":app")
+// Included local modules for mono-repo structure
 include(":color")
+include(":common")
+include(":ffmpeg")
+include(":library")
