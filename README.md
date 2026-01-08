@@ -24,7 +24,7 @@ A Spotify songs downloader powered by [spotDL](https://github.com/spotDL/spotify
 
 **The Cause:**
 1. **API Keys Revoked:** The public Spotify API credentials used by Spowlo (and the underlying `spotDL` engine) have been revoked/banned by Spotify.
-2. **Spotify Dashboard Lockout:** Spotify has globally disabled the creation of new Developer Apps. This means you **cannot generate new credentials** to fix the issue manually at this moment. (See discussion: [Reddit Thread](https://www.reddit.com/r/truespotify/comments/1h0j146/new_developer_apps_silently_disabled/)).
+2. **Spotify Dashboard Lockout:** Spotify has globally disabled the creation of new Developer Apps. This means you **cannot generate new credentials** to fix the issue manually at this moment. (See discussion: [Reddit Thread](https://www.reddit.com/r/truespotify/comments/1q4sbi3/new_developer_apps_silently_disabled_integrations/)).
 
 **Workaround:**
 If you already had a **Spotify Developer App created prior to this week**, you are one of the lucky ones!
