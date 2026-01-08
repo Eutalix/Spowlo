@@ -25,6 +25,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
@@ -42,7 +43,9 @@ import com.bobbyesp.spowlo.ui.components.settings.SettingsSwitch
 import com.bobbyesp.spowlo.utils.PreferencesUtil
 import com.bobbyesp.spowlo.utils.SPOTIFY_CLIENT_ID
 import com.bobbyesp.spowlo.utils.SPOTIFY_CLIENT_SECRET
+import com.bobbyesp.spowlo.utils.SpotifyMetadataFetcher
 import com.bobbyesp.spowlo.utils.USE_SPOTIFY_CREDENTIALS
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -52,21 +55,8 @@ fun SpotifySettingsPage(onBackPressed: () -> Unit) {
         canScroll = { true }
     )
 
-    var spotifyClientId by remember {
-        mutableStateOf(
-            PreferencesUtil.getValue(
-                SPOTIFY_CLIENT_ID
-            )
-        )
-    }
-
-    var spotifyClientSecret by remember {
-        mutableStateOf(
-            PreferencesUtil.getValue(
-                SPOTIFY_CLIENT_SECRET
-            )
-        )
-    }
+    // Coroutine scope needed to call suspend functions like SpotifyMetadataFetcher.resetApi()
+    val scope = rememberCoroutineScope()
 
     var useSpotifyCredentials by remember {
         mutableStateOf(PreferencesUtil.getValue(USE_SPOTIFY_CREDENTIALS))
@@ -136,6 +126,10 @@ fun SpotifySettingsPage(onBackPressed: () -> Unit) {
                                     USE_SPOTIFY_CREDENTIALS,
                                     useSpotifyCredentials
                                 )
+                                // Clear the cached API instance immediately to apply changes
+                                scope.launch {
+                                    SpotifyMetadataFetcher.resetApi()
+                                }
                             },
                             addTonalElevation = true
                         )
