@@ -2,6 +2,7 @@ package com.bobbyesp.spowlo.ui.dialogs
 
 import android.os.Build
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -37,11 +38,15 @@ fun UpdateDialog(
 ) {
     var currentDownloadStatus by remember { mutableStateOf(UpdateUtil.DownloadStatus.NotYet as UpdateUtil.DownloadStatus) }
     val context = LocalContext.current
-
     val scope = rememberCoroutineScope()
+
+    // Ensure safe strings for UI
+    val cleanBody = latestRelease.body?.takeIf { it.isNotBlank() } ?: "No changelog available for this version."
+    val displayTitle = latestRelease.name ?: latestRelease.tagName ?: "Update Available"
+
     UpdateDialogImpl(
         onDismissRequest = onDismissRequest,
-        title = latestRelease.name.toString(),
+        title = displayTitle,
         onConfirmUpdate = {
             scope.launch(Dispatchers.IO) {
                 runCatching {
@@ -62,7 +67,7 @@ fun UpdateDialog(
                 }
             }
         },
-        releaseNote = latestRelease.body.toString(),
+        releaseNote = cleanBody,
         downloadStatus = currentDownloadStatus
     )
 }
@@ -78,23 +83,34 @@ fun UpdateDialogImpl(
     AlertDialog(
         onDismissRequest = {},
         title = { Text(title) },
-        icon = { Icon(Icons.Outlined.NewReleases, null) }, confirmButton = {
-            TextButton(onClick = { if (downloadStatus !is UpdateUtil.DownloadStatus.Progress) onConfirmUpdate() }) {
+        icon = { Icon(Icons.Outlined.NewReleases, null) }, 
+        confirmButton = {
+            TextButton(
+                onClick = { if (downloadStatus !is UpdateUtil.DownloadStatus.Progress) onConfirmUpdate() }
+            ) {
                 when (downloadStatus) {
                     is UpdateUtil.DownloadStatus.Progress -> Text("${downloadStatus.percent} %")
                     else -> Text(stringResource(R.string.update))
                 }
             }
-        }, dismissButton = {
+        }, 
+        dismissButton = {
             DismissButton { onDismissRequest() }
-        }, text = {
-            Column(Modifier.verticalScroll(rememberScrollState())) {
+        }, 
+        text = {
+            // FIX: Using fillMaxWidth instead of weight(1f) to solve layout issues in ScrollView
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .verticalScroll(rememberScrollState())
+            ) {
                 MarkdownText(
                     markdown = releaseNote,
-                    modifier = Modifier.weight(1f),
-                    textAlign = TextAlign.Justify,
-                    style = TextStyle.Default.copy(color = MaterialTheme.colorScheme.onSurface)
+                    modifier = Modifier.fillMaxWidth(),
+                    textAlign = TextAlign.Start,
+                    style = TextStyle.Default.copy(color = MaterialTheme.colorScheme.onSurfaceVariant)
                 )
             }
-        })
+        }
+    )
 }

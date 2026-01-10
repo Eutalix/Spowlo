@@ -15,19 +15,27 @@ import androidx.compose.material.icons.rounded.FileDownloadDone
 import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material3.windowsizeclass.ExperimentalMaterial3WindowSizeClassApi
 import androidx.compose.material3.windowsizeclass.calculateWindowSizeClass
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.core.os.LocaleListCompat
 import com.bobbyesp.spowlo.App.Companion.context
 import com.bobbyesp.spowlo.ui.common.LocalDarkTheme
 import com.bobbyesp.spowlo.ui.common.LocalDynamicColorSwitch
 import com.bobbyesp.spowlo.ui.common.Route
 import com.bobbyesp.spowlo.ui.common.SettingsProvider
+import com.bobbyesp.spowlo.ui.dialogs.UpdateDialog
 import com.bobbyesp.spowlo.ui.pages.InitialEntry
 import com.bobbyesp.spowlo.ui.pages.downloader.DownloaderViewModel
 import com.bobbyesp.spowlo.ui.pages.metadata_viewer.playlists.PlaylistPageViewModel
 import com.bobbyesp.spowlo.ui.pages.mod_downloader.ModsDownloaderViewModel
 import com.bobbyesp.spowlo.ui.theme.SpowloTheme
+import com.bobbyesp.spowlo.utils.AUTO_UPDATE
 import com.bobbyesp.spowlo.utils.PreferencesUtil
+import com.bobbyesp.spowlo.utils.UpdateUtil
 import com.bobbyesp.spowlo.utils.matchUrlFromSharedText
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.Dispatchers
@@ -54,6 +62,26 @@ class MainActivity : AppCompatActivity() {
             val isUrlSharingTriggered =
                 downloaderViewModel.viewStateFlow.collectAsState().value.isUrlSharingTriggered
             val windowSizeClass = calculateWindowSizeClass(this)
+            
+            // Auto-update state
+            var updateRelease by remember { mutableStateOf<UpdateUtil.LatestRelease?>(null) }
+            var showUpdateDialog by remember { mutableStateOf(false) }
+
+            // Check for updates on startup
+            LaunchedEffect(Unit) {
+                if (PreferencesUtil.getValue(AUTO_UPDATE)) {
+                    runCatching {
+                        val release = UpdateUtil.checkForUpdate(context)
+                        if (release != null) {
+                            updateRelease = release
+                            showUpdateDialog = true
+                        }
+                    }.onFailure {
+                        Log.e(TAG, "Failed to check for updates", it)
+                    }
+                }
+            }
+
             SettingsProvider(windowSizeClass.widthSizeClass, windowSizeClass.heightSizeClass) {
                 SpowloTheme(
                     darkTheme = LocalDarkTheme.current.isDarkTheme(),
@@ -66,6 +94,13 @@ class MainActivity : AppCompatActivity() {
                         playlistPageViewModel = playlistPageViewModel,
                         isUrlShared = isUrlSharingTriggered
                     )
+
+                    if (showUpdateDialog && updateRelease != null) {
+                        UpdateDialog(
+                            onDismissRequest = { showUpdateDialog = false },
+                            latestRelease = updateRelease!!
+                        )
+                    }
                 }
             }
         }

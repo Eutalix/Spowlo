@@ -15,6 +15,7 @@ import com.bobbyesp.library.domain.UpdateStatus
 import com.bobbyesp.spowlo.App
 import com.bobbyesp.spowlo.App.Companion.context
 import com.bobbyesp.spowlo.R
+import com.bobbyesp.spowlo.utils.PreferencesUtil.encodeString
 import com.bobbyesp.spowlo.utils.PreferencesUtil.getInt
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
@@ -69,19 +70,11 @@ object UpdateUtil {
 
     private const val OWNER = "Eutalix"
     private const val REPO = "Spowlo"
-    
-    private const val ARM64 = "arm64-v8a"
-    private const val ARM32 = "armeabi-v7a"
-    private const val X86 = "x86"
-    private const val X64 = "x86_64"
     private const val TAG = "UpdateUtil"
 
     private val client = OkHttpClient()
 
-    private val requestForLatestRelease =
-        Request.Builder().url("https://api.github.com/repos/${OWNER}/${REPO}/releases/latest")
-            .build()
-
+    // Request to fetch all releases to support channel filtering
     private val requestForReleases =
         Request.Builder().url("https://api.github.com/repos/${OWNER}/${REPO}/releases").build()
 
@@ -92,29 +85,37 @@ object UpdateUtil {
             context
         ).apply {
             if (this == UpdateStatus.DONE) SpotDL.getInstance().version(context)?.let {
-                PreferencesUtil.encodeString(SPOTDL, it)
+                encodeString(SPOTDL, it)
             }
         }
     }
-
 
     private suspend fun getLatestRelease(): LatestRelease {
         return suspendCoroutine { continuation ->
             client.newCall(requestForReleases).enqueue(object : Callback {
                 override fun onResponse(call: Call, response: Response) {
                     val responseData = response.body.string()
-//                    val latestRelease = jsonFormat.decodeFromString<LatestRelease>(responseData)
-                    val releaseList =
-                        jsonFormat.decodeFromString<List<LatestRelease>>(responseData)
-                    val latestRelease =
-                        releaseList.filter { if (UPDATE_CHANNEL.getInt() == STABLE) it.name.toVersion() is Version.Stable else true }
-                            .maxByOrNull { it.name.toVersion() }
-                            ?: throw Exception("null response")
-                    releaseList.sortedBy { it.name.toVersion() }.forEach {
-                        Log.d(TAG, it.tagName.toString())
+                    try {
+                        val releaseList =
+                            jsonFormat.decodeFromString<List<LatestRelease>>(responseData)
+
+                        // Filters releases based on user preference (Stable vs All)
+                        // UPDATE_CHANNEL.getInt() assumes an extension function on String in PreferencesUtil
+                        val latestRelease =
+                            releaseList.filter { if (UPDATE_CHANNEL.getInt() == STABLE) it.name.toVersion() is Version.Stable else true }
+                                .maxByOrNull { it.name.toVersion() }
+                                ?: throw Exception("null response or no matching release found")
+                        
+                        // Debug logging
+                        releaseList.sortedBy { it.name.toVersion() }.forEach {
+                            Log.d(TAG, "Available: ${it.tagName}")
+                        }
+                        
+                        response.body.close()
+                        continuation.resume(latestRelease)
+                    } catch (e: Exception) {
+                        continuation.resumeWithException(e)
                     }
-                    response.body.close()
-                    continuation.resume(latestRelease)
                 }
 
                 override fun onFailure(call: Call, e: IOException) {
@@ -125,11 +126,19 @@ object UpdateUtil {
     }
 
     suspend fun checkForUpdate(context: Context = App.context): LatestRelease? {
-        val currentVersion = context.getCurrentVersion()
-        val latestRelease = getLatestRelease()
-        val latestVersion = latestRelease.name.toVersion()
-        return if (currentVersion < latestVersion) latestRelease
-        else null
+        return try {
+            val currentVersion = context.getCurrentVersion()
+            val latestRelease = getLatestRelease()
+            val latestVersion = latestRelease.name.toVersion()
+            
+            Log.d(TAG, "Current: $currentVersion | Remote: $latestVersion")
+            
+            if (currentVersion < latestVersion) latestRelease
+            else null
+        } catch (e: Exception) {
+            e.printStackTrace()
+            null
+        }
     }
 
     private fun Context.getCurrentVersion(): Version =
@@ -166,14 +175,19 @@ object UpdateUtil {
     suspend fun downloadApk(
         context: Context = App.context, latestRelease: LatestRelease
     ): Flow<DownloadStatus> = withContext(Dispatchers.IO) {
-        val apkVersion = context.packageManager.getPackageArchiveInfo(
-            context.getLatestApk().absolutePath, 0
-        )?.versionName.toVersion()
+        val latestApkFile = context.getLatestApk()
+        
+        // Safety check: Ensure file exists before attempting to read package info
+        if (latestApkFile.exists()) {
+            val apkVersion = context.packageManager.getPackageArchiveInfo(
+                latestApkFile.absolutePath, 0
+            )?.versionName.toVersion()
 
-        Log.d(TAG, apkVersion.toString())
+            Log.d(TAG, "Cached APK Version: $apkVersion")
 
-        if (apkVersion >= latestRelease.name.toVersion()) {
-            return@withContext flow<DownloadStatus> { emit(DownloadStatus.Finished(context.getLatestApk())) }
+            if (apkVersion >= latestRelease.name.toVersion()) {
+                return@withContext flow<DownloadStatus> { emit(DownloadStatus.Finished(latestApkFile)) }
+            }
         }
 
         val abiList = Build.SUPPORTED_ABIS
@@ -182,6 +196,7 @@ object UpdateUtil {
         val targetUrl = latestRelease.assets?.find {
             return@find it.name?.contains(preferredArch) ?: false
         }?.browserDownloadUrl ?: return@withContext emptyFlow()
+        
         val request = Request.Builder().url(targetUrl).build()
         try {
             val response = client.newCall(request).execute()
@@ -312,8 +327,6 @@ object UpdateUtil {
 
             override fun toNumber(): Long =
                 major * MAJOR + minor * MINOR + patch * PATCH + build * BUILD + 50
-            // Prioritize stable versions
-
         }
 
         class ReleaseCandidate(
