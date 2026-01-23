@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Campaign
 import androidx.compose.material.icons.outlined.CheckCircle
 import androidx.compose.material.icons.outlined.Construction
 import androidx.compose.material.icons.outlined.History
@@ -39,7 +40,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -51,7 +51,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.bobbyesp.spowlo.App
 import com.bobbyesp.spowlo.R
 import com.bobbyesp.spowlo.ui.common.booleanState
 import com.bobbyesp.spowlo.ui.components.BackButton
@@ -64,6 +63,7 @@ import com.bobbyesp.spowlo.ui.components.settings.SettingsSwitch
 import com.bobbyesp.spowlo.ui.dialogs.NotificationPermissionDialog
 import com.bobbyesp.spowlo.utils.CONFIGURE
 import com.bobbyesp.spowlo.utils.DEBUG
+import com.bobbyesp.spowlo.utils.ENABLE_NEWS
 import com.bobbyesp.spowlo.utils.INCOGNITO_MODE
 import com.bobbyesp.spowlo.utils.NOTIFICATION
 import com.bobbyesp.spowlo.utils.NotificationsUtil
@@ -88,6 +88,10 @@ fun GeneralSettingsPage(
         canScroll = { true })
 
     var displayErrorReport by DEBUG.booleanState
+
+    var enableNews by remember {
+        mutableStateOf(PreferencesUtil.getValue(ENABLE_NEWS))
+    }
 
     var useNotifications by remember {
         mutableStateOf(
@@ -238,6 +242,25 @@ fun GeneralSettingsPage(
                         ),
                     )
                 }
+
+                item {
+                    SettingsSwitch(
+                        onCheckedChange = {
+                            enableNews = !enableNews
+                            PreferencesUtil.updateValue(ENABLE_NEWS, enableNews)
+                        },
+                        checked = enableNews,
+                        title = {
+                            Text(
+                                text = stringResource(R.string.enable_news_title),
+                                fontWeight = FontWeight.Bold
+                            )
+                        },
+                        icon = Icons.Outlined.Campaign,
+                        description = { Text(text = stringResource(R.string.enable_news_summary)) }
+                    )
+                }
+
                 item {
                     SettingsSwitch(
                         onCheckedChange = {
