@@ -1,0 +1,8 @@
+{
+  "id": 1,
+  "title": "🚨 CRITICAL NOTICE: DOWNLOADS UNAVAILABLE",
+  "body": "**As of January 2026, downloading from Spotify links is currently broken for most users.**\n\n### The Cause:\n1. **API Keys Revoked:** The public Spotify API credentials used by Spowlo (and the underlying `spotDL` engine) have been revoked/banned by Spotify.\n2. **Spotify Dashboard Lockout:** Spotify has globally disabled the creation of new Developer Apps. This means you **cannot generate new credentials** to fix the issue manually at this moment.\n\n### Workaround:\nIf you already had a **Spotify Developer App created prior to this week**, you are one of the lucky ones!\n1. Go to **Settings > Spotify**.\n2. Enable **\"Use custom credentials\"**.\n3. Enter your existing **Client ID** and **Client Secret**.\n\nFor everyone else, we are monitoring the situation and waiting for Spotify to lift the restriction on new app creation.\n\n**Please do not open new issues regarding \"Failed to fetch metadata\".**",
+  "action_url": "https://github.com/spotDL/spotify-downloader/issues/2585",
+  "action_text": "View GitHub Issue",
+  "is_critical": true
+}
