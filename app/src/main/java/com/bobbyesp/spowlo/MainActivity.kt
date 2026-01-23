@@ -27,6 +27,7 @@ import com.bobbyesp.spowlo.ui.common.LocalDarkTheme
 import com.bobbyesp.spowlo.ui.common.LocalDynamicColorSwitch
 import com.bobbyesp.spowlo.ui.common.Route
 import com.bobbyesp.spowlo.ui.common.SettingsProvider
+import com.bobbyesp.spowlo.ui.dialogs.NewsDialog
 import com.bobbyesp.spowlo.ui.dialogs.UpdateDialog
 import com.bobbyesp.spowlo.ui.pages.InitialEntry
 import com.bobbyesp.spowlo.ui.pages.downloader.DownloaderViewModel
@@ -34,6 +35,8 @@ import com.bobbyesp.spowlo.ui.pages.metadata_viewer.playlists.PlaylistPageViewMo
 import com.bobbyesp.spowlo.ui.pages.mod_downloader.ModsDownloaderViewModel
 import com.bobbyesp.spowlo.ui.theme.SpowloTheme
 import com.bobbyesp.spowlo.utils.AUTO_UPDATE
+import com.bobbyesp.spowlo.utils.ENABLE_NEWS
+import com.bobbyesp.spowlo.utils.NewsUtil
 import com.bobbyesp.spowlo.utils.PreferencesUtil
 import com.bobbyesp.spowlo.utils.UpdateUtil
 import com.bobbyesp.spowlo.utils.matchUrlFromSharedText
@@ -67,8 +70,13 @@ class MainActivity : AppCompatActivity() {
             var updateRelease by remember { mutableStateOf<UpdateUtil.LatestRelease?>(null) }
             var showUpdateDialog by remember { mutableStateOf(false) }
 
-            // Check for updates on startup
+            // News state
+            var newsRelease by remember { mutableStateOf<NewsUtil.NewsRelease?>(null) }
+            var showNewsDialog by remember { mutableStateOf(false) }
+
+            // Check for updates and news on startup
             LaunchedEffect(Unit) {
+                // 1. Check for App Update
                 if (PreferencesUtil.getValue(AUTO_UPDATE)) {
                     runCatching {
                         val release = UpdateUtil.checkForUpdate(context)
@@ -78,6 +86,19 @@ class MainActivity : AppCompatActivity() {
                         }
                     }.onFailure {
                         Log.e(TAG, "Failed to check for updates", it)
+                    }
+                }
+
+                // 2. Check for News / Announcements
+                if (PreferencesUtil.getValue(ENABLE_NEWS)) {
+                    runCatching {
+                        val news = NewsUtil.checkForNews()
+                        if (news != null) {
+                            newsRelease = news
+                            showNewsDialog = true
+                        }
+                    }.onFailure {
+                        Log.e(TAG, "Failed to check for news", it)
                     }
                 }
             }
@@ -99,6 +120,13 @@ class MainActivity : AppCompatActivity() {
                         UpdateDialog(
                             onDismissRequest = { showUpdateDialog = false },
                             latestRelease = updateRelease!!
+                        )
+                    }
+
+                    if (showNewsDialog && newsRelease != null) {
+                        NewsDialog(
+                            news = newsRelease!!,
+                            onDismissRequest = { showNewsDialog = false }
                         )
                     }
                 }
