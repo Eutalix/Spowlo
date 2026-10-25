@@ -23,6 +23,9 @@ interface SongsInfoDao {
     @Query("SELECT * from downloaded_songs_info WHERE id=:id")
     suspend fun getInfoById(id: Int): DownloadedSongInfo
 
+    @Query("SELECT * from downloaded_songs_info WHERE id=:id")
+    suspend fun getInfoByIdOrNull(id: Int): DownloadedSongInfo?
+
     @Query("DELETE FROM downloaded_songs_info WHERE id = :id")
     suspend fun deleteInfoById(id: Int)
 

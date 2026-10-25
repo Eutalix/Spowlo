@@ -35,14 +35,12 @@ import com.bobbyesp.spowlo.ui.common.Route
 import com.bobbyesp.spowlo.ui.common.animatedComposable
 import com.bobbyesp.spowlo.ui.common.animatedComposableVariant
 import com.bobbyesp.spowlo.ui.common.arg
-import com.bobbyesp.spowlo.ui.common.id
 import com.bobbyesp.spowlo.ui.common.slideInVerticallyComposable
 import com.bobbyesp.spowlo.ui.dialogs.bottomsheets.DownloaderBottomSheet
 import com.bobbyesp.spowlo.ui.pages.download_tasks.DownloadTasksPage
 import com.bobbyesp.spowlo.ui.pages.download_tasks.FullscreenConsoleOutput
 import com.bobbyesp.spowlo.ui.pages.downloader.DownloaderPage
 import com.bobbyesp.spowlo.ui.pages.downloader.DownloaderViewModel
-import com.bobbyesp.spowlo.ui.pages.history.DownloadsHistoryPage
 import com.bobbyesp.spowlo.ui.pages.metadata_viewer.playlists.PlaylistPageViewModel
 import com.bobbyesp.spowlo.ui.pages.metadata_viewer.playlists.SpotifyItemPage
 import com.bobbyesp.spowlo.ui.pages.mod_downloader.ModsDownloaderPage
@@ -134,11 +132,6 @@ fun InitialEntry(
         navigation(startDestination = Route.DOWNLOADER, route = Route.DownloaderNavi) {
             animatedComposable(Route.DOWNLOADER) {
                 DownloaderPage(
-                    navigateToDownloads = {
-                        navController.navigate(Route.DOWNLOADS_HISTORY) {
-                            launchSingleTop = true
-                        }
-                    },
                     navigateToSettings = {
                         navController.navigate(Route.SETTINGS)
                     },
@@ -168,11 +161,6 @@ fun InitialEntry(
             animatedComposable(Route.GENERAL_DOWNLOAD_PREFERENCES) {
                 GeneralSettingsPage(
                     onBackPressed = onBackPressed
-                )
-            }
-            animatedComposable(Route.DOWNLOADS_HISTORY) {
-                DownloadsHistoryPage(
-                    onBackPressed = onBackPressed,
                 )
             }
             animatedComposable(Route.DOWNLOAD_DIRECTORY) {
@@ -296,22 +284,24 @@ fun InitialEntry(
         ) {
 
             animatedComposable(
-                Route.FULLSCREEN_LOG arg "taskHashCode",
-                arguments = listOf(navArgument("taskHashCode") {
-                    type = NavType.IntType
+                Route.FULLSCREEN_LOG arg "logKey",
+                arguments = listOf(navArgument("logKey") {
+                    type = NavType.StringType
                 })
-            ) {
+            ) { entry ->
 
                 FullscreenConsoleOutput(
                     onBackPressed = onBackPressed,
-                    taskHashCode = it.arguments?.getInt("taskHashCode") ?: -1
+                    logKey = entry.arguments?.getString("logKey") ?: ""
                 )
             }
 
             animatedComposable(Route.DOWNLOAD_TASKS) {
                 DownloadTasksPage(
                     onGoBack = onBackPressed,
-                    onNavigateToDetail = { navController.navigate(Route.FULLSCREEN_LOG id it) }
+                    onNavigateToLog = { key ->
+                        navController.navigate("${Route.FULLSCREEN_LOG}/$key")
+                    }
                 )
             }
         }
@@ -320,7 +310,7 @@ fun InitialEntry(
     //INIT SPOTIFY API
     LaunchedEffect(Unit) {
         runCatching {
-            SpotifyApiRequests.provideSpotifyApi()
+            SpotifyApiRequests.warmUp()
         }.onFailure {
             it.printStackTrace()
             ToastUtil.makeToast(context.getString(R.string.spotify_api_error))
@@ -330,6 +320,8 @@ fun InitialEntry(
     // AUTO-UPDATE LOGIC (Unified & Safe)
     LaunchedEffect(Unit) {
         withContext(Dispatchers.IO) {
+            SpotDLDependencyUpdater.prunePinnedOverrides(context)
+
             val isInitialized = PreferencesUtil.getValue(DEPENDENCIES_INITIALIZED)
             val currentVersion = SpotDLDependencyUpdater.getLocalSpotDLVersion(context)
             

@@ -6,7 +6,7 @@
   
 A Spotify songs downloader powered by [spotDL](https://github.com/spotDL/spotify-downloader/) made with Jetpack Compose and Material You.
 
-> **Note:** This is an active fork maintained by **Eutalix**, building upon the excellent work of BobbyESP.
+> **Note:** This is a community fork maintained by **SomeRedstone** and **Eutalix**, building upon the excellent work of BobbyESP.
 
 [![Telegram Channel](https://img.shields.io/badge/Telegram-Spowlo-green?style=flat&logo=telegram)](https://t.me/spowlo_chatroom)
 ![GitHub all releases](https://img.shields.io/github/downloads/Eutalix/Spowlo/total?label=Downloads&logo=github)
@@ -16,29 +16,10 @@ A Spotify songs downloader powered by [spotDL](https://github.com/spotDL/spotify
   ![GitHub top language](https://img.shields.io/github/languages/top/Eutalix/Spowlo?style=for-the-badge)
 </div>
 
----
+## 👀 A new era
+Spowlo is back, now as a joint effort between **SomeRedstone** and **Eutalix**.
 
-## 🚨 CRITICAL NOTICE: DOWNLOADS TEMPORARILY UNAVAILABLE 🚨
-
-**As of January 2026, downloading from Spotify links is currently broken for most users.**
-
-**The Cause:**
-1. **API Keys Revoked:** The public Spotify API credentials used by Spowlo (and the underlying `spotDL` engine) have been revoked/banned by Spotify.
-2. **Spotify Dashboard Lockout:** Spotify has globally disabled the creation of new Developer Apps. This means you **cannot generate new credentials** to fix the issue manually at this moment. (See discussion: [Reddit Thread](https://www.reddit.com/r/truespotify/comments/1q4sbi3/new_developer_apps_silently_disabled_integrations/)).
-
-**Workaround:**
-If you already had a **Spotify Developer App created prior to this week**, you are one of the lucky ones!
-1. Go to **Settings > Spotify**.
-2. Enable **"Use custom credentials"**.
-3. Enter your existing **Client ID** and **Client Secret**.
-
-For everyone else, we are monitoring the situation and waiting for Spotify to lift the restriction on new app creation. **Please do not open new issues regarding "Failed to fetch metadata".**
-
----
-
-## 🚀 What's New?
-This fork aims to keep Spowlo alive and updated. We have introduced a **Unified Dependency Updater** that fixes the "ghost version" bugs and ensures that `spotDL` and `yt-dlp` are always using the latest and greatest versions, directly from PyPI, without needing frequent APK updates.
-
+The download pipeline no longer depends on Spotify's official Web API credentials. Metadata is fetched straight from Spotify's web player through a WebView and passed to spotDL, so downloads keep working even though the old shared keys were revoked.
 ## 📸 Screenshots
 
 <div align="center">
@@ -80,7 +61,13 @@ We are currently setting up a new platform to manage translations. Stay tuned fo
 
 ## 📖 Credits & Acknowledgment
 
-A massive thank you to **BobbyESP**, the original creator of Spowlo. His work on the architecture, UI, and the complex Python-Android integration laid the foundation for everything we have here. This fork exists to honor that effort and keep the project serving the community.
+"A massive thank you to **BobbyESP**, the original creator of Spowlo. His work on the architecture, UI, and the complex Python-Android integration laid the foundation for everything we have here. This fork exists to honor that effort and keep the project serving the community."  
+-Eutalix
+
+"Spowlo is an incredible project that I find myself coming back to every now and then. This fork is a culmination of months of thought and attempts. <3
+
+I'd also like to thank Eutalix, whose fork kept Spowlo alive after BobbyESP stepped down. We maintain the project together now, and it's quite the honor"
+-SomeRedstone
 
 ### Original Credits by BobbyESP:
 - Thanks to [xnetcat](https://github.com/xnetcat) for it's help with some spotDL related things!

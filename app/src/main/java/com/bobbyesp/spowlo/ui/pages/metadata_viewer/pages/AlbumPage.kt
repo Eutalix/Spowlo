@@ -16,6 +16,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Download
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -27,6 +28,7 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -42,9 +44,11 @@ import com.bobbyesp.spowlo.ui.pages.metadata_viewer.binders.dataStringToString
 fun AlbumPage(
     data: Album,
     modifier: Modifier,
-    trackDownloadCallback: (String, String) -> Unit
+    trackDownloadCallback: (String, String) -> Unit,
+    isLoadingTracks: Boolean = false,
 ) {
     val localConfig = LocalConfiguration.current
+    val trackCount = maxOf(data.totalTracks, data.tracks.total)
 
     LazyColumn(
         modifier = modifier.fillMaxSize(),
@@ -68,7 +72,7 @@ fun AlbumPage(
                             1f, matchHeightConstraintsFirst = true
                         )
                         .clip(MaterialTheme.shapes.small),
-                    model = data.images[0].url,
+                    model = data.images.getOrNull(0)?.url ?: "",
                     contentDescription = stringResource(id = R.string.track_artwork),
                     contentScale = ContentScale.Crop,
                 )
@@ -105,6 +109,16 @@ fun AlbumPage(
                         modifier = Modifier.alpha(alpha = 0.8f)
                     )
                 }
+                if (trackCount > 0) {
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Text(
+                        text = pluralStringResource(
+                            R.plurals.song_count, trackCount, trackCount
+                        ),
+                        style = MaterialTheme.typography.bodySmall,
+                        modifier = Modifier.alpha(alpha = 0.8f)
+                    )
+                }
             }
         }
         item {
@@ -127,7 +141,7 @@ fun AlbumPage(
                     ) {
                         Icon(
                             imageVector = Icons.Filled.Download,
-                            contentDescription = "Download full playlist icon",
+                            contentDescription = stringResource(R.string.download_all_songs),
                             modifier = Modifier
                                 .weight(1f)
                                 .padding(14.dp)
@@ -161,6 +175,24 @@ fun AlbumPage(
                         )
                     }
                 )
+            }
+        }
+        if (isLoadingTracks) {
+            item {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(12.dp),
+                    horizontalArrangement = Arrangement.Center,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
+                    Text(
+                        text = stringResource(R.string.loading),
+                        style = MaterialTheme.typography.bodySmall,
+                        modifier = Modifier.padding(start = 8.dp)
+                    )
+                }
             }
         }
     }

@@ -15,13 +15,18 @@ import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.surfaceColorAtElevation
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
-import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.ImeAction
@@ -37,14 +42,12 @@ fun QueryTextBox(
     onSearchCallback: () -> Unit
 ) {
     val focusRequester = remember { FocusRequester() }
-    val focusManager = LocalFocusManager.current
     val softwareKeyboardController = LocalSoftwareKeyboardController.current
 
-    DisposableEffect(Unit) {
-        focusRequester.requestFocus()
-        onDispose {
-            // Clean up if needed
-        }
+    LaunchedEffect(Unit) {
+        // Compose focuses the back button first with a hardware keyboard, so take focus once laid out.
+        withFrameNanos { }
+        runCatching { focusRequester.requestFocus() }
     }
 
     val containerColor = MaterialTheme.colorScheme.surfaceColorAtElevation(
@@ -60,13 +63,23 @@ fun QueryTextBox(
         },
         modifier = modifier
             .fillMaxWidth()
-            .focusRequester(focusRequester),
+            .focusRequester(focusRequester)
+            .onPreviewKeyEvent { event ->
+                // Enter would otherwise move focus to the next control (the back button).
+                if (event.key != Key.Enter && event.key != Key.NumPadEnter) {
+                    return@onPreviewKeyEvent false
+                }
+                if (event.type == KeyEventType.KeyDown && event.nativeKeyEvent.repeatCount == 0) {
+                    softwareKeyboardController?.hide()
+                    onSearchCallback()
+                }
+                true
+            },
         keyboardOptions = KeyboardOptions(
             imeAction = ImeAction.Search
         ),
         keyboardActions = KeyboardActions(
             onSearch = {
-                focusManager.clearFocus()
                 softwareKeyboardController?.hide()
                 onSearchCallback()
             }

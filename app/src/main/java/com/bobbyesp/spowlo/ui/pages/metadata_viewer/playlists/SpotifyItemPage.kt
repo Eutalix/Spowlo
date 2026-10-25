@@ -11,8 +11,6 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.res.stringResource
@@ -59,9 +57,7 @@ fun SpotifyItemPage(
             }
 
             is PlaylistDataState.Loaded -> {
-                val stateData by remember {
-                    mutableStateOf(this.state.data)
-                }
+                val stateData = this.state.data
 
                 Scaffold(
                     modifier = Modifier
@@ -93,7 +89,12 @@ fun SpotifyItemPage(
                             SpotifyDataType.ALBUM -> {
                                 val album = this as? Album
                                 album?.let {
-                                    AlbumPage(album, pageModifier, trackDownloadCallback)
+                                    AlbumPage(
+                                        data = it,
+                                        modifier = pageModifier,
+                                        trackDownloadCallback = trackDownloadCallback,
+                                        isLoadingTracks = viewState.isLoadingTracks
+                                    )
                                 }
                             }
 
@@ -107,7 +108,12 @@ fun SpotifyItemPage(
                             SpotifyDataType.PLAYLIST -> {
                                 val playlist = this as? Playlist
                                 playlist?.let {
-                                    PlaylistViewPage(playlist, pageModifier, trackDownloadCallback)
+                                    PlaylistViewPage(
+                                        data = it,
+                                        modifier = pageModifier,
+                                        trackDownloadCallback = trackDownloadCallback,
+                                        isLoadingTracks = viewState.isLoadingTracks
+                                    )
                                 }
                             }
 

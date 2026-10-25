@@ -155,7 +155,7 @@ object PreferencesUtil {
         AUDIO_FORMAT to 6,
         AUDIO_QUALITY to 17,
         UPDATE_CHANNEL to STABLE,
-        THREADS to 1,
+        THREADS to 2,
         UPDATE_FREQUENCY to FREQ_DAILY
     )
 

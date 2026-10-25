@@ -4,9 +4,9 @@ import android.util.Log
 import androidx.lifecycle.ViewModel
 import com.bobbyesp.spowlo.Downloader
 import com.bobbyesp.spowlo.features.spotify_api.data.remote.SpotifyApiRequests
+import com.bobbyesp.spowlo.features.spotify_api.data.remote.web.SpotifyWebApi
 import com.bobbyesp.spowlo.features.spotify_api.model.SpotifyDataType
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
@@ -21,124 +21,108 @@ class PlaylistPageViewModel @Inject constructor() : ViewModel() {
     data class ViewState(
         val id: String = "",
         val state: PlaylistDataState = PlaylistDataState.Loading,
+        val isLoadingTracks: Boolean = false,
     )
 
     suspend fun loadData(id: String, type: SpotifyDataType = SpotifyDataType.TRACK) {
         mutableViewStateFlow.update {
-            it.copy(
-                id = id,
-                state = PlaylistDataState.Loading
+            ViewState(id = id, state = PlaylistDataState.Loading)
+        }
+
+        val result = runCatching {
+            withContext(Dispatchers.IO) {
+                when (type) {
+                    SpotifyDataType.TRACK -> SpotifyApiRequests.provideGetTrackById(id)
+                        ?.let { PlaylistDataState.Loaded(it) }
+
+                    SpotifyDataType.ALBUM -> loadAlbum(id)
+                    SpotifyDataType.PLAYLIST -> loadPlaylist(id)
+                    SpotifyDataType.ARTIST -> SpotifyApiRequests.provideGetArtistById(id)
+                        ?.let { PlaylistDataState.Loaded(it) }
+                } ?: throw Exception("Error while loading data")
+            }
+        }
+
+        result.onSuccess { state ->
+            publish(id, state, isLoadingTracks = false)
+        }.onFailure { exception ->
+            Log.e(TAG, "Could not load $type $id", exception)
+            publish(
+                id,
+                PlaylistDataState.Error(Exception(exception.message ?: "Error while loading data")),
+                isLoadingTracks = false
             )
         }
-        when (type) {
-            SpotifyDataType.TRACK -> {
-                try {
-                    val trackDeferred = withContext(Dispatchers.IO) {
-                        async {
-                            Log.d("SpotifyApiRequests", "provideGetTrackById($id)")
-                            SpotifyApiRequests.provideGetTrackById(id)
-                        }
-                    }
-                    val track = trackDeferred.await()
+    }
 
-                    mutableViewStateFlow.update {
-                        it.copy(
-                            state = PlaylistDataState.Loaded(
-                                track!!
-                            )
-                        )
-                    }
-                } catch (e: Exception) {
-                    mutableViewStateFlow.update {
-                        it.copy(
-                            state = PlaylistDataState.Error(Exception("Error while loading data"))
-                        )
-                    }
-                }
-            }
+    private suspend fun loadPlaylist(id: String): PlaylistDataState.Loaded {
+        var complete = SpotifyApiRequests.provideGetPlaylistById(id)
+            ?: throw Exception("Error while loading playlist")
 
-            SpotifyDataType.ALBUM -> {
-                try {
-                    val albumDeferred = withContext(Dispatchers.IO) {
-                        async {
-                            Log.d("SpotifyApiRequests", "providesGetAlbumById($id)")
-                            SpotifyApiRequests.providesGetAlbumById(id)
-                        }
-                    }
-                    val album = albumDeferred.await()
+        publish(id, PlaylistDataState.Loaded(complete), isLoadingTracks = true)
 
-                    mutableViewStateFlow.update {
-                        it.copy(
-                            state = PlaylistDataState.Loaded(
-                                album!!
-                            )
-                        )
-                    }
-                } catch (e: Exception) {
-                    mutableViewStateFlow.update {
-                        it.copy(
-                            state = PlaylistDataState.Error(Exception("Error while loading data"))
-                        )
-                    }
-                }
+        val tracks = complete.tracks.items.toMutableList()
+        var offset = 0
+        while (offset < MAX_TRACKS) {
+            val page = SpotifyApiRequests.provideGetPlaylistTracksPage(id, offset = offset)
+            if (page.items.isEmpty()) break
+            tracks.addAll(page.items)
+            offset += SpotifyWebApi.PLAYLIST_PAGE_SIZE
+            complete = complete.copy(
+                tracks = complete.tracks.copy(
+                    items = tracks.toList(),
+                    offset = 0,
+                    limit = SpotifyWebApi.PLAYLIST_PAGE_SIZE,
+                    total = page.total,
+                )
+            )
+            publish(id, PlaylistDataState.Loaded(complete), isLoadingTracks = true)
+            if (offset >= page.total) break
+        }
 
-            }
+        return PlaylistDataState.Loaded(complete)
+    }
 
-            SpotifyDataType.PLAYLIST -> {
-                try {
-                    val playlistDeferred = withContext(Dispatchers.IO) {
-                        async {
-                            Log.d("SpotifyApiRequests", "provideGetPlaylistById($id)")
-                            SpotifyApiRequests.provideGetPlaylistById(id)
-                        }
-                    }
-                    val playlist = playlistDeferred.await()
+    private suspend fun loadAlbum(id: String): PlaylistDataState.Loaded {
+        var complete = SpotifyApiRequests.providesGetAlbumById(id)
+            ?: throw Exception("Error while loading album")
 
-                    mutableViewStateFlow.update {
-                        it.copy(
-                            state = PlaylistDataState.Loaded(
-                                playlist!!
-                            )
-                        )
-                    }
-                } catch (e: Exception) {
-                    mutableViewStateFlow.update {
-                        it.copy(
-                            state = PlaylistDataState.Error(Exception("Error while loading data"))
-                        )
-                    }
-                }
-            }
+        publish(id, PlaylistDataState.Loaded(complete), isLoadingTracks = true)
 
-            SpotifyDataType.ARTIST -> {
-                try {
-                    val artistDeferred = withContext(Dispatchers.IO) {
-                        async {
-                            Log.d("SpotifyApiRequests", "provideGetArtistById($id)")
-                            SpotifyApiRequests.provideGetArtistById(id)
-                        }
-                    }
-                    val artist = artistDeferred.await()
+        val tracks = complete.tracks.items.toMutableList()
+        var offset = 0
+        while (offset < MAX_TRACKS) {
+            val page = SpotifyApiRequests.providesGetAlbumTracksPage(id, offset = offset)
+            if (page.items.isEmpty()) break
+            tracks.addAll(page.items)
+            offset += SpotifyWebApi.ALBUM_PAGE_SIZE
+            complete = complete.copy(
+                tracks = complete.tracks.copy(
+                    items = tracks.toList(),
+                    offset = 0,
+                    limit = SpotifyWebApi.ALBUM_PAGE_SIZE,
+                    total = page.total,
+                )
+            )
+            publish(id, PlaylistDataState.Loaded(complete), isLoadingTracks = true)
+            if (offset >= page.total) break
+        }
 
-                    mutableViewStateFlow.update {
-                        it.copy(
-                            state = PlaylistDataState.Loaded(
-                                artist!!
-                            )
-                        )
-                    }
-                } catch (e: Exception) {
-                    mutableViewStateFlow.update {
-                        it.copy(
-                            state = PlaylistDataState.Error(Exception("Error while loading data"))
-                        )
-                    }
-                }
-            }
+        return PlaylistDataState.Loaded(complete)
+    }
+
+    private fun publish(id: String, state: PlaylistDataState, isLoadingTracks: Boolean) {
+        mutableViewStateFlow.update {
+            if (it.id == id) it.copy(state = state, isLoadingTracks = isLoadingTracks) else it
         }
     }
 
     fun downloadTrack(url: String, name: String) {
         Downloader.executeParallelDownloadWithUrl(url, name)
+    }
+
+    private companion object {
+        const val TAG = "PlaylistPageViewModel"
+        const val MAX_TRACKS = 10_000
     }
 }

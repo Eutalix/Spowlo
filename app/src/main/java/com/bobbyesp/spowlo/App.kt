@@ -19,6 +19,7 @@ import android.widget.Toast
 import androidx.core.content.getSystemService
 import com.bobbyesp.ffmpeg.FFmpeg
 import com.bobbyesp.library.SpotDL
+import com.bobbyesp.spowlo.features.spotify_api.data.remote.web.SpotifyWebTransport
 import com.bobbyesp.spowlo.utils.AUDIO_DIRECTORY
 import com.bobbyesp.spowlo.utils.DownloaderUtil
 import com.bobbyesp.spowlo.utils.EXTRA_DIRECTORY
@@ -53,6 +54,7 @@ class App : Application() {
         }
         applicationScope = CoroutineScope(SupervisorJob())
         DynamicColors.applyToActivitiesIfAvailable(this)
+        SpotifyWebTransport.init(this)
 
         clipboard = getSystemService()!!
         connectivityManager = getSystemService()!!

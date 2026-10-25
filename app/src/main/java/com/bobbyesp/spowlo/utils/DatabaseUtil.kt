@@ -24,7 +24,8 @@ object DatabaseUtil {
     private val dao = db.songsInfoDao()
     fun insertInfo(vararg infoList: DownloadedSongInfo) {
         applicationScope.launch(Dispatchers.IO) {
-            infoList.forEach { dao.insertInfoDistinctByPath(it) }
+            // Replace the previous row for the same file so a re-download refreshes its log and date.
+            infoList.forEach { dao.deleteInfoByPathAndInsert(it) }
         }
     }
 
@@ -53,6 +54,7 @@ object DatabaseUtil {
         dao.deleteInfoListByIdList(idList, deleteFile)
 
     suspend fun getInfoById(id: Int): DownloadedSongInfo = dao.getInfoById(id)
+    suspend fun getInfoByIdOrNull(id: Int): DownloadedSongInfo? = dao.getInfoByIdOrNull(id)
     suspend fun deleteInfoById(id: Int) = dao.deleteInfoById(id)
 
     suspend fun insertTemplate(commandTemplate: CommandTemplate) =

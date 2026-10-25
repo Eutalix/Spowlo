@@ -166,12 +166,14 @@ fun TrackPage(
                         .fillMaxWidth()
                         .padding(horizontal = 16.dp)
                 ) {
-                    ExtraInfoCard(
-                        headlineText = stringResource(id = R.string.track_popularity),
-                        bodyText = trackData.popularity.toString(),
-                        modifier = Modifier.weight(1f)
-                    )
-                    Spacer(modifier = Modifier.width(16.dp))
+                    SpotifyApiRequests.getTrackPlayCount(trackData.id)?.let { playCount ->
+                        ExtraInfoCard(
+                            headlineText = stringResource(id = R.string.track_plays),
+                            bodyText = GeneralTextUtils.formatCount(playCount),
+                            modifier = Modifier.weight(1f)
+                        )
+                        Spacer(modifier = Modifier.width(16.dp))
+                    }
                     ExtraInfoCard(
                         headlineText = stringResource(id = R.string.track_duration),
                         bodyText = GeneralTextUtils.convertDuration(trackData.durationMs.toDouble()),

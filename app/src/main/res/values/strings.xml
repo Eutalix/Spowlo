@@ -153,7 +153,7 @@
     <string name="clear_all_cookies">Delete all the cookies</string>
     <string name="cookies_desc">Use Netscape formatted cookies for downloads</string>
     <string name="cookies_file_name" translatable="false">cookies.txt</string>
-    <string name="cookies_usage_msg">Downloading songs with high quality requires YT Music account authentication information. Click \"Generate new cookies\", enter the URL of the website and then log in with your account in the browser page, the app will generate it for you.</string>
+    <string name="cookies_usage_msg">Cookies are passed to yt-dlp, including your YouTube account. Signed-in YouTube downloads use a JavaScript runtime bundled with the app, so no extra setup is needed.</string>
     <string name="remove_cookie_profile_desc">Remove cookies for \"%1$s\"?</string>
     <string name="clear_all_cookies_desc">Delete all the cookies stored in the app?</string>
     <string name="download_lyrics">Download Lyrics</string>
@@ -281,7 +281,7 @@
     <string name="go_back">Go back</string>
     <string name="both">Both</string>
     <string name="update_check_failed">The app updates checker failed</string>
-    <string name="track_popularity">Popularity</string>
+    <string name="track_plays">Plays</string>
     <string name="track_duration">Duration</string>
     <string name="download_started_msg">Download started</string>
     <string name="download_finished_msg">Download finished</string>
@@ -299,6 +299,13 @@
     <string name="open_log">Open log</string>
     <string name="restart_task">Restart task</string>
     <string name="download_tasks">Download tasks</string>
+    <string name="downloads">Downloads</string>
+    <string name="downloads_in_progress">In progress</string>
+    <string name="downloads_completed">Downloaded</string>
+    <string name="downloads_empty_title">No downloads yet</string>
+    <string name="downloads_empty_description">Songs you download will appear here.</string>
+    <string name="play_file">Play</string>
+    <string name="download_log_empty">No log was saved for this download.</string>
     <string name="tasks">Tasks</string>
     <string name="error">An error occurred</string>
     <string name="font_size">Font size</string>
@@ -366,10 +373,15 @@
     <string name="incognito_mode">Incognito mode</string>
     <string name="incognito_mode_desc">Disable download history</string>
     <string name="artist_followers">Followers</string>
-    <string name="artist_popularity">Popularity</string>
+    <string name="artist_monthly_listeners">Monthly listeners</string>
     <string name="artist_top_tracks">Top Tracks</string>
     <string name="artist_top_albums">Top Albums</string>
-    <string name="uncomplete_playlist">Right now Spowlo may not show all songs due to the lack of pagination, but when trying to download the full playlist, all the songs will be downloaded. This is already fixed in the upcoming Spowlo 2.0.0</string>
+    <string name="download_all_songs">Download all songs</string>
+    <string name="collection_empty">No playable songs were found in this playlist or album.</string>
+    <plurals name="song_count">
+        <item quantity="one">%d song</item>
+        <item quantity="other">%d songs</item>
+    </plurals>
     <string name="enable_news_title">News &amp; Announcements</string>
     <string name="enable_news_summary">Receive notifications about critical updates, fixes, and app news.</string>
 </resources>
