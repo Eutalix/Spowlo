@@ -523,6 +523,7 @@ fun DownloaderBottomSheet(
         }
 
         val state = rememberLazyListState()
+        val isCollectionUrl = url.contains("/playlist/") || url.contains("/album/")
 
         LaunchedEffect(Unit) {
             state.scrollToItem(1)
@@ -607,6 +608,16 @@ fun DownloaderBottomSheet(
                             text = stringResource(R.string.start_download)
                         )
                     }
+                }
+            }
+            if (isCollectionUrl) {
+                item {
+                    FilledButtonWithIcon(
+                        modifier = Modifier.padding(end = 12.dp),
+                        onClick = downloadButtonCallback,
+                        icon = Icons.Outlined.DownloadDone,
+                        text = stringResource(R.string.start_download)
+                    )
                 }
             }
         }

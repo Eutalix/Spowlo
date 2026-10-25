@@ -11,7 +11,6 @@ object Route {
 
     const val HOME = "home"
     const val DOWNLOADER = "downloader"
-    const val DOWNLOADS_HISTORY = "download_history"
     const val PLAYLIST = "playlist"
     const val SETTINGS = "settings"
     const val FORMAT_SELECTION = "format"

@@ -4,6 +4,7 @@ import android.content.Context
 import android.util.Log
 import com.bobbyesp.library.BuildConfig
 import com.bobbyesp.spotdl_common.Constants.LIBRARY_NAME
+import com.bobbyesp.spotdl_common.Constants.PACKAGES_ROOT_NAME
 import com.bobbyesp.spotdl_common.utils.json
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.sync.Mutex
@@ -27,13 +28,13 @@ object SpotDLDependencyUpdater {
     private val mutex = Mutex()
     private val isDebug = BuildConfig.DEBUG
 
-    // List of volatile packages to update via Hotfix.
+    // Volatile packages to update via Hotfix. soundcloud-v2 is excluded: its
+    // newer releases import curl_cffi and break spotDL's audio provider import.
     private val TARGET_PACKAGES = listOf(
         "ytmusicapi",
         "yt-dlp",
         "spotdl",
-        "syncedlyrics",
-        "soundcloud-v2"
+        "syncedlyrics"
     )
 
     /**
@@ -56,6 +57,8 @@ object SpotDLDependencyUpdater {
                 }
 
                 var updatesCount = 0
+
+                dropPinnedOverrides(sitePackages)
 
                 TARGET_PACKAGES.forEach { pkgName ->
                     try {
@@ -92,6 +95,30 @@ object SpotDLDependencyUpdater {
         val v = getLocalVersion(sitePackages, "spotdl")
         if(isDebug) Log.d(TAG, ">>> DepUpdater: Check local SpotDL version: $v")
         return v
+    }
+
+    /** Returns the yt-dlp version in effect: the updated copy if installed, else the bundled one. */
+    fun getLocalYtDlpVersion(context: Context): String {
+        val updated = getLocalVersion(getSitePackagesDir(context), "yt-dlp")
+        if (updated != "0.0.0") return updated
+
+        val libDir = File(
+            File(context.noBackupFilesDir, LIBRARY_NAME),
+            "$PACKAGES_ROOT_NAME/python/usr/lib"
+        )
+        val sitePackages = libDir
+            .listFiles { file -> file.isDirectory && file.name.startsWith("python3") }
+            ?.firstOrNull()
+            ?.let { File(it, "site-packages") }
+            ?: return "0.0.0"
+
+        return getLocalVersion(sitePackages, "yt-dlp")
+    }
+
+    /** Drops hotfix copies of packages that must stay on the bundled version. */
+    fun prunePinnedOverrides(context: Context) {
+        val sitePackages = getSitePackagesDir(context)
+        if (sitePackages.exists()) dropPinnedOverrides(sitePackages)
     }
 
     suspend fun areUpdatesAvailable(context: Context): Boolean {
@@ -152,6 +179,19 @@ object SpotDLDependencyUpdater {
         } finally {
             tempFile.delete()
         }
+    }
+
+    // The PyPI name (soundcloud-v2) differs from the module name (soundcloud).
+    private fun dropPinnedOverrides(sitePackages: File) {
+        File(sitePackages, "soundcloud").takeIf { it.exists() }?.let {
+            if (isDebug) Log.d(TAG, ">>> DepUpdater: Removing pinned override ${it.name}")
+            FileUtils.deleteDirectory(it)
+        }
+
+        sitePackages.listFiles { file ->
+            file.isDirectory && file.name.endsWith(".dist-info") &&
+                (file.name.startsWith("soundcloud_v2") || file.name.startsWith("soundcloud-v2"))
+        }?.forEach { FileUtils.deleteDirectory(it) }
     }
 
     private fun clearOldVersions(sitePackages: File, pkgName: String) {

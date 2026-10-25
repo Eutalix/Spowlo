@@ -5,8 +5,6 @@ import android.util.Log
 import androidx.annotation.CheckResult
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.ui.text.AnnotatedString
-import com.adamratzman.spotify.models.Album
-import com.adamratzman.spotify.models.Artist
 import com.adamratzman.spotify.models.Track
 import com.bobbyesp.library.SpotDL
 import com.bobbyesp.library.domain.model.SpotifySong
@@ -15,6 +13,7 @@ import com.bobbyesp.spowlo.App.Companion.applicationScope
 import com.bobbyesp.spowlo.App.Companion.context
 import com.bobbyesp.spowlo.App.Companion.startService
 import com.bobbyesp.spowlo.App.Companion.stopService
+import com.bobbyesp.spowlo.features.spotify_api.data.remote.SpotifyApiRequests
 import com.bobbyesp.spowlo.ui.common.containsEllipsis
 import com.bobbyesp.spowlo.utils.DownloaderUtil
 import com.bobbyesp.spowlo.utils.FilesUtil
@@ -22,6 +21,7 @@ import com.bobbyesp.spowlo.utils.NotificationsUtil
 import com.bobbyesp.spowlo.utils.SpotifyMetadataFetcher
 import com.bobbyesp.spowlo.utils.ToastUtil
 import com.bobbyesp.spowlo.utils.UrlValidator
+import com.bobbyesp.spowlo.utils.toSpotifySong
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -60,6 +60,8 @@ object Downloader {
         val state: State,
         val currentLine: String,
         val taskName: String,
+        val artist: String = "",
+        val artworkUrl: String = "",
     ) {
         fun toKey() = makeKey(url, url.reversed())
         sealed class State {
@@ -166,13 +168,20 @@ object Downloader {
         }
     }
 
-    fun onTaskStarted(url: String, name: String) =
+    fun onTaskStarted(
+        url: String,
+        name: String,
+        artist: String = "",
+        artworkUrl: String = ""
+    ) =
         DownloadTask(
             url = url,
             consoleOutput = "",
             state = DownloadTask.State.Running(0f),
             currentLine = "",
-            taskName = name
+            taskName = name,
+            artist = artist,
+            artworkUrl = artworkUrl,
         ).run {
             mutableTaskList[this.toKey()] = this
             val key = makeKey(url, url.reversed())
@@ -322,30 +331,27 @@ object Downloader {
             try {
                 val cleanedUrl = cleanSpotifyUrl(url)
 
-                if (skipInfoFetch) {
-                    val songInfo = SpotifySong(url = cleanedUrl)
-                    downloadSong(songInfo, preferences = downloadPreferences)
-                    return@launch
+                when (UrlValidator.classify(cleanedUrl)) {
+                    UrlValidator.Type.SpotifyTrack -> {
+                        val spotifyTrack = SpotifyMetadataFetcher.fetchTrackFromUrl(cleanedUrl)
+                            ?: throw Exception("Failed to fetch metadata from Spotify API.")
+
+                        val songInfo = spotifyTrack.toSpotifySongWithDetails()
+
+                        if (!skipInfoFetch) DownloaderUtil.updateSongsState(listOf(songInfo))
+                        mutableTaskState.update { songInfo.toTask(preferencesHash = downloadPreferences.hashCode()) }
+
+                        downloadSong(songInfo, preferences = downloadPreferences)
+                    }
+
+                    UrlValidator.Type.SpotifyPlaylist,
+                    UrlValidator.Type.SpotifyAlbum -> {
+                        updateState(State.Idle)
+                        downloadCollection(cleanedUrl)
+                    }
+
+                    else -> throw Exception("This link is not supported. Use a Spotify track, album or playlist.")
                 }
-
-                if (UrlValidator.classify(cleanedUrl) != UrlValidator.Type.SpotifyTrack) {
-                    throw Exception("Link is not a valid Spotify track URL.")
-                }
-
-                val spotifyTrack = SpotifyMetadataFetcher.fetchTrackFromUrl(cleanedUrl)
-                    ?: throw Exception("Failed to fetch metadata from Spotify API.")
-
-                val fullAlbum = spotifyTrack.album.toFullAlbum()
-                val fullArtist = spotifyTrack.artists.firstOrNull()?.toFullArtist()
-                
-                val songInfo = withContext(Dispatchers.Default) { 
-                    spotifyTrack.toSpotifySong(fullAlbum, fullArtist) 
-                }
-
-                DownloaderUtil.updateSongsState(listOf(songInfo))
-                mutableTaskState.update { songInfo.toTask(preferencesHash = downloadPreferences.hashCode()) }
-
-                downloadSong(songInfo, preferences = downloadPreferences)
             } catch (e: Exception) {
                 if (e is CancellationException) throw e
                 manageDownloadError(e, isFetchingInfo = true, isTaskAborted = true)
@@ -370,12 +376,7 @@ object Downloader {
                 val spotifyTrack = SpotifyMetadataFetcher.fetchTrackFromUrl(cleanedUrl)
                     ?: throw Exception("Failed to fetch metadata from Spotify API.")
                 
-                val fullAlbum = spotifyTrack.album.toFullAlbum()
-                val fullArtist = spotifyTrack.artists.firstOrNull()?.toFullArtist()
-                
-                val songInfo = withContext(Dispatchers.Default) { 
-                    spotifyTrack.toSpotifySong(fullAlbum, fullArtist) 
-                }
+                val songInfo = spotifyTrack.toSpotifySongWithDetails()
 
                 DownloaderUtil.updateSongsState(listOf(songInfo))
                 mutableTaskState.update {
@@ -453,8 +454,32 @@ object Downloader {
     }
 
     fun executeParallelDownloadWithUrl(url: String, name: String) = applicationScope.launch(Dispatchers.IO) {
-        DownloaderUtil.executeParallelDownload(url, name)
+        runCatching {
+            val cleanedUrl = cleanSpotifyUrl(url)
+            when (UrlValidator.classify(cleanedUrl)) {
+                UrlValidator.Type.SpotifyTrack -> {
+                    val track = SpotifyMetadataFetcher.fetchTrackFromUrl(cleanedUrl)
+                        ?: throw Exception("Failed to fetch metadata from Spotify API.")
+
+                    DownloaderUtil.executeParallelDownload(track.toSpotifySongWithDetails(), name)
+                }
+
+                UrlValidator.Type.SpotifyPlaylist,
+                UrlValidator.Type.SpotifyAlbum -> downloadCollection(cleanedUrl, fallbackName = name)
+
+                else -> throw Exception("This link is not supported. Use a Spotify track, album or playlist.")
+            }
+        }.onFailure { manageDownloadError(it, isFetchingInfo = true) }
     }
+
+    fun downloadCollection(url: String, fallbackName: String = "") =
+        applicationScope.launch(Dispatchers.IO) {
+            runCatching {
+                val collection = SpotifyMetadataFetcher.fetchCollectionFromUrl(url)
+                    ?: throw Exception("Could not load the Spotify album or playlist.")
+                DownloaderUtil.executeCollectionDownload(collection, fallbackName)
+            }.onFailure { manageDownloadError(it, isFetchingInfo = true) }
+        }
 
     fun String.toNotificationId(): Int = this.hashCode()
     private fun String.getNumbers(): Int {
@@ -463,34 +488,10 @@ object Downloader {
         return if (sb.isNotEmpty()) sb.toString().toInt() else 0
     }
 
-    private suspend fun Track.toSpotifySong(fullAlbum: Album?, fullArtist: Artist?): SpotifySong {
-        val releaseDate = this.album.releaseDate
-        val fullDate = if (releaseDate?.month != null && releaseDate.day != null) {
-            "${releaseDate.year}-${releaseDate.month.toString().padStart(2, '0')}-${releaseDate.day.toString().padStart(2, '0')}"
-        } else {
-            releaseDate?.year?.toString() ?: ""
-        }
-        
-        return SpotifySong(
-            name = this.name,
-            artist = this.artists.firstOrNull()?.name ?: "Unknown Artist",
-            artists = this.artists.mapNotNull { it.name },
-            genres = fullArtist?.genres ?: emptyList(),
-            album_name = this.album.name,
-            album_artist = this.album.artists.joinToString(", ") { it.name ?: "" },
-            cover_url = this.album.images?.firstOrNull()?.url ?: "",
-            duration = this.durationMs / 1000.0,
-            disc_number = this.discNumber,
-            disc_count = fullAlbum?.totalTracks ?: 1,
-            isrc = this.externalIds.firstOrNull { it.key.equals("isrc", ignoreCase = true) }?.id,
-            publisher = fullAlbum?.label,
-            date = fullDate,
-            copyright_text = fullAlbum?.copyrights?.firstOrNull()?.text,
-            url = this.externalUrls.spotify ?: this.uri.uri,
-            song_id = this.id,
-            explicit = this.explicit,
-            year = this.album.releaseDate?.year ?: 0,
-            track_number = this.trackNumber
-        )
+    // toFullAlbum()/toFullArtist() need the official API client, so look the ids up through our backend.
+    private suspend fun Track.toSpotifySongWithDetails(): SpotifySong {
+        val fullAlbum = album.id?.let { SpotifyApiRequests.providesGetAlbumById(it) }
+        val fullArtist = artists.firstOrNull()?.id?.let { SpotifyApiRequests.provideGetArtistById(it) }
+        return toSpotifySong(fullAlbum, fullArtist)
     }
 }
