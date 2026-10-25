@@ -14,7 +14,6 @@ import androidx.core.content.FileProvider
 import androidx.documentfile.provider.DocumentFile
 import com.bobbyesp.spowlo.App.Companion.context
 import com.bobbyesp.spowlo.R
-import com.bobbyesp.spowlo.ui.pages.history.THUMBNAIL_REGEX
 import okhttp3.internal.closeQuietly
 import java.io.File
 import java.io.InputStream
@@ -26,6 +25,7 @@ import java.io.InputStream
 //////////////////////////////////////////////////////////////
 
 const val AUDIO_REGEX = "(mp3|aac|opus|m4a)$"
+const val THUMBNAIL_REGEX = "\\.(jpg|png)$"
 
 object FilesUtil {
     fun readFile(file: File): String {

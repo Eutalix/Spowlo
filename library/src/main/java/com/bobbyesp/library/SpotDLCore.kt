@@ -32,6 +32,7 @@ abstract class SpotDLCore {
 
     private var pythonPath: File? = null
     private var ffmpegPath: File? = null
+    private var runnerPath: File? = null
     private lateinit var spotdlPath: File
 
     /* ENVIRONMENT VARIABLES */
@@ -75,7 +76,8 @@ abstract class SpotDLCore {
 
         // Set environment variables
         ENV_LD_LIBRARY_PATH =
-            pythonDir.absolutePath + "/usr/lib" + ":" + ffmpegDir.absolutePath + "/usr/lib"
+            pythonDir.absolutePath + "/usr/lib" + ":" + ffmpegDir.absolutePath + "/usr/lib" +
+                ":" + binariesDirectory.absolutePath
         ENV_SSL_CERT_FILE = pythonDir.absolutePath + "/usr/etc/tls/cert.pem"
         ENV_PYTHONHOME = pythonDir.absolutePath + "/usr"
         
@@ -139,6 +141,26 @@ abstract class SpotDLCore {
                 throw SpotDLException("Error extracting SpotDL source files", e)
             }
         }
+
+        installRunner(appContext, spotDlDir)
+    }
+
+    /**
+     * Installs the download runner and the SpotipyFree shim (spotDL imports it
+     * but cannot create it here: SpotipyFree needs curl_cffi, which is glibc-only).
+     */
+    private fun installRunner(appContext: Context, spotDlDir: File) {
+        runnerPath = File(spotDlDir, "spowlo_runner.py").apply {
+            writeText(DOWNLOAD_RUNNER_SCRIPT)
+        }
+
+        val customSitePackages = File(
+            File(appContext.noBackupFilesDir, LIBRARY_NAME),
+            "custom_site_packages"
+        ).ensure()
+        File(customSitePackages, "SpotipyFree.py").writeText(SPOTIPYFREE_SHIM)
+
+        if (isDebug) Log.d(TAG, ">>> SpotDLCore: Runner installed at ${runnerPath?.absolutePath}")
     }
 
     /**
@@ -217,12 +239,14 @@ abstract class SpotDLCore {
         val args = request.buildCommand()
         val command: MutableList<String?> = ArrayList()
 
-        // --- CRITICAL FIX: INVOKE AS MODULE ---
-        // Instead of executing the spotdl binary directly (which forces sys.path prepending),
-        // execute python with "-m spotdl" to respect our custom PYTHONPATH.
+        // Downloads use our runner; every other operation uses `python -m spotdl`.
         command.add(pythonPath!!.absolutePath)
-        command.add("-m")
-        command.add("spotdl")
+        if (args.firstOrNull() == "download" && runnerPath?.exists() == true) {
+            command.add(runnerPath!!.absolutePath)
+        } else {
+            command.add("-m")
+            command.add("spotdl")
+        }
         
         command.addAll(args)
 
@@ -337,5 +361,214 @@ abstract class SpotDLCore {
 
     fun shouldUpdatePython(appContext: Context, version: String): Boolean {
         return version != SharedPrefsHelper[appContext, pythonLibVersion]
+    }
+
+    private companion object {
+        /** Downloads tracks from `.spotdl` metadata files without touching Spotify. */
+        val DOWNLOAD_RUNNER_SCRIPT = """
+            import dataclasses
+            import importlib.util
+            import json
+            import re
+            import sys
+
+            INT_FIELDS = ("disc_number", "disc_count", "duration", "track_number", "tracks_count", "year")
+            LIST_FIELDS = ("artists", "genres")
+            STR_FIELDS = ("album_id", "copyright_text", "cover_url", "isrc", "name", "artist", "album_name", "album_artist", "date", "song_id", "publisher", "url")
+
+
+            def register_spotdl_package():
+                '''Skip spotdl/__init__.py, which imports a web UI this build lacks.'''
+                located = importlib.util.find_spec("spotdl")
+                if located is None or not located.submodule_search_locations:
+                    raise ImportError("spotdl is not installed")
+                package = importlib.util.module_from_spec(
+                    importlib.util.spec_from_loader("spotdl", loader=None, is_package=True)
+                )
+                package.__path__ = list(located.submodule_search_locations)
+                sys.modules["spotdl"] = package
+
+
+            def sanitize(entry, fields):
+                data = {}
+                for key, value in entry.items():
+                    if key not in fields:
+                        continue
+                    if key in INT_FIELDS:
+                        value = int(value or 0)
+                    elif key in LIST_FIELDS:
+                        value = list(value or [])
+                    elif key in STR_FIELDS:
+                        value = "" if value is None else str(value)
+                    data[key] = value
+                return data
+
+
+            def parse_views(value):
+                if isinstance(value, (int, float)):
+                    return int(value)
+                if not value or not isinstance(value, str):
+                    return 0
+                match = re.match(r"([\d.,]+)\s*([kmb]?)", value.strip().lower())
+                if not match:
+                    return 0
+                number, unit = match.groups()
+                multiplier = {"k": 1000, "m": 1000000, "b": 1000000000}.get(unit, 1)
+                try:
+                    return int(float(number.replace(",", "")) * multiplier)
+                except ValueError:
+                    return 0
+
+
+            def patch_search_providers():
+                patch_ytmusic()
+                patch_youtube()
+
+
+            def patch_ytmusic():
+                try:
+                    from spotdl.providers.audio import ytmusic
+                    from spotdl.providers.audio.base import ISRC_REGEX
+                    from spotdl.types.result import Result
+                    from spotdl.utils.formatter import parse_duration
+                    from ytmusicapi import YTMusic
+                except Exception as error:
+                    print(f"YouTube Music search patch skipped: {error}")
+                    return
+
+                # Without views, spotDL runs a full yt-dlp extraction per candidate.
+                def ytmusic_results(self, search_term, log_search_failures=True, **kwargs):
+                    search_results = self.client.search(search_term, **kwargs)
+                    is_isrc_result = ISRC_REGEX.search(search_term) is not None
+
+                    results = []
+                    for result in search_results or []:
+                        if (
+                            result is None
+                            or result.get("videoId") is None
+                            or result.get("artists") in [[], None]
+                        ):
+                            continue
+
+                        results.append(
+                            Result(
+                                source=self.name,
+                                url=(
+                                    f'https://{"music" if result["resultType"] == "song" else "www"}'
+                                    f".youtube.com/watch?v={result['videoId']}"
+                                ),
+                                verified=result.get("resultType") == "song",
+                                name=result["title"],
+                                result_id=result["videoId"],
+                                author=result["artists"][0]["name"],
+                                artists=tuple(map(lambda a: a["name"], result["artists"])),
+                                duration=parse_duration(result.get("duration")),
+                                isrc_search=is_isrc_result,
+                                search_query=search_term,
+                                explicit=result.get("isExplicit"),
+                                views=parse_views(result.get("views")),
+                                album=(
+                                    result.get("album", {}).get("name")
+                                    if result.get("album")
+                                    else None
+                                ),
+                            )
+                        )
+
+                    return results
+
+                ytmusic.YouTubeMusic.get_results = ytmusic_results
+
+                # The hardcoded German locale makes the songs filter return nothing.
+                if hasattr(ytmusic.YouTubeMusic, "_create_client"):
+                    ytmusic.YouTubeMusic._create_client = staticmethod(
+                        lambda: YTMusic(language="en")
+                    )
+                else:
+                    original_init = ytmusic.YouTubeMusic.__init__
+
+                    def init(self, *args, **kwargs):
+                        original_init(self, *args, **kwargs)
+                        self.client = YTMusic(language="en")
+
+                    ytmusic.YouTubeMusic.__init__ = init
+
+
+            def patch_youtube():
+                try:
+                    from spotdl.providers.audio import youtube
+                    from spotdl.types.result import Result
+                    from yt_dlp import YoutubeDL
+                except Exception as error:
+                    print(f"YouTube search patch skipped: {error}")
+                    return
+
+                def youtube_results(self, search_term, *_args, **_kwargs):
+                    options = dict(self.audio_handler.params)
+                    options.pop("cookiefile", None)
+                    options.update(skip_download=True, extract_flat="in_playlist")
+                    with YoutubeDL(options) as ydl:
+                        info = ydl.extract_info(f"ytsearch10:{search_term}", download=False)
+
+                    results = []
+                    for entry in (info or {}).get("entries") or []:
+                        if not entry or not entry.get("id"):
+                            continue
+                        results.append(
+                            Result(
+                                source=self.name,
+                                url=f"https://www.youtube.com/watch?v={entry['id']}",
+                                verified=False,
+                                name=entry.get("title") or "",
+                                duration=entry.get("duration") or 0,
+                                author=entry.get("uploader") or entry.get("channel") or "",
+                                search_query=search_term,
+                                views=entry.get("view_count") or 0,
+                                result_id=entry["id"],
+                            )
+                        )
+                    return results
+
+                youtube.YouTube.get_results = youtube_results
+
+
+            def main():
+                register_spotdl_package()
+                patch_search_providers()
+
+                from spotdl.download.downloader import Downloader
+                from spotdl.types.song import Song
+                from spotdl.utils.arguments import parse_arguments
+                from spotdl.utils.config import create_settings
+
+                arguments = parse_arguments()
+                _, downloader_settings, _ = create_settings(arguments)
+
+                fields = {field.name for field in dataclasses.fields(Song)}
+                songs = []
+                for path in arguments.query:
+                    with open(path, "r", encoding="utf-8") as handle:
+                        for entry in json.load(handle):
+                            songs.append(Song(**sanitize(entry, fields)))
+
+                if not songs:
+                    print("No songs found in the metadata file.")
+                    return 1
+
+                downloader = Downloader(downloader_settings)
+                downloader.download_multiple_songs(songs)
+                return 0
+
+
+            if __name__ == "__main__":
+                sys.exit(main())
+        """.trimIndent()
+
+        /** Import-only stand-in; never instantiated on the `.spotdl` path. */
+        val SPOTIPYFREE_SHIM = """
+            class Spotify:
+                def __init__(self, *args, **kwargs):
+                    raise RuntimeError("SpotipyFree is unavailable; Spowlo resolves metadata natively.")
+        """.trimIndent()
     }
 }

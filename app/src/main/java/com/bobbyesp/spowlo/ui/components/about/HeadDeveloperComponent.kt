@@ -17,7 +17,9 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.res.vectorResource
+import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.bobbyesp.spowlo.R
 import com.bobbyesp.spowlo.ui.common.AsyncImageImpl
@@ -30,6 +32,7 @@ fun HeadDeveloperComponent(
     modifier: Modifier = Modifier,
     name: String,
     description: String,
+    quote: String? = null,
     logoUrl: String,
     githubUrl: String,
 ) {
@@ -58,6 +61,17 @@ fun HeadDeveloperComponent(
                 .padding(bottom = 6.dp)
                 .alpha(0.7f),
         )
+        if (quote != null) {
+            Text(
+                text = quote,
+                modifier = Modifier
+                    .padding(horizontal = 24.dp)
+                    .padding(bottom = 6.dp)
+                    .alpha(0.55f),
+                fontStyle = FontStyle.Italic,
+                textAlign = TextAlign.Center,
+            )
+        }
         Row(modifier = Modifier) {
             GithubLinkButton(
                 modifier = Modifier,

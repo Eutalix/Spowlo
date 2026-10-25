@@ -29,9 +29,8 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.ContentAlpha
 import androidx.compose.material.ExperimentalMaterialApi
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.LibraryMusic
+import androidx.compose.material.icons.filled.FileDownloadDone
 import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.Terminal
 import androidx.compose.material.icons.outlined.Cancel
 import androidx.compose.material.icons.outlined.ContentPaste
 import androidx.compose.material.icons.outlined.Error
@@ -103,7 +102,6 @@ import com.google.accompanist.permissions.rememberPermissionState
 )
 fun DownloaderPage(
     navigateToSettings: () -> Unit = {},
-    navigateToDownloads: () -> Unit = {},
     navigateToDownloaderSheet: () -> Unit = {},
     onSongCardClicked: () -> Unit = {},
     navigateToSearch: () -> Unit = {},
@@ -199,7 +197,6 @@ fun DownloaderPage(
         },
         navigateToTasks = navigateToTasks,
         navigateToSearch = navigateToSearch,
-        navigateToDownloads = navigateToDownloads,
         onSongCardClicked = { onSongCardClicked() },
         showOutput = showConsoleOutput,
         showSongCard = true,
@@ -247,7 +244,6 @@ fun DownloaderPageImplementation(
     showDownloadProgress: Boolean = false,
     downloadCallback: () -> Unit = {},
     navigateToSettings: () -> Unit = {},
-    navigateToDownloads: () -> Unit = {},
     navigateToTasks: () -> Unit = {},
     navigateToSearch: () -> Unit = {},
     pasteCallback: () -> Unit = {},
@@ -276,14 +272,8 @@ fun DownloaderPageImplementation(
                 }
                 IconButton(onClick = { navigateToTasks() }) {
                     Icon(
-                        imageVector = Icons.Filled.Terminal,
-                        contentDescription = stringResource(id = R.string.download_tasks)
-                    )
-                }
-                IconButton(onClick = { navigateToDownloads() }) {
-                    Icon(
-                        imageVector = Icons.Filled.LibraryMusic,
-                        contentDescription = stringResource(id = R.string.downloads_history)
+                        imageVector = Icons.Filled.FileDownloadDone,
+                        contentDescription = stringResource(id = R.string.downloads)
                     )
                 }
             })

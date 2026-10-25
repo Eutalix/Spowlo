@@ -154,7 +154,7 @@ fun SearcherPage(
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 with(viewState) {
-                    when (this.viewState) {
+                    when (val searchState = this.viewState) {
                         is ViewSearchState.Idle -> {
                             Text(
                                 text = stringResource(id = R.string.search),
@@ -249,7 +249,14 @@ fun SearcherPage(
                         }
 
                         is ViewSearchState.Error -> {
-                            Text(text = "Error")
+                            Text(
+                                text = searchState.error,
+                                color = MaterialTheme.colorScheme.error,
+                                textAlign = TextAlign.Center,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 16.dp)
+                            )
                         }
                     }
                 }

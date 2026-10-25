@@ -103,15 +103,20 @@ fun AboutPage(onBackPressed: () -> Unit) {
 
             // --- MAINTAINER SECTION ---
             item {
-                PreferenceSubtitle(
-                    modifier = Modifier.padding(bottom = 6.dp, top = 12.dp),
-                    text = "Current Maintainer" 
-                )
                 HeadDeveloperComponent(
+                    modifier = Modifier.padding(top = 12.dp),
                     name = "Eutalix",
-                    description = "Maintaining the fork",
+                    description = "Maintainer",
                     logoUrl = "https://github.com/Eutalix.png",
                     githubUrl = "https://github.com/Eutalix"
+                )
+                HeadDeveloperComponent(
+                    modifier = Modifier.padding(top = 12.dp),
+                    name = "SomeRedstone",
+                    description = "Maintainer",
+                    quote = "spowlo's like the ex you can't stop thinking about",
+                    logoUrl = "https://github.com/SomeRedstone.png",
+                    githubUrl = "https://github.com/SomeRedstone"
                 )
             }
             // --------------------------

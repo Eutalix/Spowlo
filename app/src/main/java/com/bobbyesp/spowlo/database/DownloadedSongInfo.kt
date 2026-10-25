@@ -6,12 +6,14 @@ import androidx.room.PrimaryKey
 
 @Entity(tableName = "downloaded_songs_info")
 data class DownloadedSongInfo(
-    @PrimaryKey(autoGenerate = true) val id: Int,
+    @PrimaryKey(autoGenerate = true) val id: Int = 0,
     val songName: String,
     val songAuthor: String,
     val songUrl: String,
     val thumbnailUrl: String,
     val songPath: String,
     @ColumnInfo(defaultValue = "0.0") val songDuration: Double = 0.0,
-    @ColumnInfo(defaultValue = "Unknown") val extractor: String = "Unknown"
+    @ColumnInfo(defaultValue = "Unknown") val extractor: String = "Unknown",
+    @ColumnInfo(defaultValue = "") val consoleOutput: String = "",
+    @ColumnInfo(defaultValue = "0") val downloadedAt: Long = 0L
 )

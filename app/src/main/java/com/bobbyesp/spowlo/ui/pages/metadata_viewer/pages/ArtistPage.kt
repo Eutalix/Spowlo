@@ -44,6 +44,7 @@ import com.bobbyesp.spowlo.ui.components.songs.metadata_viewer.TrackComponent
 import com.bobbyesp.spowlo.ui.components.text.MarqueeText
 import com.bobbyesp.spowlo.ui.theme.harmonizeWithPrimary
 import com.bobbyesp.spowlo.utils.ChromeCustomTabsUtil
+import com.bobbyesp.spowlo.utils.GeneralTextUtils
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.withContext
@@ -115,22 +116,28 @@ fun ArtistPage(
                 Spacer(modifier = Modifier.height(6.dp))
                 SelectionContainer {
                     Text(
-                        text = "${stringResource(id = R.string.artist_followers)}: ${data.followers.total}",
+                        text = "${stringResource(id = R.string.artist_followers)}: ${
+                            GeneralTextUtils.formatCount((data.followers.total ?: 0).toLong())
+                        }",
                         style = MaterialTheme.typography.bodyMedium.copy(
                             fontWeight = FontWeight.Bold
                         ),
                         modifier = Modifier.alpha(alpha = 0.8f)
                     )
                 }
-                Spacer(modifier = Modifier.height(6.dp))
-                SelectionContainer {
-                    Text(
-                        text = "${stringResource(id = R.string.artist_popularity)}: ${data.popularity}",
-                        style = MaterialTheme.typography.bodyMedium.copy(
-                            fontWeight = FontWeight.Bold
-                        ),
-                        modifier = Modifier.alpha(alpha = 0.8f)
-                    )
+                SpotifyApiRequests.getArtistMonthlyListeners(data.id)?.let { listeners ->
+                    Spacer(modifier = Modifier.height(6.dp))
+                    SelectionContainer {
+                        Text(
+                            text = "${stringResource(id = R.string.artist_monthly_listeners)}: ${
+                                GeneralTextUtils.formatCount(listeners)
+                            }",
+                            style = MaterialTheme.typography.bodyMedium.copy(
+                                fontWeight = FontWeight.Bold
+                            ),
+                            modifier = Modifier.alpha(alpha = 0.8f)
+                        )
+                    }
                 }
                 FilledTonalButton(
                     modifier = Modifier.padding(start = 8.dp),
