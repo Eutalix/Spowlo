@@ -12,6 +12,9 @@ import com.bobbyesp.spowlo.App.Companion.context
 import com.bobbyesp.spowlo.R
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import java.text.DateFormat
+import java.text.NumberFormat
+import java.util.Date
 import java.util.regex.Pattern
 
 object ToastUtil {
@@ -68,6 +71,12 @@ object GeneralTextUtils {
         clipboard.setPrimaryClip(clip)
         ToastUtil.makeToast(R.string.copied_to_clipboard)
     }
+
+    fun formatCount(count: Long): String = NumberFormat.getIntegerInstance().format(count)
+
+    fun formatDate(timestamp: Long): String =
+        if (timestamp <= 0L) ""
+        else DateFormat.getDateInstance(DateFormat.MEDIUM).format(Date(timestamp))
 }
 
 private const val GIGA_BYTES = 1024f * 1024f * 1024f

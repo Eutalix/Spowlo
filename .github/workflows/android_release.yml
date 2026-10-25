@@ -4,6 +4,7 @@ on:
   push:
     tags:
       - 'v*'
+  workflow_dispatch:
 
 jobs:
   build:
@@ -33,7 +34,7 @@ jobs:
           
           touch release_notes.md
           
-          if [ -f CHANGELOG.md ]; then
+          if [[ "$GITHUB_REF" == refs/tags/v* && -f CHANGELOG.md ]]; then
             sed -n "/^## \[$VERSION\]/,/^## \[/p" CHANGELOG.md | sed '1d;$d' > release_notes.md
           fi
           
@@ -71,6 +72,14 @@ jobs:
 
       - name: Build Release APK
         run: ./gradlew assembleRelease --stacktrace
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: spowlo-release-apk
+          path: app/build/outputs/apk/release/*.apk
+          if-no-files-found: error
+          retention-days: 14
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
