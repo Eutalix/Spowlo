@@ -32,6 +32,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.util.UUID
+import java.util.concurrent.ConcurrentHashMap
 import kotlin.math.roundToInt
 
 object Downloader {
@@ -156,6 +157,7 @@ object Downloader {
     private val mutableProcessCount = MutableStateFlow(0)
     val processCount = mutableProcessCount.asStateFlow()
     private val mutableQuickDownloadCount = MutableStateFlow(0)
+    private val activeParallelDownloads = ConcurrentHashMap<String, Boolean>()
     val mutableTaskList = mutableStateMapOf<String, DownloadTask>()
 
     init {
@@ -325,9 +327,10 @@ object Downloader {
         downloadPreferences: DownloaderUtil.DownloadPreferences = DownloaderUtil.DownloadPreferences(),
         skipInfoFetch: Boolean = false
     ) {
+        if (!isDownloaderAvailable()) return
+        updateState(State.FetchingInfo)
         currentJob?.cancel()
         currentJob = applicationScope.launch(Dispatchers.IO) {
-            updateState(State.FetchingInfo)
             try {
                 val cleanedUrl = cleanSpotifyUrl(url)
 
@@ -454,22 +457,31 @@ object Downloader {
     }
 
     fun executeParallelDownloadWithUrl(url: String, name: String) = applicationScope.launch(Dispatchers.IO) {
-        runCatching {
-            val cleanedUrl = cleanSpotifyUrl(url)
-            when (UrlValidator.classify(cleanedUrl)) {
-                UrlValidator.Type.SpotifyTrack -> {
-                    val track = SpotifyMetadataFetcher.fetchTrackFromUrl(cleanedUrl)
-                        ?: throw Exception("Failed to fetch metadata from Spotify API.")
+        val requestKey = makeKey(url, url.reversed())
+        if (activeParallelDownloads.putIfAbsent(requestKey, true) != null) {
+            ToastUtil.makeToastSuspend(context.getString(R.string.task_running))
+            return@launch
+        }
+        try {
+            runCatching {
+                val cleanedUrl = cleanSpotifyUrl(url)
+                when (UrlValidator.classify(cleanedUrl)) {
+                    UrlValidator.Type.SpotifyTrack -> {
+                        val track = SpotifyMetadataFetcher.fetchTrackFromUrl(cleanedUrl)
+                            ?: throw Exception("Failed to fetch metadata from Spotify API.")
 
-                    DownloaderUtil.executeParallelDownload(track.toSpotifySongWithDetails(), name)
+                        DownloaderUtil.executeParallelDownload(track.toSpotifySongWithDetails(), name)
+                    }
+
+                    UrlValidator.Type.SpotifyPlaylist,
+                    UrlValidator.Type.SpotifyAlbum -> downloadCollection(cleanedUrl, fallbackName = name)
+
+                    else -> throw Exception("This link is not supported. Use a Spotify track, album or playlist.")
                 }
-
-                UrlValidator.Type.SpotifyPlaylist,
-                UrlValidator.Type.SpotifyAlbum -> downloadCollection(cleanedUrl, fallbackName = name)
-
-                else -> throw Exception("This link is not supported. Use a Spotify track, album or playlist.")
-            }
-        }.onFailure { manageDownloadError(it, isFetchingInfo = true) }
+            }.onFailure { manageDownloadError(it, isFetchingInfo = true) }
+        } finally {
+            activeParallelDownloads.remove(requestKey)
+        }
     }
 
     fun downloadCollection(url: String, fallbackName: String = "") =
