@@ -51,7 +51,7 @@ Spowlo uses YT Music and YouTube to download the songs. This is because Spotify 
 
 ## ⬇️Download
 
-For most devices, it is recommended to install the **ARM64-v8a** version of the apks.
+Spowlo is distributed as an **ARM64-v8a** APK. 32-bit devices are not supported.
 
 - Download the latest stable version from [GitHub releases](https://github.com/Eutalix/Spowlo/releases/latest)
 
