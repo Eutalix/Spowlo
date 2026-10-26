@@ -48,6 +48,14 @@
 #keep database entities
 -keep class com.bobbyesp.spowlo.database.** { *; }
 
+# Keep class and method names so user-submitted crash reports stay readable.
+-dontobfuscate
+
+# Commons Compress registers zip extra fields by instantiating them reflectively.
+-keep class * implements org.apache.commons.compress.archivers.zip.ZipExtraField {
+    <init>();
+}
+
 # @Serializable and @Polymorphic are used at runtime for polymorphic serialization.
 -keepattributes RuntimeVisibleAnnotations,AnnotationDefault
 
