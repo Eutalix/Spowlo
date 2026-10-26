@@ -4,10 +4,9 @@ import android.content.Context
 import android.util.Log
 import com.bobbyesp.library.SpotDL.isDebug
 import com.bobbyesp.library.util.exceptions.SpotDLException
-import com.bobbyesp.spotdl_common.Constants
 import com.bobbyesp.spotdl_common.domain.Dependency
 import com.bobbyesp.spotdl_common.domain.model.DownloadedDependencies
-import com.bobbyesp.spotdl_common.utils.ZipUtils.unzip
+import com.bobbyesp.spotdl_common.utils.ZipUtils.unzipAsset
 import com.bobbyesp.spotdl_common.utils.dependencies.dependencyDownloadCallback
 import org.apache.commons.io.FileUtils
 import java.io.File
@@ -26,15 +25,14 @@ object SpotDL : SpotDLCore() {
      */
     @Throws(SpotDLException::class)
     override fun initPython(appContext: Context, pythonDir: File) {
-        val pythonLibrary = File(
-            binariesDirectory, Constants.LibrariesName.PYTHON
-        )
-        if (!pythonDir.exists() || shouldUpdatePython(appContext, pythonLibrary.length().toString())) {
+        val version = BuildConfig.PYTHON_BUNDLE_VERSION
+        if (!pythonDir.exists() || shouldUpdatePython(appContext, version)) {
             FileUtils.deleteQuietly(pythonDir)
             pythonDir.mkdirs()
             try {
                 if(isDebug) Log.i("SpotDL", "Unzipping Python library")
-                unzip(pythonLibrary, pythonDir)
+                unzipAsset(appContext, PYTHON_BUNDLE_ASSET, pythonDir)
+                updatePython(appContext, version)
                 if(isDebug) Log.i("SpotDL", "Unzipped finished for the Python library")
             } catch (e: Exception) {
                 FileUtils.deleteQuietly(pythonDir)
@@ -44,6 +42,8 @@ object SpotDL : SpotDLCore() {
             if(isDebug) Log.i("SpotDL", "Python library already exists or doesn't need to be updated")
         }
     }
+
+    private const val PYTHON_BUNDLE_ASSET = "libpython.zip"
 
     @JvmStatic
     fun getInstance() = this

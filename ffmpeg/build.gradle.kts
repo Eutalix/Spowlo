@@ -6,6 +6,8 @@ plugins {
 
 val versionName = "1.0.0"
 
+val ffmpegBundleVersion = file("src/main/assets/libffmpeg.zip").length()
+
 android {
     namespace = "com.bobbyesp.ffmpeg"
     compileSdk = 35
@@ -14,6 +16,8 @@ android {
         minSdk = 26
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         consumerProguardFiles("consumer-rules.pro")
+
+        buildConfigField("String", "FFMPEG_BUNDLE_VERSION", "\"$ffmpegBundleVersion\"")
     }
 
     flavorDimensions.add("bundling")

@@ -9,6 +9,8 @@ plugins {
 
 val versionName = "1.0.0"
 
+val pythonBundleVersion = file("src/bundled/assets/libpython.zip").length()
+
 val localProperties = Properties().apply {
     val file = project.rootDir.resolve("local.properties")
     if (file.exists()) {
@@ -25,6 +27,8 @@ android {
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         consumerProguardFiles("consumer-rules.pro")
+
+        buildConfigField("String", "PYTHON_BUNDLE_VERSION", "\"$pythonBundleVersion\"")
     }
 
     flavorDimensions.add("bundling")

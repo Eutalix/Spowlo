@@ -3,20 +3,18 @@ package com.bobbyesp.ffmpeg
 import android.content.Context
 import com.bobbyesp.spotdl_common.SharedPrefsHelper
 import com.bobbyesp.library.util.exceptions.SpotDLException
-import com.bobbyesp.spotdl_common.utils.ZipUtils.unzip
+import com.bobbyesp.spotdl_common.utils.ZipUtils.unzipAsset
 import org.apache.commons.io.FileUtils
 import java.io.File
 
 object FFmpeg {
     private var initialized = false
-    private var binDir: File? = null
 
     @Synchronized
     fun init(appContext: Context) {
         if (initialized) return
         val baseDir = File(appContext.noBackupFilesDir, baseName)
         if (!baseDir.exists()) baseDir.mkdir()
-        binDir = File(appContext.applicationInfo.nativeLibraryDir)
         val packagesDir = File(baseDir, packagesRoot)
         val ffmpegDir = File(packagesDir, ffmegDirName)
         initFFmpeg(appContext, ffmpegDir)
@@ -24,19 +22,17 @@ object FFmpeg {
     }
 
     private fun initFFmpeg(appContext: Context, ffmpegDir: File) {
-        val ffmpegLib = File(binDir, ffmpegLibName)
-        // using size of lib as version
-        val ffmpegSize = ffmpegLib.length().toString()
-        if (!ffmpegDir.exists() || shouldUpdateFFmpeg(appContext, ffmpegSize)) {
+        val version = BuildConfig.FFMPEG_BUNDLE_VERSION
+        if (!ffmpegDir.exists() || shouldUpdateFFmpeg(appContext, version)) {
             FileUtils.deleteQuietly(ffmpegDir)
             ffmpegDir.mkdirs()
             try {
-                unzip(ffmpegLib, ffmpegDir)
+                unzipAsset(appContext, ffmpegBundleAsset, ffmpegDir)
             } catch (e: Exception) {
                 FileUtils.deleteQuietly(ffmpegDir)
                 throw SpotDLException("failed to initialize", e)
             }
-            updateFFmpeg(appContext, ffmpegSize)
+            updateFFmpeg(appContext, version)
         }
     }
 
@@ -54,7 +50,7 @@ object FFmpeg {
     private const val baseName = "spotdl-android"
     private const val packagesRoot = "packages"
     private const val ffmegDirName = "ffmpeg"
-    private const val ffmpegLibName = "libffmpeg.zip.so"
+    private const val ffmpegBundleAsset = "libffmpeg.zip"
     private const val ffmpegLibVersion = "ffmpegLibVersion"
 
 }
