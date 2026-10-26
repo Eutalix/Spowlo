@@ -6,7 +6,7 @@ plugins {
 
 val versionName = "1.0.0"
 
-val ffmpegBundleVersion = file("src/main/assets/libffmpeg.zip").length()
+val ffmpegBundleVersion = file("src/main/assets/libffmpeg.tar.xz").length()
 
 android {
     namespace = "com.bobbyesp.ffmpeg"

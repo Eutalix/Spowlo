@@ -47,6 +47,7 @@ dependencies {
     implementation(fileTree(mapOf("dir" to "libs", "include" to listOf("*.jar"))))
     implementation(libs.commons.io)
     implementation(libs.commons.compress)
+    implementation(libs.xz)
     implementation(libs.bundles.ktor)
     implementation(libs.kotlinx.serialization.json)
 }

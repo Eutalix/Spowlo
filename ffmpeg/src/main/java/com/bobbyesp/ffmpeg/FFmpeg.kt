@@ -3,7 +3,7 @@ package com.bobbyesp.ffmpeg
 import android.content.Context
 import com.bobbyesp.spotdl_common.SharedPrefsHelper
 import com.bobbyesp.library.util.exceptions.SpotDLException
-import com.bobbyesp.spotdl_common.utils.ZipUtils.unzipAsset
+import com.bobbyesp.spotdl_common.utils.ZipUtils.extractTarXzAsset
 import org.apache.commons.io.FileUtils
 import java.io.File
 
@@ -27,7 +27,7 @@ object FFmpeg {
             FileUtils.deleteQuietly(ffmpegDir)
             ffmpegDir.mkdirs()
             try {
-                unzipAsset(appContext, ffmpegBundleAsset, ffmpegDir)
+                extractTarXzAsset(appContext, ffmpegBundleAsset, ffmpegDir)
             } catch (e: Exception) {
                 FileUtils.deleteQuietly(ffmpegDir)
                 throw SpotDLException("failed to initialize", e)
@@ -50,7 +50,7 @@ object FFmpeg {
     private const val baseName = "spotdl-android"
     private const val packagesRoot = "packages"
     private const val ffmegDirName = "ffmpeg"
-    private const val ffmpegBundleAsset = "libffmpeg.zip"
+    private const val ffmpegBundleAsset = "libffmpeg.tar.xz"
     private const val ffmpegLibVersion = "ffmpegLibVersion"
 
 }
