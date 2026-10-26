@@ -37,6 +37,14 @@ object SpotDLDependencyUpdater {
         "syncedlyrics"
     )
 
+    // Excluded by spotDL 4.6.0 due to broken localized search.
+    private val BLOCKED_VERSIONS = mapOf(
+        "ytmusicapi" to setOf("1.12.2", "1.12.3")
+    )
+    private val VERSION_FALLBACKS = mapOf(
+        "ytmusicapi" to "1.12.1"
+    )
+
     /**
      * Updates all volatile packages. Returns a log string.
      * Thread-safe: Only one update can run at a time.
@@ -132,7 +140,7 @@ object SpotDLDependencyUpdater {
             TARGET_PACKAGES.any { pkgName ->
                 try {
                     val pypiInfo = getPypiInfo(pkgName) ?: return@any false
-                    val remoteVersion = pypiInfo.info.version
+                    val remoteVersion = resolveRemoteVersion(pkgName, pypiInfo.info.version)
                     val localVersion = getLocalVersion(sitePackages, pkgName)
                     
                     localVersion != remoteVersion && localVersion != "0.0.0"
@@ -146,8 +154,16 @@ object SpotDLDependencyUpdater {
     private fun checkAndInstallPackage(pkgName: String, sitePackagesDir: File): String {
         if(isDebug) Log.d(TAG, ">>> DepUpdater: Checking package $pkgName")
         
-        val pypiInfo = getPypiInfo(pkgName) ?: return "[Error] $pkgName: Failed to query PyPI"
-        val remoteVersion = pypiInfo.info.version
+        val latestInfo = getPypiInfo(pkgName) ?: return "[Error] $pkgName: Failed to query PyPI"
+        val latestVersion = latestInfo.info.version
+        val remoteVersion = resolveRemoteVersion(pkgName, latestVersion)
+        val pypiInfo = if (remoteVersion == latestVersion) {
+            latestInfo
+        } else {
+            if(isDebug) Log.w(TAG, ">>> DepUpdater: Skipping blocked $pkgName $latestVersion, using $remoteVersion")
+            getPypiInfo(pkgName, remoteVersion)
+                ?: return "[Error] $pkgName: Failed to query PyPI for $remoteVersion"
+        }
         val localVersion = getLocalVersion(sitePackagesDir, pkgName)
         
         if(isDebug) Log.d(TAG, ">>> DepUpdater: $pkgName | Local: $localVersion | Remote: $remoteVersion")
@@ -180,6 +196,13 @@ object SpotDLDependencyUpdater {
             tempFile.delete()
         }
     }
+
+    private fun resolveRemoteVersion(pkgName: String, latestVersion: String): String =
+        if (latestVersion in BLOCKED_VERSIONS[pkgName].orEmpty()) {
+            VERSION_FALLBACKS[pkgName] ?: latestVersion
+        } else {
+            latestVersion
+        }
 
     // The PyPI name (soundcloud-v2) differs from the module name (soundcloud).
     private fun dropPinnedOverrides(sitePackages: File) {
@@ -264,9 +287,10 @@ object SpotDLDependencyUpdater {
         return "0.0.0"
     }
 
-    private fun getPypiInfo(pkgName: String): PyPiResponse? {
+    private fun getPypiInfo(pkgName: String, version: String? = null): PyPiResponse? {
         return try {
-            val url = URL("https://pypi.org/pypi/$pkgName/json")
+            val versionPath = if (version.isNullOrEmpty()) "" else "/$version"
+            val url = URL("https://pypi.org/pypi/$pkgName$versionPath/json")
             json.decodeFromStream<PyPiResponse>(url.openStream())
         } catch (e: Exception) {
             Log.e(TAG, "Error querying PyPI for $pkgName", e)
