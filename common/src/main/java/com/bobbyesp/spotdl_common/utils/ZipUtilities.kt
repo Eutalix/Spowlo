@@ -1,5 +1,6 @@
 package com.bobbyesp.spotdl_common.utils
 
+import android.content.Context
 import android.system.Os
 import org.apache.commons.compress.archivers.zip.ZipArchiveEntry
 import org.apache.commons.compress.archivers.zip.ZipArchiveInputStream
@@ -59,6 +60,28 @@ object ZipUtils {
                     FileOutputStream(entryDestination).use { out -> IOUtils.copy(zis, out) }
                 }
             }
+        }
+    }
+
+    /**
+     * Unzips an asset archive. Assets are not seekable, so the archive is staged in [stagingDir]
+     * until it has been read and then removed.
+     */
+    fun unzipAsset(
+        context: Context,
+        assetName: String,
+        targetDirectory: File,
+        stagingDir: File = context.cacheDir
+    ) {
+        val staged = File(stagingDir, assetName)
+        try {
+            stagingDir.mkdirs()
+            context.assets.open(assetName).use { input ->
+                FileOutputStream(staged).use { output -> IOUtils.copy(input, output) }
+            }
+            unzip(staged, targetDirectory)
+        } finally {
+            staged.delete()
         }
     }
 }
