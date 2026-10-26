@@ -9,7 +9,7 @@ plugins {
 
 val versionName = "1.0.0"
 
-val pythonBundleVersion = file("src/bundled/assets/libpython.zip").length()
+val pythonBundleVersion = file("src/bundled/assets/libpython.tar.xz").length()
 
 val localProperties = Properties().apply {
     val file = project.rootDir.resolve("local.properties")

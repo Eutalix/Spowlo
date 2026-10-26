@@ -6,7 +6,7 @@ import com.bobbyesp.library.SpotDL.isDebug
 import com.bobbyesp.library.util.exceptions.SpotDLException
 import com.bobbyesp.spotdl_common.domain.Dependency
 import com.bobbyesp.spotdl_common.domain.model.DownloadedDependencies
-import com.bobbyesp.spotdl_common.utils.ZipUtils.unzipAsset
+import com.bobbyesp.spotdl_common.utils.ZipUtils.extractTarXzAsset
 import com.bobbyesp.spotdl_common.utils.dependencies.dependencyDownloadCallback
 import org.apache.commons.io.FileUtils
 import java.io.File
@@ -30,10 +30,10 @@ object SpotDL : SpotDLCore() {
             FileUtils.deleteQuietly(pythonDir)
             pythonDir.mkdirs()
             try {
-                if(isDebug) Log.i("SpotDL", "Unzipping Python library")
-                unzipAsset(appContext, PYTHON_BUNDLE_ASSET, pythonDir)
+                if(isDebug) Log.i("SpotDL", "Extracting Python bundle")
+                extractTarXzAsset(appContext, PYTHON_BUNDLE_ASSET, pythonDir)
                 updatePython(appContext, version)
-                if(isDebug) Log.i("SpotDL", "Unzipped finished for the Python library")
+                if(isDebug) Log.i("SpotDL", "Extracted the Python bundle")
             } catch (e: Exception) {
                 FileUtils.deleteQuietly(pythonDir)
                 throw SpotDLException("Failed to initialize Python", e)
@@ -43,7 +43,7 @@ object SpotDL : SpotDLCore() {
         }
     }
 
-    private const val PYTHON_BUNDLE_ASSET = "libpython.zip"
+    private const val PYTHON_BUNDLE_ASSET = "libpython.tar.xz"
 
     @JvmStatic
     fun getInstance() = this

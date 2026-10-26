@@ -12,6 +12,7 @@ paginationCompose = "3.3.5"
 ksp = "2.1.0-1.0.29"
 commonsIo = "2.16.1"
 commonsCompress = "1.24.0"
+xz = "1.10"
 
 androidxLifecycle = "2.8.7"
 androidxNavigation = "2.8.7"
@@ -105,6 +106,7 @@ junit4 = { group = "junit", name = "junit", version.ref = "junit4" }
 
 commons-io = { module = "commons-io:commons-io", version.ref = "commonsIo" }
 commons-compress = { module = "org.apache.commons:commons-compress", version.ref = "commonsCompress" }
+xz = { module = "org.tukaani:xz", version.ref = "xz" }
 
 kotlinx-coroutines-android = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-android", version.ref = "kotlinxCoroutines" }
 kotlinx-datetime = { group = "org.jetbrains.kotlinx", name = "kotlinx-datetime", version.ref = "kotlinxDatetime" }
