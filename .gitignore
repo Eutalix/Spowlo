@@ -18,3 +18,6 @@ release.jks
 /.idea/deploymentTargetSelector.xml
 # Local maintainer notes
 /MAINTAINING.md
+# JVM crash logs
+hs_err_pid*.log
+replay_pid*.log
