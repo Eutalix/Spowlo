@@ -16,3 +16,5 @@ local.properties
 keystore.properties
 release.jks
 /.idea/deploymentTargetSelector.xml
+# Local maintainer notes
+/MAINTAINING.md
