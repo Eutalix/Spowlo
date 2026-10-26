@@ -57,6 +57,14 @@ val keystorePropertiesFile = rootProject.file("keystore.properties")
 
 val splitApks = !project.hasProperty("noSplits")
 
+val gitCommitHash: String = System.getenv("GITHUB_SHA")?.take(7)
+    ?: runCatching {
+        providers.exec {
+            workingDir(rootProject.projectDir)
+            commandLine("git", "rev-parse", "--short=7", "HEAD")
+        }.standardOutput.asText.get().trim()
+    }.getOrDefault("nogit")
+
 android {
     if (keystorePropertiesFile.exists()) {
         val keystoreProperties = Properties()
@@ -85,9 +93,10 @@ android {
         targetSdk = 35
         versionCode = currentVersion.toVersionCode()
 
-        versionName = currentVersion.toVersionName().run {
-            if (!splitApks) "$this-(F-Droid)"
-            else this
+        versionName = buildString {
+            append(currentVersion.toVersionName())
+            append('-').append(gitCommitHash)
+            if (!splitApks) append("-(F-Droid)")
         }
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
