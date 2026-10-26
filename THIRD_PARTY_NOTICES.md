@@ -12,8 +12,6 @@ Spowlo bundles QuickJS-ng to give yt-dlp a JavaScript runtime for its EJS challe
 | --- | --- | --- |
 | `app/src/main/jniLibs/arm64-v8a/libqjs.so` | arm64-v8a | QuickJS-ng shared library |
 | `app/src/main/jniLibs/arm64-v8a/libqjs_bin.so` | arm64-v8a | `qjs` CLI |
-| `app/src/main/jniLibs/armeabi-v7a/libqjs.so` | armeabi-v7a | QuickJS-ng shared library |
-| `app/src/main/jniLibs/armeabi-v7a/libqjs_bin.so` | armeabi-v7a | `qjs` CLI |
 
 `libqjs_bin.so` is the upstream `qjs` executable. Android only lets an app execute files from its `nativeLibraryDir`, and the build only packages native libraries whose name ends in `.so`, so it is shipped under that name.
 
@@ -31,7 +29,7 @@ cmake -B build -G Ninja \
 cmake --build build --target qjs_exe
 ```
 
-Repeat with `ANDROID_ABI=armeabi-v7a`. Copy `libqjs.so` from the build directory, and `qjs` as `libqjs_bin.so`.
+Copy `libqjs.so` from the build directory, and `qjs` as `libqjs_bin.so`.
 
 ### License
 
