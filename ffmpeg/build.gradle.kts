@@ -1,3 +1,5 @@
+import java.security.MessageDigest
+
 plugins {
     id("com.android.library")
     id("org.jetbrains.kotlin.android")
@@ -6,7 +8,11 @@ plugins {
 
 val versionName = "1.0.0"
 
-val ffmpegBundleVersion = file("src/main/assets/libffmpeg.tar.xz").length()
+val ffmpegBundleVersion = providers
+    .fileContents(layout.projectDirectory.file("src/main/assets/libffmpeg.tar.xz"))
+    .asBytes.get()
+    .let { MessageDigest.getInstance("SHA-256").digest(it) }
+    .joinToString("") { "%02x".format(it.toInt() and 0xff) }
 
 android {
     namespace = "com.bobbyesp.ffmpeg"
