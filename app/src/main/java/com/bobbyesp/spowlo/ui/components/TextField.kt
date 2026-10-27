@@ -39,12 +39,14 @@ fun QueryTextBox(
     modifier: Modifier = Modifier,
     query: String,
     onValueChange: (String) -> Unit,
-    onSearchCallback: () -> Unit
+    onSearchCallback: () -> Unit,
+    requestFocusOnStart: Boolean = true
 ) {
     val focusRequester = remember { FocusRequester() }
     val softwareKeyboardController = LocalSoftwareKeyboardController.current
 
     LaunchedEffect(Unit) {
+        if (!requestFocusOnStart) return@LaunchedEffect
         // Compose focuses the back button first with a hardware keyboard, so take focus once laid out.
         withFrameNanos { }
         runCatching { focusRequester.requestFocus() }

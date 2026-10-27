@@ -118,6 +118,8 @@ fun matchUrlFromSharedText(s: String): String {
     }
 }
 
+fun String.isUrl(): Boolean = matchUrlFromString(this).isNotEmpty()
+
 private fun matchUrlFromString(s: String, isMatchingMultiLink: Boolean = false): String {
     val builder = StringBuilder()
     val pattern =

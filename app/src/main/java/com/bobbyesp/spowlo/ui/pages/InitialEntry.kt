@@ -1,6 +1,7 @@
 package com.bobbyesp.spowlo.ui.pages
 
 import android.Manifest
+import android.net.Uri
 import android.os.Build
 import android.util.Log
 import androidx.compose.animation.ExperimentalAnimationApi
@@ -146,8 +147,14 @@ fun InitialEntry(
                     navigateToTasks = {
                         navController.navigate(Route.DownloadTasksNavi)
                     },
-                    navigateToSearch = {
-                        navController.navigate(Route.SearcherNavi)
+                    navigateToSearch = { query ->
+                        if (query.isBlank()) {
+                            navController.navigate(Route.SearcherNavi)
+                        } else {
+                            navController.navigate(
+                                Route.SEARCHER + "?query=" + Uri.encode(query)
+                            )
+                        }
                     },
                     downloaderViewModel = downloaderViewModel,
                     sheetState = sheetState
@@ -239,11 +246,19 @@ fun InitialEntry(
         }
 
         //Can add the downloads history bottom sheet here using `val downloadsHistoryViewModel = hiltViewModel()`
-        navigation(startDestination = Route.SEARCHER, route = Route.SearcherNavi) {
+        val searcherRoute = Route.SEARCHER + "?query={query}"
 
-            animatedComposableVariant(Route.SEARCHER) {
+        navigation(startDestination = searcherRoute, route = Route.SearcherNavi) {
+
+            animatedComposableVariant(
+                searcherRoute, arguments = listOf(navArgument("query") {
+                    type = NavType.StringType
+                    defaultValue = ""
+                })
+            ) { backStackEntry ->
                 SearcherPage(
-                    navController = navController
+                    navController = navController,
+                    initialQuery = backStackEntry.arguments?.getString("query").orEmpty(),
                 )
             }
 
