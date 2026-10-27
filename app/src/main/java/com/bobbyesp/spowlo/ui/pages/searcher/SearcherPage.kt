@@ -70,16 +70,25 @@ import kotlinx.coroutines.launch
 
 @Composable
 fun SearcherPage(
-    viewModel: SearcherPageViewModel = viewModel(), navController: NavController
+    viewModel: SearcherPageViewModel = viewModel(),
+    navController: NavController,
+    initialQuery: String = ""
 ) {
     val viewState = viewModel.viewStateFlow.collectAsStateWithLifecycle().value
 
     val (query, onValueChange) = rememberSaveable(key = "searchQuery_searchPage") {
-        mutableStateOf("")
+        mutableStateOf(initialQuery)
     }
 
     LaunchedEffect(query) {
         viewModel.updateSearchText(query)
+    }
+
+    LaunchedEffect(initialQuery) {
+        if (initialQuery.isNotBlank()) {
+            viewModel.updateSearchText(initialQuery)
+            viewModel.search()
+        }
     }
 
     val onItemClick: (String, String) -> Unit = { type, id ->
@@ -128,7 +137,8 @@ fun SearcherPage(
                         viewModel.viewModelScope.launch {
                             viewModel.search()
                         }
-                    })
+                    },
+                    requestFocusOnStart = initialQuery.isBlank())
             }
             LazyRow(
                 modifier = Modifier

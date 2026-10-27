@@ -64,6 +64,11 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusDirection
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
@@ -89,6 +94,7 @@ import com.bobbyesp.spowlo.utils.DEBUG
 import com.bobbyesp.spowlo.utils.PreferencesUtil
 import com.bobbyesp.spowlo.utils.PreferencesUtil.getBoolean
 import com.bobbyesp.spowlo.utils.ToastUtil
+import com.bobbyesp.spowlo.utils.isUrl
 import com.bobbyesp.spowlo.utils.matchUrlFromClipboard
 import com.google.accompanist.permissions.ExperimentalPermissionsApi
 import com.google.accompanist.permissions.PermissionStatus
@@ -104,7 +110,7 @@ fun DownloaderPage(
     navigateToSettings: () -> Unit = {},
     navigateToDownloaderSheet: () -> Unit = {},
     onSongCardClicked: () -> Unit = {},
-    navigateToSearch: () -> Unit = {},
+    navigateToSearch: (String) -> Unit = {},
     navigateToTasks: () -> Unit = {},
     sheetState: SheetState,
     downloaderViewModel: DownloaderViewModel = viewModel(),
@@ -133,8 +139,10 @@ fun DownloaderPage(
     val keyboardController = LocalSoftwareKeyboardController.current
 
     val checkPermissionOrDownload = {
-        if (Build.VERSION.SDK_INT > 29 || storagePermission.status == PermissionStatus.Granted) {
-            val url = viewState.url
+        val url = viewState.url
+        if (url.isNotBlank() && !url.isUrl()) {
+            navigateToSearch(url.trim())
+        } else if (Build.VERSION.SDK_INT > 29 || storagePermission.status == PermissionStatus.Granted) {
             if (url.isNotEmpty()) {
                 if (CONFIGURE.getBoolean()) {
                     navigateToDownloaderSheet()
@@ -245,7 +253,7 @@ fun DownloaderPageImplementation(
     downloadCallback: () -> Unit = {},
     navigateToSettings: () -> Unit = {},
     navigateToTasks: () -> Unit = {},
-    navigateToSearch: () -> Unit = {},
+    navigateToSearch: (String) -> Unit = {},
     pasteCallback: () -> Unit = {},
     cancelCallback: () -> Unit = {},
     onSongCardClicked: () -> Unit = {},
@@ -264,7 +272,7 @@ fun DownloaderPageImplementation(
                     )
                 }
             }, actions = {
-                IconButton(onClick = { navigateToSearch() }) {
+                IconButton(onClick = { navigateToSearch("") }) {
                     Icon(
                         imageVector = Icons.Filled.Search,
                         contentDescription = stringResource(id = R.string.searcher)
@@ -456,7 +464,18 @@ fun InputUrl(
         modifier = Modifier
             .padding(0f.dp, 16f.dp)
             .fillMaxWidth()
-            .focusRequester(focusRequester),
+            .focusRequester(focusRequester)
+            .onPreviewKeyEvent { event ->
+                if (event.key != Key.Enter && event.key != Key.NumPadEnter) {
+                    return@onPreviewKeyEvent false
+                }
+                if (event.type == KeyEventType.KeyDown && event.nativeKeyEvent.repeatCount == 0) {
+                    softwareKeyboardController?.hide()
+                    focusManager.moveFocus(FocusDirection.Down)
+                    onDone()
+                }
+                true
+            },
         textStyle = MaterialTheme.typography.bodyLarge,
         maxLines = 3,
         trailingIcon = {
