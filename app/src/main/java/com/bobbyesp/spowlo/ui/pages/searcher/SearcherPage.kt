@@ -33,6 +33,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
@@ -40,6 +41,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -65,9 +67,11 @@ import com.bobbyesp.spowlo.ui.components.others.shimmer.cards.HorizontalSongCard
 import com.bobbyesp.spowlo.ui.components.text.AnimatedCounter
 import com.bobbyesp.spowlo.ui.components.text.MarqueeText
 import com.bobbyesp.spowlo.ui.ext.loadStateContent
+import com.bobbyesp.spowlo.utils.UrlValidator
 import com.bobbyesp.spowlo.utils.secondOrNull
 import kotlinx.coroutines.launch
 
+@OptIn(ExperimentalComposeUiApi::class)
 @Composable
 fun SearcherPage(
     viewModel: SearcherPageViewModel = viewModel(),
@@ -75,6 +79,7 @@ fun SearcherPage(
     initialQuery: String = ""
 ) {
     val viewState = viewModel.viewStateFlow.collectAsStateWithLifecycle().value
+    val keyboardController = LocalSoftwareKeyboardController.current
 
     val (query, onValueChange) = rememberSaveable(key = "searchQuery_searchPage") {
         mutableStateOf(initialQuery)
@@ -93,6 +98,17 @@ fun SearcherPage(
 
     val onItemClick: (String, String) -> Unit = { type, id ->
         navController.navigate(Route.PLAYLIST_PAGE + "/" + type + "/" + id)
+    }
+
+    val onQueryChange: (String) -> Unit = { newQuery ->
+        val wasLink = UrlValidator.parseSpotifyLink(query) != null
+        onValueChange(newQuery)
+        if (!wasLink) {
+            UrlValidator.parseSpotifyLink(newQuery)?.let { link ->
+                keyboardController?.hide()
+                onItemClick(link.type, link.id)
+            }
+        }
     }
 
     val types = listOf(
@@ -132,10 +148,15 @@ fun SearcherPage(
                         .fillMaxWidth()
                         .padding(horizontal = 16.dp),
                     query = query,
-                    onValueChange = onValueChange,
+                    onValueChange = onQueryChange,
                     onSearchCallback = {
-                        viewModel.viewModelScope.launch {
-                            viewModel.search()
+                        val link = UrlValidator.parseSpotifyLink(query)
+                        if (link != null) {
+                            onItemClick(link.type, link.id)
+                        } else {
+                            viewModel.viewModelScope.launch {
+                                viewModel.search()
+                            }
                         }
                     },
                     requestFocusOnStart = initialQuery.isBlank())
