@@ -1,3 +1,4 @@
+import java.security.MessageDigest
 import java.util.Properties
 
 plugins {
@@ -9,7 +10,11 @@ plugins {
 
 val versionName = "1.0.0"
 
-val pythonBundleVersion = file("src/bundled/assets/libpython.tar.xz").length()
+val pythonBundleVersion = providers
+    .fileContents(layout.projectDirectory.file("src/bundled/assets/libpython.tar.xz"))
+    .asBytes.get()
+    .let { MessageDigest.getInstance("SHA-256").digest(it) }
+    .joinToString("") { "%02x".format(it.toInt() and 0xff) }
 
 val localProperties = Properties().apply {
     val file = project.rootDir.resolve("local.properties")
