@@ -16,7 +16,7 @@ val ffmpegBundleVersion = providers
 
 android {
     namespace = "com.bobbyesp.ffmpeg"
-    compileSdk = 35
+    compileSdk = 36
 
     defaultConfig {
         minSdk = 26

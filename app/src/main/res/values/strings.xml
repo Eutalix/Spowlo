@@ -39,7 +39,7 @@
     <string name="battery_configuration">Battery configuration</string>
     <string name="general">General</string>
     <string name="appearance">Appearance</string>
-    <string name="appearance_settings">Change how the app looks like</string>
+    <string name="appearance_settings">Change how the app looks</string>
     <string name="about">About</string>
     <string name="about_page">Telegram, GitHub, bug reports</string>
     <string name="network">Network</string>
@@ -153,7 +153,7 @@
     <string name="clear_all_cookies">Delete all the cookies</string>
     <string name="cookies_desc">Use Netscape formatted cookies for downloads</string>
     <string name="cookies_file_name" translatable="false">cookies.txt</string>
-    <string name="cookies_usage_msg">Cookies are passed to yt-dlp, including your YouTube account. Signed-in YouTube downloads use a JavaScript runtime bundled with the app, so no extra setup is needed.</string>
+    <string name="cookies_usage_msg">Cookies are passed to yt-dlp, including your YouTube account.</string>
     <string name="remove_cookie_profile_desc">Remove cookies for \"%1$s\"?</string>
     <string name="clear_all_cookies_desc">Delete all the cookies stored in the app?</string>
     <string name="download_lyrics">Download Lyrics</string>
@@ -311,9 +311,10 @@
     <string name="font_size">Font size</string>
     <string name="channel_name">Download</string>
     <string name="service_channel_name">Download Starting</string>
-    <string name="channel_description">Show up your downloads on notification centre</string>
+    <string name="channel_description">Shows download progress while Spowlo works in the background</string>
+    <string name="finished_channel_name">Download finished</string>
+    <string name="finished_channel_description">Alerts when a download finishes or fails</string>
     <string name="service_title">Spowlo is downloading...</string>
-    <string name="execute_parallel_download">Executing parallel download</string>
     <string name="followers">Followers</string>
     <string name="no_running_downloads_description">All the downloads that you make from the search page will appear here.</string>
     <string name="log_copied">The log has been copied to the clipboard</string>
@@ -321,11 +322,13 @@
     <string name="downloader_settings_desc">Change more advanced settings of spotDL</string>
     <string name="general_settings">General settings</string>
     <string name="use_notifications">Use notifications</string>
-    <string name="use_notifications_desc">Pop up notifications with the actual downloads progress</string>
+    <string name="use_notifications_desc">Show download progress and let you know when your songs are ready!</string>
+    <string name="notifications_blocked_desc">Notifications are blocked. Tap to open system settings.</string>
+    <string name="notification_hint_title">Notifications are off</string>
+    <string name="notification_hint_desc">Turn them on to see progress and know when your songs are ready!</string>
     <string name="agree">Agree</string>
     <string name="spotify_api_info">Spotify API</string>
     <string name="spotify_api_info_description">This Spotify credentials can be used for having more closer and precise results to the songs requested in the main downloader page of the app. \n\nThis doesn\'t make effect on the searcher page because the app already uses extended-quota API credentials provided by Spotify.</string>
-    <string name="parallel_download">Parallel download</string>
     <string name="tracks">Tracks</string>
     <string name="playlists">Playlists</string>
     <string name="pre_configure_download">Configure download</string>
@@ -356,9 +359,10 @@
     <string name="lyric_providers_desc">Choose from where you want to download the lyrics</string>
     <string name="sponsorblock">SponsorBlock</string>
     <string name="sponsorblock_desc">Use SponsorBlock along with YouTube and/or YouTube Music providers</string>
-    <string name="enable_notifications">Enable notifications?</string>
-    <string name="enable_notifications_desc">Spowlo needs your permission to post notifications about download status</string>
-    <string name="continue_">Continue</string>
+    <string name="enable_notifications">Turn on notifications?</string>
+    <string name="enable_notifications_desc">See download progress and get notified when a song is ready. You can cancel a download from the notification.</string>
+    <string name="enable_notifications_action">Turn on</string>
+    <string name="not_now">Not now</string>
     <string name="only_verified_results">Use only verified results</string>
     <string name="only_verified_results_desc">Download only verified results, only works in select providers</string>
     <string name="skip_explict">Skip explicit songs</string>

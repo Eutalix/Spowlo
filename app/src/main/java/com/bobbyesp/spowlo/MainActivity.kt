@@ -18,6 +18,7 @@ import androidx.compose.material3.windowsizeclass.calculateWindowSizeClass
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -50,6 +51,7 @@ class MainActivity : AppCompatActivity() {
     private val downloaderViewModel: DownloaderViewModel by viewModels()
     private val modsDownloaderViewModel: ModsDownloaderViewModel by viewModels()
     private val playlistPageViewModel: PlaylistPageViewModel by viewModels()
+    private var openDownloadsRequest by mutableIntStateOf(0)
 
     @OptIn(ExperimentalMaterial3WindowSizeClassApi::class)
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -113,7 +115,8 @@ class MainActivity : AppCompatActivity() {
                         downloaderViewModel = downloaderViewModel,
                         modsDownloaderViewModel = modsDownloaderViewModel,
                         playlistPageViewModel = playlistPageViewModel,
-                        isUrlShared = isUrlSharingTriggered
+                        isUrlShared = isUrlSharingTriggered,
+                        openDownloadsRequest = openDownloadsRequest
                     )
 
                     if (showUpdateDialog && updateRelease != null) {
@@ -145,6 +148,11 @@ class MainActivity : AppCompatActivity() {
     private fun handleShareIntent(intent: Intent) {
         Log.d(TAG, "handleShareIntent: $intent")
 
+        if (intent.action == ACTION_OPEN_DOWNLOADS) {
+            openDownloadsRequest++
+            return
+        }
+
         when (intent.action) {
             Intent.ACTION_VIEW -> {
                 intent.dataString?.let {
@@ -169,6 +177,7 @@ class MainActivity : AppCompatActivity() {
 
     companion object {
         private const val TAG = "MainActivity"
+        const val ACTION_OPEN_DOWNLOADS = "com.bobbyesp.spowlo.OPEN_DOWNLOADS"
         private var sharedUrl = ""
 
         fun setLanguage(locale: String) {

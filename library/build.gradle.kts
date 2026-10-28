@@ -25,7 +25,7 @@ val localProperties = Properties().apply {
 
 android {
     namespace = "com.bobbyesp.library"
-    compileSdk = 35
+    compileSdk = 36
 
     defaultConfig {
         minSdk = 26

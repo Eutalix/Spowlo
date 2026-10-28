@@ -29,6 +29,7 @@ import androidx.navigation.navOptions
 import androidx.navigation.navigation
 import com.bobbyesp.library.data.remote.SpotDLDependencyUpdater
 import com.bobbyesp.spowlo.App
+import com.bobbyesp.spowlo.Downloader
 import com.bobbyesp.spowlo.R
 import com.bobbyesp.spowlo.features.spotify_api.data.remote.SpotifyApiRequests
 import com.bobbyesp.spowlo.ui.common.LocalWindowWidthState
@@ -37,7 +38,9 @@ import com.bobbyesp.spowlo.ui.common.animatedComposable
 import com.bobbyesp.spowlo.ui.common.animatedComposableVariant
 import com.bobbyesp.spowlo.ui.common.arg
 import com.bobbyesp.spowlo.ui.common.slideInVerticallyComposable
+import com.bobbyesp.spowlo.ui.dialogs.NotificationPermissionDialog
 import com.bobbyesp.spowlo.ui.dialogs.bottomsheets.DownloaderBottomSheet
+import com.bobbyesp.spowlo.ui.dialogs.rememberNotificationPermissionRequest
 import com.bobbyesp.spowlo.ui.pages.download_tasks.DownloadTasksPage
 import com.bobbyesp.spowlo.ui.pages.download_tasks.FullscreenConsoleOutput
 import com.bobbyesp.spowlo.ui.pages.downloader.DownloaderPage
@@ -64,6 +67,8 @@ import com.bobbyesp.spowlo.ui.pages.settings.general.GeneralSettingsPage
 import com.bobbyesp.spowlo.ui.pages.settings.spotify.SpotifySettingsPage
 import com.bobbyesp.spowlo.ui.pages.settings.updater.UpdaterPage
 import com.bobbyesp.spowlo.utils.DEPENDENCIES_INITIALIZED
+import com.bobbyesp.spowlo.utils.NOTIFICATION_PROMPT_SHOWN
+import com.bobbyesp.spowlo.utils.NotificationsUtil
 import com.bobbyesp.spowlo.utils.PreferencesUtil
 import com.bobbyesp.spowlo.utils.ToastUtil
 import com.google.accompanist.navigation.material.ExperimentalMaterialNavigationApi
@@ -88,7 +93,8 @@ fun InitialEntry(
     downloaderViewModel: DownloaderViewModel,
     modsDownloaderViewModel: ModsDownloaderViewModel,
     playlistPageViewModel: PlaylistPageViewModel,
-    isUrlShared: Boolean
+    isUrlShared: Boolean,
+    openDownloadsRequest: Int = 0
 ) {
     //bottom sheet remember state
     val bottomSheetNavigator = rememberBottomSheetNavigator()
@@ -109,6 +115,35 @@ fun InitialEntry(
 
     val cookiesViewModel: CookiesSettingsViewModel = viewModel()
     val onBackPressed: () -> Unit = { navController.popBackStack() }
+
+    LaunchedEffect(openDownloadsRequest) {
+        if (openDownloadsRequest > 0) {
+            navController.navigate(Route.DownloadTasksNavi) {
+                launchSingleTop = true
+            }
+        }
+    }
+
+    val downloaderState by Downloader.downloaderState.collectAsStateWithLifecycle()
+    val processCount by Downloader.processCount.collectAsStateWithLifecycle()
+    val hasActiveDownload = downloaderState is Downloader.State.DownloadingSong ||
+        downloaderState is Downloader.State.DownloadingPlaylist ||
+        processCount > 0
+
+    var showNotificationPrompt by remember { mutableStateOf(false) }
+    val requestNotificationPermission = rememberNotificationPermissionRequest { granted ->
+        if (!granted) ToastUtil.makeToast(context.getString(R.string.permission_denied))
+    }
+
+    LaunchedEffect(hasActiveDownload) {
+        if (hasActiveDownload &&
+            !PreferencesUtil.getValue(NOTIFICATION_PROMPT_SHOWN) &&
+            !NotificationsUtil.notificationsEnabled()
+        ) {
+            PreferencesUtil.updateValue(NOTIFICATION_PROMPT_SHOWN, true)
+            showNotificationPrompt = true
+        }
+    }
 
     if (isUrlShared) {
         if (navController.currentDestination?.route != Route.DOWNLOADER) {
@@ -457,4 +492,13 @@ fun InitialEntry(
         )
     }
 
+    if (showNotificationPrompt) {
+        NotificationPermissionDialog(
+            onDismissRequest = { showNotificationPrompt = false },
+            onPermissionGranted = {
+                showNotificationPrompt = false
+                requestNotificationPermission()
+            }
+        )
+    }
 }

@@ -40,6 +40,9 @@ const val SDCARD_URI = "sd_card_uri"
 const val PLAYLIST = "playlist"
 const val LANGUAGE = "language"
 const val NOTIFICATION = "notification"
+const val NOTIFICATION_PERMISSION_REQUESTED = "notification_permission_requested"
+const val NOTIFICATION_PROMPT_SHOWN = "notification_prompt_shown"
+const val NOTIFICATION_HINT_DISMISSED = "notification_hint_dismissed"
 private const val THEME_COLOR = "theme_color"
 const val PALETTE_STYLE = "palette_style"
 const val CUSTOM_PATH = "custom_path"
@@ -118,6 +121,9 @@ private val BooleanPreferenceDefaults =
         SPOTDL_UPDATE to true,
         SKIP_INFO_FETCH to false,
         NOTIFICATION to false,
+        NOTIFICATION_PERMISSION_REQUESTED to false,
+        NOTIFICATION_PROMPT_SHOWN to false,
+        NOTIFICATION_HINT_DISMISSED to false,
         DEPENDENCIES_INITIALIZED to false,
         ENABLE_NEWS to true
     )

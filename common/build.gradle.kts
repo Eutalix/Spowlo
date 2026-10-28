@@ -9,7 +9,7 @@ val versionName = "1.0.0"
 
 android {
     namespace = "com.bobbyesp.spotdl_common"
-    compileSdk = 35 
+    compileSdk = 36
 
     defaultConfig {
         minSdk = 26 

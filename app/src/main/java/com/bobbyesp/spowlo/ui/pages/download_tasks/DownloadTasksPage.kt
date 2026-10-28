@@ -1,6 +1,7 @@
 package com.bobbyesp.spowlo.ui.pages.download_tasks
 
 import android.content.Intent
+import android.os.Build
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.expandVertically
@@ -27,13 +28,18 @@ import androidx.compose.material.icons.outlined.Checklist
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.DeleteSweep
 import androidx.compose.material.icons.outlined.DownloadForOffline
+import androidx.compose.material.icons.outlined.NotificationsActive
 import androidx.compose.material3.BottomAppBar
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.TriStateCheckbox
@@ -58,6 +64,8 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.bobbyesp.spowlo.Downloader
@@ -72,8 +80,15 @@ import com.bobbyesp.spowlo.ui.components.SpowloDialog
 import com.bobbyesp.spowlo.ui.components.download_tasks.DownloadedSongCard
 import com.bobbyesp.spowlo.ui.components.download_tasks.DownloadingTaskItem
 import com.bobbyesp.spowlo.ui.components.download_tasks.TaskState
+import com.bobbyesp.spowlo.ui.dialogs.NotificationPermissionDialog
+import com.bobbyesp.spowlo.ui.dialogs.rememberNotificationPermissionRequest
 import com.bobbyesp.spowlo.utils.FilesUtil
 import com.bobbyesp.spowlo.utils.FilesUtil.getFileSize
+import com.bobbyesp.spowlo.utils.NOTIFICATION
+import com.bobbyesp.spowlo.utils.NOTIFICATION_HINT_DISMISSED
+import com.bobbyesp.spowlo.utils.NOTIFICATION_PERMISSION_REQUESTED
+import com.bobbyesp.spowlo.utils.NotificationsUtil
+import com.bobbyesp.spowlo.utils.PreferencesUtil
 import com.bobbyesp.spowlo.utils.ToastUtil
 import com.bobbyesp.spowlo.utils.toFileSizeText
 import kotlinx.coroutines.Dispatchers
@@ -104,6 +119,24 @@ fun DownloadTasksPage(
     var showDeleteDialog by remember { mutableStateOf(false) }
     var deleteFile by remember { mutableStateOf(false) }
     var pendingDeleteIds by remember { mutableStateOf<List<Int>>(emptyList()) }
+
+    var notificationsOn by remember { mutableStateOf(NotificationsUtil.notificationsEnabled()) }
+    var hintDismissed by remember {
+        mutableStateOf(PreferencesUtil.getValue(NOTIFICATION_HINT_DISMISSED))
+    }
+    var permissionRequested by remember {
+        mutableStateOf(PreferencesUtil.getValue(NOTIFICATION_PERMISSION_REQUESTED))
+    }
+    var showNotificationDialog by remember { mutableStateOf(false) }
+
+    LifecycleEventEffect(Lifecycle.Event.ON_RESUME) {
+        notificationsOn = NotificationsUtil.notificationsEnabled()
+    }
+
+    val requestNotificationPermission = rememberNotificationPermissionRequest { granted ->
+        notificationsOn = NotificationsUtil.notificationsEnabled()
+        if (!granted) ToastUtil.makeToast(context.getString(R.string.permission_denied))
+    }
 
     val historyUrls = remember(songsList) { songsList.map { it.songUrl }.toSet() }
     val activeTasks = Downloader.mutableTaskList.values
@@ -272,6 +305,28 @@ fun DownloadTasksPage(
                 return@LazyColumn
             }
 
+            if (!notificationsOn && !hintDismissed) {
+                item {
+                    NotificationHint(
+                        onEnable = {
+                            if (Build.VERSION.SDK_INT >= 33 && !permissionRequested) {
+                                showNotificationDialog = true
+                            } else if (!NotificationsUtil.areNotificationsEnabled()) {
+                                PreferencesUtil.updateValue(NOTIFICATION, true)
+                                NotificationsUtil.openNotificationSettings()
+                            } else {
+                                PreferencesUtil.updateValue(NOTIFICATION, true)
+                                notificationsOn = true
+                            }
+                        },
+                        onDismiss = {
+                            hintDismissed = true
+                            PreferencesUtil.updateValue(NOTIFICATION_HINT_DISMISSED, true)
+                        }
+                    )
+                }
+            }
+
             if (activeTasks.isNotEmpty()) {
                 item {
                     SectionHeader(
@@ -427,6 +482,74 @@ fun DownloadTasksPage(
                 }
             }
         )
+    }
+
+    if (showNotificationDialog) {
+        NotificationPermissionDialog(
+            onDismissRequest = { showNotificationDialog = false },
+            onPermissionGranted = {
+                showNotificationDialog = false
+                permissionRequested = true
+                requestNotificationPermission()
+            }
+        )
+    }
+}
+
+@Composable
+private fun NotificationHint(
+    onEnable: () -> Unit,
+    onDismiss: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Card(
+        modifier = modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.secondaryContainer,
+            contentColor = MaterialTheme.colorScheme.onSecondaryContainer
+        )
+    ) {
+        Row(
+            modifier = Modifier.padding(start = 16.dp, top = 12.dp, end = 4.dp, bottom = 12.dp),
+            verticalAlignment = Alignment.Top
+        ) {
+            Icon(
+                imageVector = Icons.Outlined.NotificationsActive,
+                contentDescription = null,
+                modifier = Modifier.padding(top = 2.dp)
+            )
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .padding(horizontal = 12.dp)
+            ) {
+                Text(
+                    text = stringResource(R.string.notification_hint_title),
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Bold
+                )
+                Spacer(Modifier.height(2.dp))
+                Text(
+                    text = stringResource(R.string.notification_hint_desc),
+                    style = MaterialTheme.typography.bodySmall
+                )
+                TextButton(
+                    onClick = onEnable,
+                    contentPadding = PaddingValues(horizontal = 0.dp, vertical = 4.dp),
+                    colors = ButtonDefaults.textButtonColors(
+                        contentColor = MaterialTheme.colorScheme.onSecondaryContainer
+                    )
+                ) {
+                    Text(text = stringResource(R.string.enable_notifications_action))
+                }
+            }
+            IconButton(onClick = onDismiss) {
+                Icon(
+                    imageVector = Icons.Outlined.Close,
+                    contentDescription = stringResource(R.string.dismiss)
+                )
+            }
+        }
     }
 }
 
