@@ -1,6 +1,5 @@
 package com.bobbyesp.spowlo.ui.pages.settings.general
 
-import android.Manifest
 import android.os.Build
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -50,6 +49,8 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.bobbyesp.spowlo.R
 import com.bobbyesp.spowlo.ui.common.booleanState
@@ -61,21 +62,19 @@ import com.bobbyesp.spowlo.ui.components.settings.ElevatedSettingsCard
 import com.bobbyesp.spowlo.ui.components.settings.SettingsItemNew
 import com.bobbyesp.spowlo.ui.components.settings.SettingsSwitch
 import com.bobbyesp.spowlo.ui.dialogs.NotificationPermissionDialog
+import com.bobbyesp.spowlo.ui.dialogs.rememberNotificationPermissionRequest
 import com.bobbyesp.spowlo.utils.CONFIGURE
 import com.bobbyesp.spowlo.utils.DEBUG
 import com.bobbyesp.spowlo.utils.ENABLE_NEWS
 import com.bobbyesp.spowlo.utils.INCOGNITO_MODE
 import com.bobbyesp.spowlo.utils.NOTIFICATION
+import com.bobbyesp.spowlo.utils.NOTIFICATION_PERMISSION_REQUESTED
 import com.bobbyesp.spowlo.utils.NotificationsUtil
 import com.bobbyesp.spowlo.utils.PreferencesUtil
-import com.bobbyesp.spowlo.utils.PreferencesUtil.updateBoolean
 import com.bobbyesp.spowlo.utils.ToastUtil
-import com.google.accompanist.permissions.ExperimentalPermissionsApi
-import com.google.accompanist.permissions.PermissionStatus
-import com.google.accompanist.permissions.rememberPermissionState
 import kotlinx.coroutines.DelicateCoroutinesApi
 
-@OptIn(ExperimentalMaterial3Api::class, DelicateCoroutinesApi::class, ExperimentalPermissionsApi::class)
+@OptIn(ExperimentalMaterial3Api::class, DelicateCoroutinesApi::class)
 @Composable
 fun GeneralSettingsPage(
     onBackPressed: () -> Unit,
@@ -99,6 +98,20 @@ fun GeneralSettingsPage(
         )
     }
 
+    var permissionRequested by remember {
+        mutableStateOf(
+            PreferencesUtil.getValue(NOTIFICATION_PERMISSION_REQUESTED)
+        )
+    }
+
+    var notificationsAllowed by remember {
+        mutableStateOf(NotificationsUtil.areNotificationsEnabled())
+    }
+
+    LifecycleEventEffect(Lifecycle.Event.ON_RESUME) {
+        notificationsAllowed = NotificationsUtil.areNotificationsEnabled()
+    }
+
     var configureBeforeDownload by remember {
         mutableStateOf(
             PreferencesUtil.getValue(CONFIGURE)
@@ -111,16 +124,15 @@ fun GeneralSettingsPage(
         )
     }
 
-    var isNotificationPermissionGranted by remember {
-        mutableStateOf(NotificationsUtil.areNotificationsEnabled())
+    var showNotificationDialog by remember { mutableStateOf(false) }
+    val requestNotificationPermission = rememberNotificationPermissionRequest { granted ->
+        notificationsAllowed = NotificationsUtil.areNotificationsEnabled()
+        if (granted) {
+            useNotifications = true
+        } else {
+            ToastUtil.makeToast(context.getString(R.string.permission_denied))
+        }
     }
-
-    var showNotificationDialog by remember {mutableStateOf(false)}
-    val notificationPermission =
-        if (Build.VERSION.SDK_INT >= 33) rememberPermissionState(permission = Manifest.permission.POST_NOTIFICATIONS) { status ->
-            if (!status) ToastUtil.makeToast(context.getString(R.string.permission_denied))
-            else isNotificationPermissionGranted = true
-        } else null
 
     var showFreqDialog by remember { mutableStateOf(false) }
 
@@ -264,28 +276,44 @@ fun GeneralSettingsPage(
                 item {
                     SettingsSwitch(
                         onCheckedChange = {
-                            if (notificationPermission?.status is PermissionStatus.Denied) {
-                                showNotificationDialog = true
-                            } else if (isNotificationPermissionGranted) {
-                                if (useNotifications)
-                                    NotificationsUtil.cancelAllNotifications()
-                                useNotifications = !useNotifications
-                                PreferencesUtil.updateValue(
-                                    NOTIFICATION, useNotifications
-                                )
-
+                            if (useNotifications && notificationsAllowed) {
+                                useNotifications = false
+                                PreferencesUtil.updateValue(NOTIFICATION, false)
+                                NotificationsUtil.cancelAllNotifications()
+                            } else if (!notificationsAllowed) {
+                                if (Build.VERSION.SDK_INT >= 33 && !permissionRequested) {
+                                    showNotificationDialog = true
+                                } else {
+                                    PreferencesUtil.updateValue(NOTIFICATION, true)
+                                    NotificationsUtil.openNotificationSettings()
+                                }
+                            } else {
+                                useNotifications = true
+                                PreferencesUtil.updateValue(NOTIFICATION, true)
                             }
                         },
-                        checked = useNotifications && isNotificationPermissionGranted,
+                        checked = useNotifications && notificationsAllowed,
                         title = {
                             Text(
                                 text = stringResource(R.string.use_notifications),
                                 fontWeight = FontWeight.Bold
                             )
                         },
-                        icon = if (useNotifications) Icons.Outlined.NotificationsActive else Icons.Outlined.NotificationsOff,
+                        icon = if (useNotifications && notificationsAllowed) {
+                            Icons.Outlined.NotificationsActive
+                        } else {
+                            Icons.Outlined.NotificationsOff
+                        },
                         description = {
-                            Text(text = stringResource(R.string.use_notifications_desc))
+                            Text(
+                                text = stringResource(
+                                    if (permissionRequested && !notificationsAllowed) {
+                                        R.string.notifications_blocked_desc
+                                    } else {
+                                        R.string.use_notifications_desc
+                                    }
+                                )
+                            )
                         },
                     )
                 }
@@ -352,10 +380,9 @@ fun GeneralSettingsPage(
         NotificationPermissionDialog(onDismissRequest = {
             showNotificationDialog = false
         }, onPermissionGranted = {
-            notificationPermission?.launchPermissionRequest()
-            NOTIFICATION.updateBoolean(true)
-            useNotifications = true
             showNotificationDialog = false
+            permissionRequested = true
+            requestNotificationPermission()
         })
     }
 }

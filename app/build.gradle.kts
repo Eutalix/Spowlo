@@ -86,7 +86,7 @@ android {
         localProperties.load(FileInputStream(localFile))
     }
 
-    compileSdk = 35
+    compileSdk = 36
     defaultConfig {
         applicationId = "com.bobbyesp.spowlo"
         minSdk = 26

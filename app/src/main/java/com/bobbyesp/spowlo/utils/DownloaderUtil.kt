@@ -457,10 +457,9 @@ object DownloaderUtil {
                     NotificationsUtil.makeNotificationForParallelDownloads(
                         notificationId = taskId.hashCode(),
                         taskId = taskId,
-                        progress = progress.roundToInt(),
+                        progress = if (text.contains('%')) (progress * 100).roundToInt() else null,
                         text = text,
-                        extraString = "$name - ${context.getString(R.string.parallel_download)}",
-                        taskUrl = url,
+                        title = name,
                     )
                     Downloader.updateTaskOutput(
                         url = url, line = text, progress = progress, isPlaylist = false
@@ -486,6 +485,13 @@ object DownloaderUtil {
         Downloader.onProcessEnded()
         metadataFile.delete()
         ToastUtil.makeToastSuspend(context.getString(R.string.download_finished_msg))
+    }
+
+    private fun overallProgress(text: String, progress: Float): Int? {
+        if (!text.contains("Total")) return null
+        val total = Regex("(\\d+)%").find(text.substringAfter("Total"))
+            ?.groupValues?.get(1)?.toIntOrNull()
+        return total ?: (progress * 100).roundToInt()
     }
 
     suspend fun executeCollectionDownload(collection: SpotifyCollection, fallbackName: String) {
@@ -522,10 +528,9 @@ object DownloaderUtil {
                     NotificationsUtil.makeNotificationForParallelDownloads(
                         notificationId = taskId.hashCode(),
                         taskId = taskId,
-                        progress = progress.roundToInt(),
+                        progress = overallProgress(text, progress),
                         text = text,
-                        extraString = "$taskName - ${context.getString(R.string.parallel_download)}",
-                        taskUrl = url,
+                        title = taskName,
                     )
                     Downloader.updateTaskOutput(
                         url = url, line = text, progress = progress, isPlaylist = true

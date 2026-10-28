@@ -188,9 +188,9 @@ object Downloader {
             mutableTaskList[this.toKey()] = this
             val key = makeKey(url, url.reversed())
             NotificationsUtil.notifyProgress(
-                name + " - " + context.getString(R.string.parallel_download),
+                name,
                 notificationId = key.toNotificationId(),
-                progress = ((state as DownloadTask.State.Running).progress * 100f).roundToInt(),
+                progress = 0,
                 text = currentLine
             )
         }
@@ -287,7 +287,7 @@ object Downloader {
             mutableTaskState.update { it.copy(progress = progress, progressText = line) }
             NotificationsUtil.notifyProgress(
                 notificationId = notificationId,
-                progress = (progress * 100).roundToInt(),
+                progress = if (line.contains('%')) (progress * 100).roundToInt() else null,
                 text = line,
                 title = songInfo.name
             )
