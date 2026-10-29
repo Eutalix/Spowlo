@@ -47,8 +47,6 @@ import com.bobbyesp.spowlo.ui.pages.downloader.DownloaderPage
 import com.bobbyesp.spowlo.ui.pages.downloader.DownloaderViewModel
 import com.bobbyesp.spowlo.ui.pages.metadata_viewer.playlists.PlaylistPageViewModel
 import com.bobbyesp.spowlo.ui.pages.metadata_viewer.playlists.SpotifyItemPage
-import com.bobbyesp.spowlo.ui.pages.mod_downloader.ModsDownloaderPage
-import com.bobbyesp.spowlo.ui.pages.mod_downloader.ModsDownloaderViewModel
 import com.bobbyesp.spowlo.ui.pages.playlist.PlaylistMetadataPage
 import com.bobbyesp.spowlo.ui.pages.searcher.SearcherPage
 import com.bobbyesp.spowlo.ui.pages.settings.SettingsPage
@@ -91,7 +89,6 @@ private const val TAG = "SpowloDebug"
 @Composable
 fun InitialEntry(
     downloaderViewModel: DownloaderViewModel,
-    modsDownloaderViewModel: ModsDownloaderViewModel,
     playlistPageViewModel: PlaylistPageViewModel,
     isUrlShared: Boolean,
     openDownloadsRequest: Int = 0
@@ -231,11 +228,6 @@ fun InitialEntry(
             slideInVerticallyComposable(Route.PLAYLIST_METADATA_PAGE) {
                 PlaylistMetadataPage(
                     onBackPressed,
-                )
-            }
-            animatedComposable(Route.MODS_DOWNLOADER) {
-                ModsDownloaderPage(
-                    onBackPressed, modsDownloaderViewModel
                 )
             }
             animatedComposable(Route.COOKIE_PROFILE) {
