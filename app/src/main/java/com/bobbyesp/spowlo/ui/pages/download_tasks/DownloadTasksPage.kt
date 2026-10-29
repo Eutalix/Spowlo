@@ -138,10 +138,11 @@ fun DownloadTasksPage(
         if (!granted) ToastUtil.makeToast(context.getString(R.string.permission_denied))
     }
 
-    val historyUrls = remember(songsList) { songsList.map { it.songUrl }.toSet() }
     val activeTasks = Downloader.mutableTaskList.values
         .filter { task ->
-            task.state !is Downloader.DownloadTask.State.Completed || task.url !in historyUrls
+            task.state is Downloader.DownloadTask.State.Running ||
+                task.state is Downloader.DownloadTask.State.Error ||
+                task.state is Downloader.DownloadTask.State.Canceled
         }
         .sortedBy { task ->
             when (task.state) {

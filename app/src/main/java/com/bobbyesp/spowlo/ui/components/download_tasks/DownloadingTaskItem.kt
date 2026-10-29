@@ -198,9 +198,9 @@ fun DownloadingTaskItem(
                 Spacer(Modifier.height(10.dp))
                 Text(
                     text = progressText,
-                    style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
+                    style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.error,
-                    maxLines = 2,
+                    maxLines = 3,
                     overflow = TextOverflow.Ellipsis
                 )
             }

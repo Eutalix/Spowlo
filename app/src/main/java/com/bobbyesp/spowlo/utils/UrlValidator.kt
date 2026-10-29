@@ -35,7 +35,10 @@ object UrlValidator {
         }
     }
 
-    fun isSupported(url: String): Boolean = url.isNotBlank()
+    fun isDownloadable(url: String): Boolean = when (classify(url)) {
+        Type.SpotifyTrack, Type.SpotifyAlbum, Type.SpotifyPlaylist -> true
+        Type.SpotifyArtist, Type.Other -> false
+    }
 
     /** Returns the Spotify item behind [text], if it contains a supported link or URI. */
     fun parseSpotifyLink(text: String): SpotifyLink? {

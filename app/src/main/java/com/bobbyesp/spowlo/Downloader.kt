@@ -18,8 +18,11 @@ import com.bobbyesp.spowlo.ui.common.containsEllipsis
 import com.bobbyesp.spowlo.utils.DownloaderUtil
 import com.bobbyesp.spowlo.utils.FilesUtil
 import com.bobbyesp.spowlo.utils.NotificationsUtil
+import com.bobbyesp.spowlo.utils.SpotifyApiException
 import com.bobbyesp.spowlo.utils.SpotifyMetadataFetcher
 import com.bobbyesp.spowlo.utils.ToastUtil
+import com.bobbyesp.spowlo.utils.TrackLinkRequiredException
+import com.bobbyesp.spowlo.utils.UnsupportedLinkException
 import com.bobbyesp.spowlo.utils.UrlValidator
 import com.bobbyesp.spowlo.utils.toSpotifySong
 import kotlinx.coroutines.CancellationException
@@ -31,6 +34,7 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.io.IOException
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
 import kotlin.math.roundToInt
@@ -48,11 +52,11 @@ object Downloader {
         "${additionalString}_$url"
 
     data class ErrorState(
-        val errorReport: String = "",
-        val errorMessageResId: Int = R.string.unknown_error,
+        val messageResId: Int? = null,
+        val message: String? = null,
+        val details: String? = null,
     ) {
-        fun isErrorOccurred(): Boolean =
-            errorMessageResId != R.string.unknown_error || errorReport.isNotEmpty()
+        fun isErrorOccurred(): Boolean = messageResId != null || message != null
     }
 
     data class DownloadTask(
@@ -224,40 +228,45 @@ object Downloader {
         return (matchResult?.groupValues?.get(1)?.toFloatOrNull() ?: 0f) / 100f
     }
 
-    fun onTaskEnded(url: String, response: String? = null, notificationTitle: String? = null) {
+    fun onTaskEnded(url: String, response: String? = null, notificationTitle: String? = null): Boolean {
         val key = makeKey(url, url.reversed())
+        val oldValue = mutableTaskList[key] ?: return false
+        if (oldValue.state is DownloadTask.State.Error || oldValue.state is DownloadTask.State.Canceled) return false
         NotificationsUtil.finishNotification(
             notificationId = key.toNotificationId(),
             title = notificationTitle,
             text = context.getString(R.string.status_completed),
         )
-        mutableTaskList.run {
-            val oldValue = get(key) ?: return
-            val newValue = oldValue.copy(state = DownloadTask.State.Completed).run {
-                response?.let { copy(consoleOutput = response) } ?: this
-            }
-            this[key] = newValue
+        val newValue = oldValue.copy(state = DownloadTask.State.Completed).run {
+            response?.let { copy(consoleOutput = response) } ?: this
         }
+        mutableTaskList[key] = newValue
         FilesUtil.scanDownloadDirectoryToMediaLibrary(App.audioDownloadDir)
+        return true
     }
 
-    fun onTaskError(errorReport: String, url: String) =
+    fun onTaskError(message: String, url: String, details: String? = null) =
         mutableTaskList.run {
             val key = makeKey(url, url.reversed())
-            NotificationsUtil.makeErrorReportNotification(
-                notificationId = key.toNotificationId(),
-                error = errorReport
-            )
             val oldValue = mutableTaskList[key] ?: return
+            NotificationsUtil.makeErrorReportNotification(
+                title = oldValue.taskName.ifBlank { context.getString(R.string.download_error_msg) },
+                notificationId = key.toNotificationId(),
+                error = message
+            )
             mutableTaskList[key] = oldValue.copy(
-                state = DownloadTask.State.Error(errorReport),
-                currentLine = errorReport,
-                consoleOutput = oldValue.consoleOutput + "\n" + errorReport
+                state = DownloadTask.State.Error(details ?: message),
+                currentLine = message,
+                consoleOutput = oldValue.consoleOutput + "\n" + (details ?: message)
             )
         }
 
     fun onProcessEnded() = mutableProcessCount.update { it - 1 }
     fun onProcessStarted() = mutableProcessCount.update { it + 1 }
+
+    fun isTaskRunning(url: String): Boolean =
+        mutableTaskList[makeKey(url, url.reversed())]?.state is DownloadTask.State.Running
+
     fun onProcessCanceled(taskId: String) =
         mutableTaskList.run { get(taskId)?.let { this.put(taskId, it.copy(state = DownloadTask.State.Canceled)) } }
 
@@ -270,7 +279,7 @@ object Downloader {
     }
 
     @CheckResult
-    private fun downloadSong(
+    private suspend fun downloadSong(
         songInfo: SpotifySong,
         preferences: DownloaderUtil.DownloadPreferences = DownloaderUtil.DownloadPreferences()
     ): Result<List<String>> {
@@ -337,7 +346,7 @@ object Downloader {
                 when (UrlValidator.classify(cleanedUrl)) {
                     UrlValidator.Type.SpotifyTrack -> {
                         val spotifyTrack = SpotifyMetadataFetcher.fetchTrackFromUrl(cleanedUrl)
-                            ?: throw Exception("Failed to fetch metadata from Spotify API.")
+                            ?: throw SpotifyApiException("Failed to fetch metadata from Spotify API.")
 
                         val songInfo = spotifyTrack.toSpotifySongWithDetails()
 
@@ -353,7 +362,7 @@ object Downloader {
                         downloadCollection(cleanedUrl)
                     }
 
-                    else -> throw Exception("This link is not supported. Use a Spotify track, album or playlist.")
+                    else -> throw UnsupportedLinkException()
                 }
             } catch (e: Exception) {
                 if (e is CancellationException) throw e
@@ -373,11 +382,11 @@ object Downloader {
                 val cleanedUrl = cleanSpotifyUrl(url)
                 
                 if (UrlValidator.classify(cleanedUrl) != UrlValidator.Type.SpotifyTrack) {
-                    throw Exception("Link is not a valid Spotify track URL.")
+                    throw TrackLinkRequiredException()
                 }
 
                 val spotifyTrack = SpotifyMetadataFetcher.fetchTrackFromUrl(cleanedUrl)
-                    ?: throw Exception("Failed to fetch metadata from Spotify API.")
+                    ?: throw SpotifyApiException("Failed to fetch metadata from Spotify API.")
                 
                 val songInfo = spotifyTrack.toSpotifySongWithDetails()
 
@@ -401,13 +410,11 @@ object Downloader {
     fun clearErrorState() = mutableErrorState.update { ErrorState() }
 
     fun showErrorMessage(resId: Int) {
-        ToastUtil.makeToastSuspend(context.getString(resId))
-        mutableErrorState.update { ErrorState(errorMessageResId = resId) }
+        mutableErrorState.update { ErrorState(messageResId = resId) }
     }
-    
+
     fun showErrorMessage(message: String) {
-        ToastUtil.makeToastSuspend(message)
-        mutableErrorState.update { ErrorState(errorReport = message) }
+        mutableErrorState.update { ErrorState(message = message) }
     }
 
     private fun clearProgressState(isFinished: Boolean) {
@@ -429,14 +436,25 @@ object Downloader {
         songName: String? = null
     ) {
         th.printStackTrace()
-        val resId = if (isFetchingInfo) R.string.fetch_info_error_msg else R.string.download_error_msg
-        ToastUtil.makeToastSuspend(context.getString(resId))
-        mutableErrorState.update { ErrorState(errorReport = th.stackTraceToString()) }
+        val isUserFixable = th is UnsupportedLinkException || th is TrackLinkRequiredException
+        val messageResId = when (th) {
+            is UnsupportedLinkException -> R.string.unsupported_link
+            is TrackLinkRequiredException -> R.string.track_link_required
+            is SpotifyApiException -> R.string.spotify_api_error
+            is IOException -> R.string.network_error
+            else -> if (isFetchingInfo) R.string.fetch_info_error_msg else R.string.download_error_msg
+        }
+        mutableErrorState.update {
+            ErrorState(
+                messageResId = messageResId,
+                details = if (isUserFixable) null else th.stackTraceToString(),
+            )
+        }
         notificationId?.let {
             NotificationsUtil.finishNotification(
                 notificationId = notificationId,
                 title = songName,
-                text = "${context.getString(R.string.download_error_msg)}\n\n${th.message.toString()}"
+                text = context.getString(messageResId)
             )
         }
         if (isTaskAborted) {
@@ -468,7 +486,7 @@ object Downloader {
                 when (UrlValidator.classify(cleanedUrl)) {
                     UrlValidator.Type.SpotifyTrack -> {
                         val track = SpotifyMetadataFetcher.fetchTrackFromUrl(cleanedUrl)
-                            ?: throw Exception("Failed to fetch metadata from Spotify API.")
+                            ?: throw SpotifyApiException("Failed to fetch metadata from Spotify API.")
 
                         DownloaderUtil.executeParallelDownload(track.toSpotifySongWithDetails(), name)
                     }
@@ -476,7 +494,7 @@ object Downloader {
                     UrlValidator.Type.SpotifyPlaylist,
                     UrlValidator.Type.SpotifyAlbum -> downloadCollection(cleanedUrl, fallbackName = name)
 
-                    else -> throw Exception("This link is not supported. Use a Spotify track, album or playlist.")
+                    else -> throw UnsupportedLinkException()
                 }
             }.onFailure { manageDownloadError(it, isFetchingInfo = true) }
         } finally {
@@ -488,7 +506,7 @@ object Downloader {
         applicationScope.launch(Dispatchers.IO) {
             runCatching {
                 val collection = SpotifyMetadataFetcher.fetchCollectionFromUrl(url)
-                    ?: throw Exception("Could not load the Spotify album or playlist.")
+                    ?: throw SpotifyApiException("Could not load the Spotify album or playlist.")
                 DownloaderUtil.executeCollectionDownload(collection, fallbackName)
             }.onFailure { manageDownloadError(it, isFetchingInfo = true) }
         }

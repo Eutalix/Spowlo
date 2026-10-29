@@ -70,9 +70,15 @@
     <string name="audio_quality">Quality</string>
     <string name="audio_quality_desc">Choose the quality for your downloads</string>
     <string name="audio">Audio</string>
-    <string name="url_empty">There\'s no link to download</string>
+    <string name="url_empty">Paste a link or type a song name to get started</string>
+    <string name="unsupported_link">That link isn\'t supported. Use a Spotify track, album, or playlist link.</string>
+    <string name="track_link_required">Open a Spotify track link to see its details.</string>
+    <string name="network_error">Couldn\'t reach Spotify. Check your connection and try again.</string>
     <string name="fetch_info_error_msg">Couldn\'t fetch song info.</string>
-    <string name="download_error_msg">Couldn\'t download the song.</string>
+    <string name="download_error_msg">Couldn\'t download the song. Please wait a few seconds, then retry.</string>
+    <string name="retrying_download">Retrying download...</string>
+    <string name="collection_download_error">Couldn\'t download this album or playlist.</string>
+    <string name="partial_download_error">Some songs couldn\'t be downloaded. The rest were added to your library.</string>
     <string name="download_finish_notification">Download finished</string>
     <string name="preserve_original_audio">Preserve original audio</string>
     <string name="preserve_original_audio_desc">Keep the audio in its original format.</string>
@@ -270,7 +276,7 @@
     <string name="searching_error">Search failed.</string>
     <string name="search">Type something to search Spotify.</string>
     <string name="err_act_reload">Reload the page</string>
-    <string name="error_copy">Copy the error</string>
+    <string name="error_copy">Copy details</string>
     <string name="track_artwork">Track artwork</string>
     <string name="album">Album</string>
     <string name="artist">Artist</string>
