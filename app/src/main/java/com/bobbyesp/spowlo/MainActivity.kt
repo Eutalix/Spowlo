@@ -33,7 +33,6 @@ import com.bobbyesp.spowlo.ui.dialogs.UpdateDialog
 import com.bobbyesp.spowlo.ui.pages.InitialEntry
 import com.bobbyesp.spowlo.ui.pages.downloader.DownloaderViewModel
 import com.bobbyesp.spowlo.ui.pages.metadata_viewer.playlists.PlaylistPageViewModel
-import com.bobbyesp.spowlo.ui.pages.mod_downloader.ModsDownloaderViewModel
 import com.bobbyesp.spowlo.ui.theme.SpowloTheme
 import com.bobbyesp.spowlo.utils.AUTO_UPDATE
 import com.bobbyesp.spowlo.utils.ENABLE_NEWS
@@ -49,7 +48,6 @@ import kotlinx.coroutines.runBlocking
 @AndroidEntryPoint
 class MainActivity : AppCompatActivity() {
     private val downloaderViewModel: DownloaderViewModel by viewModels()
-    private val modsDownloaderViewModel: ModsDownloaderViewModel by viewModels()
     private val playlistPageViewModel: PlaylistPageViewModel by viewModels()
     private var openDownloadsRequest by mutableIntStateOf(0)
 
@@ -113,7 +111,6 @@ class MainActivity : AppCompatActivity() {
                 ) {
                     InitialEntry(
                         downloaderViewModel = downloaderViewModel,
-                        modsDownloaderViewModel = modsDownloaderViewModel,
                         playlistPageViewModel = playlistPageViewModel,
                         isUrlShared = isUrlSharingTriggered,
                         openDownloadsRequest = openDownloadsRequest

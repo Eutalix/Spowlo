@@ -15,7 +15,6 @@ object Route {
     const val SETTINGS = "settings"
     const val FORMAT_SELECTION = "format"
     const val PLAYLIST_METADATA_PAGE = "playlist_metadata_page"
-    const val MODS_DOWNLOADER = "mods_downloader"
     const val SEARCHER = "searcher"
     const val MEDIA_PLAYER = "media_player"
     const val SPOTIFY_SETUP = "spotify_setup"
