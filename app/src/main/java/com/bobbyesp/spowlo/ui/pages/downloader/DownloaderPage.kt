@@ -11,7 +11,7 @@ import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -22,6 +22,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
@@ -32,10 +33,12 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.FileDownloadDone
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.outlined.Cancel
+import androidx.compose.material.icons.outlined.ContentCopy
 import androidx.compose.material.icons.outlined.ContentPaste
 import androidx.compose.material.icons.outlined.Error
 import androidx.compose.material.icons.outlined.FileDownload
 import androidx.compose.material.icons.rounded.Settings
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
@@ -47,6 +50,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SheetState
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.windowsizeclass.WindowWidthSizeClass
 import androidx.compose.runtime.Composable
@@ -77,7 +81,6 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -94,6 +97,7 @@ import com.bobbyesp.spowlo.utils.DEBUG
 import com.bobbyesp.spowlo.utils.PreferencesUtil
 import com.bobbyesp.spowlo.utils.PreferencesUtil.getBoolean
 import com.bobbyesp.spowlo.utils.ToastUtil
+import com.bobbyesp.spowlo.utils.UrlValidator
 import com.bobbyesp.spowlo.utils.isUrl
 import com.bobbyesp.spowlo.utils.matchUrlFromClipboard
 import com.google.accompanist.permissions.ExperimentalPermissionsApi
@@ -139,29 +143,40 @@ fun DownloaderPage(
     val keyboardController = LocalSoftwareKeyboardController.current
 
     val checkPermissionOrDownload = {
-        val url = viewState.url
+        val url = viewState.url.trim()
         if (url.isNotBlank() && !url.isUrl()) {
-            navigateToSearch(url.trim())
-        } else if (Build.VERSION.SDK_INT > 29 || storagePermission.status == PermissionStatus.Granted) {
-            if (url.isNotEmpty()) {
+            navigateToSearch(url)
+        } else if (downloaderViewModel.validateLinkOrShowError(url)) {
+            if (Build.VERSION.SDK_INT > 29 || storagePermission.status == PermissionStatus.Granted) {
                 if (CONFIGURE.getBoolean()) {
                     navigateToDownloaderSheet()
+                } else if (UrlValidator.classify(url) == UrlValidator.Type.SpotifyTrack) {
+                    downloaderViewModel.startDownloadSong()
                 } else {
-                    if (url.contains("track")) {
-                        downloaderViewModel.startDownloadSong()
-                    } else if (url.contains("album") || url.contains("artist") || url.contains("playlist")) {
-                        navigateToDownloaderSheet()
-                    }
+                    navigateToDownloaderSheet()
                 }
+            } else {
+                storagePermission.launchPermissionRequest()
             }
-        } else {
-            storagePermission.launchPermissionRequest()
         }
     }
 
     val downloadCallback = {
         checkPermissionOrDownload()
         keyboardController?.hide()
+    }
+
+    val onLinkReceived = { url: String ->
+        if (downloaderViewModel.validateLinkOrShowError(url)) {
+            if (CONFIGURE.getBoolean()) {
+                navigateToDownloaderSheet()
+            } else if (UrlValidator.classify(url) == UrlValidator.Type.SpotifyTrack) {
+                ToastUtil.makeToast(R.string.fetching_metadata)
+                downloaderViewModel.requestMetadata()
+            } else {
+                navigateToDownloaderSheet()
+            }
+        }
     }
 
     var showConsoleOutput by remember { mutableStateOf(DEBUG.getBoolean()) }
@@ -174,16 +189,7 @@ fun DownloaderPage(
     if (viewState.isUrlSharingTriggered) {
         val url = viewState.url
         if (url.isNotEmpty()) {
-            if (CONFIGURE.getBoolean()) {
-                navigateToDownloaderSheet()
-            } else {
-                if (url.contains("track")) {
-                    ToastUtil.makeToast(R.string.fetching_metadata)
-                    downloaderViewModel.requestMetadata()
-                } else if (url.contains("album") || url.contains("artist") || url.contains("playlist")) {
-                    navigateToDownloaderSheet()
-                }
-            }
+            onLinkReceived(url)
         }
         //downloadCallback()
         downloaderViewModel.onShareIntentConsumed()
@@ -215,19 +221,7 @@ fun DownloaderPage(
             ).let { url ->
                 downloaderViewModel.updateUrl(url)
                 if (url.isNotEmpty()) {
-                    if (CONFIGURE.getBoolean()) {
-                        navigateToDownloaderSheet()
-                    } else {
-                        if (url.contains("track")) {
-                            ToastUtil.makeToast(R.string.fetching_metadata)
-                            downloaderViewModel.requestMetadata()
-                        } else if (url.contains("album") || url.contains("artist") || url.contains(
-                                "playlist"
-                            )
-                        ) {
-                            navigateToDownloaderSheet()
-                        }
-                    }
+                    onLinkReceived(url)
                 }
             }
         },
@@ -377,9 +371,9 @@ fun DownloaderPageImplementation(
 
                     AnimatedVisibility(visible = errorState.isErrorOccurred()) {
                         ErrorMessage(
+                            modifier = Modifier.padding(vertical = 8.dp),
                             url = viewState.url,
-                            errorMessageResId = errorState.errorMessageResId,
-                            errorReport = errorState.errorReport
+                            errorState = errorState
                         )
                     }
                     content()
@@ -522,32 +516,59 @@ fun InputUrl(
 fun ErrorMessage(
     modifier: Modifier = Modifier,
     url: String,
-    errorReport: String = "",
-    errorMessageResId: Int,
+    errorState: Downloader.ErrorState,
 ) {
     val clipboardManager = LocalClipboardManager.current
     val context = LocalContext.current
-    Row(
+    val message = errorState.message
+        ?: stringResource(errorState.messageResId ?: R.string.unknown_error)
+    val details = errorState.details
+
+    Column(
         modifier = modifier
             .fillMaxWidth()
-            .run {
-                if (errorReport.isNotEmpty()) {
-                    clip(MaterialTheme.shapes.large).clickable {
-                        clipboardManager.setText(AnnotatedString(App.getVersionReport() + "\nURL: $url\n$errorReport"))
-                        ToastUtil.makeToastSuspend(context.getString(R.string.error_copied))
-                    }
-                } else this
+            .clip(MaterialTheme.shapes.large)
+            .background(MaterialTheme.colorScheme.errorContainer)
+            .padding(start = 16.dp, top = 12.dp, end = 16.dp, bottom = 4.dp)
+    ) {
+        Row(verticalAlignment = Alignment.Top) {
+            Icon(
+                imageVector = Icons.Outlined.Error,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onErrorContainer,
+                modifier = Modifier.size(20.dp)
+            )
+            Spacer(modifier = Modifier.width(10.dp))
+            Text(
+                text = message,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onErrorContainer,
+                modifier = Modifier.weight(1f)
+            )
+        }
+        if (!details.isNullOrEmpty()) {
+            TextButton(
+                onClick = {
+                    clipboardManager.setText(
+                        AnnotatedString(App.getVersionReport() + "\nURL: $url\n$details")
+                    )
+                    ToastUtil.makeToastSuspend(context.getString(R.string.error_copied))
+                },
+                modifier = Modifier
+                    .align(Alignment.End)
+                    .padding(top = 4.dp),
+                colors = ButtonDefaults.textButtonColors(
+                    contentColor = MaterialTheme.colorScheme.onErrorContainer
+                )
+            ) {
+                Icon(
+                    imageVector = Icons.Outlined.ContentCopy,
+                    contentDescription = null,
+                    modifier = Modifier.size(16.dp)
+                )
+                Spacer(modifier = Modifier.width(6.dp))
+                Text(text = stringResource(R.string.error_copy))
             }
-            .padding(horizontal = 8.dp, vertical = 8.dp)) {
-        Icon(
-            Icons.Outlined.Error, contentDescription = null, tint = MaterialTheme.colorScheme.error
-        )
-        Text(
-            maxLines = 10,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.padding(start = 6.dp),
-            text = errorReport.ifEmpty { stringResource(id = errorMessageResId) },
-            color = MaterialTheme.colorScheme.error
-        )
+        }
     }
 }

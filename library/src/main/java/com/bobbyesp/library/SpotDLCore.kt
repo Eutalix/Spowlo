@@ -301,7 +301,7 @@ abstract class SpotDLCore {
             if (!ignoreErrors(request, out)) {
                 idProcessMap.remove(processId)
                 Log.e("SpotDL", "Error occurred. $err, $out, $exitCode")
-                throw SpotDLException(err)
+                throw SpotDLException(errorDetails(err, out))
             }
         }
         idProcessMap.remove(processId)
@@ -345,8 +345,16 @@ abstract class SpotDLCore {
     }
 
     private fun ignoreErrors(request: SpotDLRequest, out: String): Boolean {
+        // A non-zero exit from a download means songs are missing.
+        if (request.hasOption("download")) return false
         return out.isNotEmpty() && !request.hasOption("--print-errors")
     }
+
+    private fun errorDetails(err: String, out: String): String =
+        listOf(
+            err.trim().takeLast(MAX_ERROR_DETAILS_LENGTH),
+            out.trim().takeLast(MAX_ERROR_DETAILS_LENGTH / 2),
+        ).filter { it.isNotEmpty() }.joinToString("\n")
 
     @Throws(SpotDLException::class)
     private fun assertInit() {
@@ -364,11 +372,14 @@ abstract class SpotDLCore {
     }
 
     private companion object {
+        private const val MAX_ERROR_DETAILS_LENGTH = 8_000
+
         /** Downloads tracks from `.spotdl` metadata files without touching Spotify. */
         val DOWNLOAD_RUNNER_SCRIPT = """
             import dataclasses
             import importlib.util
             import json
+            import logging
             import re
             import sys
 
@@ -423,6 +434,19 @@ abstract class SpotDLCore {
             def patch_search_providers():
                 patch_ytmusic()
                 patch_youtube()
+
+
+            def patch_error_reporting():
+                try:
+                    from spotdl.providers.audio import base
+
+                    # spotDL emits this generic warning on any failed download; QuickJS is bundled.
+                    base.warn_if_deno_missing = lambda: None
+                    logger = logging.getLogger("spotdl.providers.audio.base")
+                    logger.setLevel(logging.DEBUG)
+                    logger.addHandler(logging.StreamHandler(sys.stderr))
+                except Exception as error:
+                    print(f"Error reporting patch skipped: {error}", file=sys.stderr)
 
 
             def patch_ytmusic():
@@ -535,6 +559,7 @@ abstract class SpotDLCore {
             def main():
                 register_spotdl_package()
                 patch_search_providers()
+                patch_error_reporting()
 
                 from spotdl.download.downloader import Downloader
                 from spotdl.types.song import Song
@@ -557,6 +582,18 @@ abstract class SpotDLCore {
 
                 downloader = Downloader(downloader_settings)
                 downloader.download_multiple_songs(songs)
+
+                errors = getattr(downloader, "errors", [])
+                if errors:
+                    details = "\n".join(errors[:20])
+                    if len(errors) > 20:
+                        details += f"\n... and {len(errors) - 20} more"
+                    print(
+                        f"{len(errors)} download(s) failed:\n{details}",
+                        file=sys.stderr,
+                    )
+                    return 1
+
                 return 0
 
 

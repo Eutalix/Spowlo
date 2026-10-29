@@ -123,7 +123,10 @@ fun String.isUrl(): Boolean = matchUrlFromString(this).isNotEmpty()
 private fun matchUrlFromString(s: String, isMatchingMultiLink: Boolean = false): String {
     val builder = StringBuilder()
     val pattern =
-        Pattern.compile("(http|https)://[\\w\\-_]+(\\.[\\w\\-_]+)+([\\w\\-.,@?^=%&:/~+#]*[\\w\\-@?^=%&/~+#])?")
+        Pattern.compile(
+            "(http|https)://[\\w\\-_]+(\\.[\\w\\-_]+)+([\\w\\-.,@?^=%&:/~+#]*[\\w\\-@?^=%&/~+#])?",
+            Pattern.CASE_INSENSITIVE
+        )
     with(pattern.matcher(s)) {
         if (isMatchingMultiLink)
             while (find()) {
