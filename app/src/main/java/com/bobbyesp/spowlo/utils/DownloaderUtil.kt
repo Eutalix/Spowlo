@@ -68,13 +68,9 @@ object DownloaderUtil {
         val audioFormat: Int = PreferencesUtil.getAudioFormat(),
         val audioQuality: Int = PreferencesUtil.getAudioQuality(),
         val preserveOriginalAudio: Boolean = PreferencesUtil.getValue(ORIGINAL_AUDIO),
-        val useSpotifyPreferences: Boolean = PreferencesUtil.getValue(USE_SPOTIFY_CREDENTIALS),
-        val spotifyClientID: String = SPOTIFY_CLIENT_ID.getString(),
-        val spotifyClientSecret: String = SPOTIFY_CLIENT_SECRET.getString(),
         val useYtMetadata: Boolean = PreferencesUtil.getValue(USE_YT_METADATA),
         val useCookies: Boolean = PreferencesUtil.getValue(COOKIES),
         val downloadLyrics: Boolean = PreferencesUtil.getValue(DOWNLOAD_LYRICS),
-        val useCaching: Boolean = PreferencesUtil.getValue(USE_CACHING),
         val dontFilter: Boolean = PreferencesUtil.getValue(DONT_FILTER_RESULTS),
         val formatId: String = "",
         val incognitoMode: Boolean = PreferencesUtil.getValue(INCOGNITO_MODE),
@@ -307,15 +303,6 @@ object DownloaderUtil {
                 }
 
                 addAudioProvider(downloadPreferences)
-
-                if (useSpotifyPreferences) {
-                    if (spotifyClientID.isNotEmpty() && spotifyClientSecret.isNotEmpty()) {
-                        addOption("--client-id", spotifyClientID)
-                        addOption("--client-secret", spotifyClientSecret)
-                    } else {
-                        Log.w(TAG, "Custom Spotify credentials enabled but not provided. Falling back to default.")
-                    }
-                }
             }
         }
         return request

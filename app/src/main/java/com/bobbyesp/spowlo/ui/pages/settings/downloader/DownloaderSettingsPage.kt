@@ -13,7 +13,6 @@ import androidx.compose.material.icons.automirrored.outlined.Article
 import androidx.compose.material.icons.outlined.Album
 import androidx.compose.material.icons.outlined.AudioFile
 import androidx.compose.material.icons.outlined.Audiotrack
-import androidx.compose.material.icons.outlined.Cached
 import androidx.compose.material.icons.outlined.Download
 import androidx.compose.material.icons.outlined.Filter
 import androidx.compose.material.icons.outlined.HighQuality
@@ -64,7 +63,6 @@ import com.bobbyesp.spowlo.utils.SPLIT_BY_MAIN_ARTIST
 import com.bobbyesp.spowlo.utils.SPLIT_BY_PLAYLIST
 import com.bobbyesp.spowlo.utils.SPONSORBLOCK
 import com.bobbyesp.spowlo.utils.THREADS
-import com.bobbyesp.spowlo.utils.USE_CACHING
 import com.bobbyesp.spowlo.utils.USE_YT_METADATA
 import kotlinx.coroutines.DelicateCoroutinesApi
 
@@ -75,12 +73,6 @@ fun DownloaderSettingsPage(
 ) {
 
     val threadsNumber = THREADS.intState
-
-    var useCache by remember {
-        mutableStateOf(
-            PreferencesUtil.getValue(USE_CACHING)
-        )
-    }
 
     var dontFilter by remember {
         mutableStateOf(
@@ -184,29 +176,6 @@ fun DownloaderSettingsPage(
                 item {
                     PreferenceSubtitle(text = stringResource(id = R.string.general))
                 }
-                item {
-                    SettingsSwitch(
-                        onCheckedChange = {
-                            useCache = !useCache
-                            PreferencesUtil.updateValue(USE_CACHING, useCache)
-                        },
-                        checked = useCache,
-                        title = {
-                            Text(
-                                text = stringResource(id = R.string.use_cache),
-                                fontWeight = FontWeight.Bold
-                            )
-                        },
-                        icon = Icons.Outlined.Cached,
-                        description = { Text(text = stringResource(id = R.string.use_cache_desc)) },
-                        modifier = Modifier.clip(
-                            RoundedCornerShape(
-                                topStart = 8.dp, topEnd = 8.dp
-                            )
-                        ),
-                    )
-
-                }
 
                 /*item {
                     SettingsSwitch(
@@ -257,11 +226,7 @@ fun DownloaderSettingsPage(
                         description = { Text(text = stringResource(id = R.string.output_format_desc)) },
                         icon = Icons.Outlined.Output,
                         onClick = { showOutputFormatDialog = true },
-                        modifier = Modifier.clip(
-                            RoundedCornerShape(
-                                bottomStart = 8.dp, bottomEnd = 8.dp
-                            )
-                        ),
+                        modifier = Modifier.clip(RoundedCornerShape(8.dp)),
                     )
                 }
 

@@ -48,7 +48,6 @@ const val PALETTE_STYLE = "palette_style"
 const val CUSTOM_PATH = "custom_path"
 
 const val USE_YT_METADATA = "use_yt_metadata"
-const val USE_SPOTIFY_CREDENTIALS = "use_spotify_credentials"
 const val DOWNLOAD_LYRICS = "download_lyrics"
 const val LYRIC_PROVIDERS = "lyric_providers"
 const val AUDIO_PROVIDERS = "audio_providers"
@@ -61,10 +60,6 @@ const val OUTPUT_FORMAT = "output_format"
 
 const val SKIP_INFO_FETCH = "skip_info_fetch"
 
-const val SPOTIFY_CLIENT_ID = "spotify_client_id"
-const val SPOTIFY_CLIENT_SECRET = "spotify_client_secret"
-
-const val USE_CACHING = "use_caching"
 const val DONT_FILTER_RESULTS = "dont_filter_results"
 const val SPLIT_BY_PLAYLIST = "split_by_playlist"
 const val SPLIT_BY_MAIN_ARTIST = "split_by_main_artist"
@@ -100,8 +95,6 @@ const val PRE_RELEASE = 1
 private val StringPreferenceDefaults =
     mapOf(
         EXTRA_DIRECTORY to "",
-        SPOTIFY_CLIENT_ID to "",
-        SPOTIFY_CLIENT_SECRET to "",
         LYRIC_PROVIDERS to "",
         AUDIO_PROVIDERS to "",
     )
@@ -112,11 +105,9 @@ private val BooleanPreferenceDefaults =
         CONFIGURE to true,
         CELLULAR_DOWNLOAD to true,
         ORIGINAL_AUDIO to false,
-        USE_SPOTIFY_CREDENTIALS to false,
         USE_YT_METADATA to false,
         DOWNLOAD_LYRICS to false,
         AUTO_UPDATE to true,
-        USE_CACHING to false,
         DONT_FILTER_RESULTS to false,
         SPOTDL_UPDATE to true,
         SKIP_INFO_FETCH to false,

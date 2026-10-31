@@ -55,7 +55,6 @@ import com.bobbyesp.spowlo.ui.components.SettingTitle
 import com.bobbyesp.spowlo.ui.components.SmallTopAppBar
 import com.bobbyesp.spowlo.ui.components.fraction
 import com.bobbyesp.spowlo.ui.components.settings.SettingsItemNew
-import com.bobbyesp.spowlo.ui.pages.settings.about.LocalAsset
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -172,25 +171,6 @@ fun SettingsPage(navController: NavController) {
                     highlightIcon = true
                 )
 
-            }
-            item {
-                SettingsItemNew(
-                    title = {
-                        Text(
-                            text = stringResource(id = R.string.spotify_settings),
-                            fontWeight = FontWeight.Bold
-                        )
-                    },
-                    description = { Text(text = stringResource(id = R.string.spotify_settings_desc)) },
-                    icon = LocalAsset(id = R.drawable.spotify_logo),
-                    onClick = {
-                        navController.navigate(Route.SPOTIFY_PREFERENCES) {
-                            launchSingleTop = true
-                        }
-                    },
-                    addTonalElevation = true,
-                    highlightIcon = true
-                )
             }
             item {
                 //new settings item for download directory
