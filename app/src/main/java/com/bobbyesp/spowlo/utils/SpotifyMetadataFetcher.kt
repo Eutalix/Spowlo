@@ -4,7 +4,6 @@ import android.util.Log
 import com.adamratzman.spotify.models.Track
 import com.bobbyesp.library.domain.model.SpotifySong
 import com.bobbyesp.spowlo.features.spotify_api.data.remote.web.SpotifyWebApi
-import com.bobbyesp.spowlo.features.spotify_api.data.remote.web.SpotifyWebAuth
 
 data class SpotifyCollection(
     val url: String,
@@ -20,11 +19,6 @@ object SpotifyMetadataFetcher {
     private const val TAG = "SpotifyMetadataFetcher"
 
     private const val MAX_TRACKS = 10_000
-
-    /** Drops the cached anonymous session. */
-    suspend fun resetApi() {
-        SpotifyWebAuth.invalidate()
-    }
 
     /** [Track] metadata for a Spotify URL, or null when it is not a track or the lookup fails. */
     suspend fun fetchTrackFromUrl(spotifyUrl: String): Track? {

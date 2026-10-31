@@ -13,7 +13,6 @@ import com.adamratzman.spotify.models.SpotifyPublicUser
 import com.adamratzman.spotify.models.SpotifySearchResult
 import com.adamratzman.spotify.models.Track
 import com.bobbyesp.spowlo.features.spotify_api.data.remote.web.SpotifyWebApi
-import com.bobbyesp.spowlo.features.spotify_api.data.remote.web.SpotifyWebAuth
 
 /** Facade used by the metadata screens, backed by [SpotifyWebApi]. */
 object SpotifyApiRequests {
@@ -22,12 +21,6 @@ object SpotifyApiRequests {
 
     suspend fun warmUp() {
         SpotifyWebApi.warmUp()
-    }
-
-    /** Drops the cached anonymous session. */
-    suspend fun resetApi() {
-        Log.d(TAG, "Resetting Spotify web session")
-        SpotifyWebAuth.invalidate()
     }
 
     suspend fun provideUserSearch(query: String): SpotifyPublicUser? = null

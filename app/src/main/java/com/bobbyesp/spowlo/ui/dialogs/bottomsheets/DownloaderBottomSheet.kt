@@ -28,9 +28,7 @@ import androidx.compose.material.icons.outlined.Cancel
 import androidx.compose.material.icons.outlined.Dataset
 import androidx.compose.material.icons.outlined.DownloadDone
 import androidx.compose.material.icons.outlined.HighQuality
-import androidx.compose.material.icons.outlined.Key
 import androidx.compose.material.icons.outlined.Output
-import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -64,8 +62,6 @@ import com.bobbyesp.spowlo.ui.icons.Artist
 import com.bobbyesp.spowlo.ui.pages.settings.downloader.AudioFormatDialog
 import com.bobbyesp.spowlo.ui.pages.settings.downloader.AudioQualityDialog
 import com.bobbyesp.spowlo.ui.pages.settings.downloader.OutputFormatDialog
-import com.bobbyesp.spowlo.ui.pages.settings.spotify.SpotifyClientIDDialog
-import com.bobbyesp.spowlo.ui.pages.settings.spotify.SpotifyClientSecretDialog
 import com.bobbyesp.spowlo.utils.COOKIES
 import com.bobbyesp.spowlo.utils.DONT_FILTER_RESULTS
 import com.bobbyesp.spowlo.utils.DOWNLOAD_LYRICS
@@ -77,8 +73,6 @@ import com.bobbyesp.spowlo.utils.SKIP_ALBUM_ART
 import com.bobbyesp.spowlo.utils.SKIP_EXPLICIT
 import com.bobbyesp.spowlo.utils.SPONSORBLOCK
 import com.bobbyesp.spowlo.utils.ToastUtil
-import com.bobbyesp.spowlo.utils.USE_CACHING
-import com.bobbyesp.spowlo.utils.USE_SPOTIFY_CREDENTIALS
 import com.bobbyesp.spowlo.utils.USE_YT_METADATA
 import com.google.accompanist.permissions.ExperimentalPermissionsApi
 import com.google.accompanist.permissions.PermissionStatus
@@ -138,14 +132,6 @@ fun DownloaderBottomSheet(
         )
     }
 
-    var useSpotifyCredentials by remember {
-        mutableStateOf(
-            settings.getValue(
-                USE_SPOTIFY_CREDENTIALS
-            )
-        )
-    }
-
     var useYtMetadata by remember {
         mutableStateOf(
             settings.getValue(
@@ -158,14 +144,6 @@ fun DownloaderBottomSheet(
         mutableStateOf(
             settings.getValue(
                 COOKIES
-            )
-        )
-    }
-
-    var useCaching by remember {
-        mutableStateOf(
-            settings.getValue(
-                USE_CACHING
             )
         )
     }
@@ -216,8 +194,6 @@ fun DownloaderBottomSheet(
 
     var showAudioFormatDialog by remember { mutableStateOf(false) }
     var showAudioQualityDialog by remember { mutableStateOf(false) }
-    var showClientIdDialog by remember { mutableStateOf(false) }
-    var showClientSecretDialog by remember { mutableStateOf(false) }
     var showOutputFormatDialog by remember { mutableStateOf(false) }
 
     val downloadButtonCallback = {
@@ -336,38 +312,6 @@ fun DownloaderBottomSheet(
                                 onClick = { showAudioQualityDialog = true },
                             )
                         }
-                        DrawerSheetSubtitle(text = stringResource(id = R.string.spotify))
-                        Row(
-                            modifier = Modifier
-                                .horizontalScroll(rememberScrollState())
-                                .fillMaxWidth()
-                                .clip(RoundedCornerShape(6.dp))
-                        ) {
-                            AudioFilterChip(
-                                label = stringResource(id = R.string.use_spotify_credentials),
-                                animated = true,
-                                selected = useSpotifyCredentials,
-                                onClick = {
-                                    useSpotifyCredentials = !useSpotifyCredentials
-                                    scope.launch {
-                                        settings.updateValue(
-                                            USE_SPOTIFY_CREDENTIALS, useSpotifyCredentials
-                                        )
-                                    }
-                                })
-                            ButtonChip(
-                                label = stringResource(id = R.string.client_id),
-                                icon = Icons.Outlined.Person,
-                                enabled = useSpotifyCredentials,
-                                onClick = { showClientIdDialog = true },
-                            )
-                            ButtonChip(
-                                label = stringResource(id = R.string.client_secret),
-                                icon = Icons.Outlined.Key,
-                                enabled = useSpotifyCredentials,
-                                onClick = { showClientSecretDialog = true },
-                            )
-                        }
 
                     }
                 }
@@ -389,17 +333,6 @@ fun DownloaderBottomSheet(
                                 .fillMaxWidth()
                                 .clip(RoundedCornerShape(6.dp))
                         ) {
-                            AudioFilterChip(
-                                label = stringResource(id = R.string.use_cache),
-                                animated = true,
-                                selected = useCaching,
-                                onClick = {
-                                    useCaching = !useCaching
-                                    scope.launch {
-                                        settings.updateValue(USE_CACHING, useCaching)
-                                    }
-                                })
-
                             ButtonChip(
                                 label = stringResource(id = R.string.output_format),
                                 icon = Icons.Outlined.Output,
@@ -632,16 +565,6 @@ fun DownloaderBottomSheet(
         AudioQualityDialog(
             onDismissRequest = { showAudioQualityDialog = false },
         )
-    }
-    if (showClientIdDialog) {
-        SpotifyClientIDDialog {
-            showClientIdDialog = !showClientIdDialog
-        }
-    }
-    if (showClientSecretDialog) {
-        SpotifyClientSecretDialog {
-            showClientSecretDialog = !showClientSecretDialog
-        }
     }
     if (showOutputFormatDialog) {
         OutputFormatDialog(

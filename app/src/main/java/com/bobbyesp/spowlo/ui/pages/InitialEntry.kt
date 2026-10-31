@@ -62,7 +62,6 @@ import com.bobbyesp.spowlo.ui.pages.settings.documentation.DocumentationPage
 import com.bobbyesp.spowlo.ui.pages.settings.downloader.AudioQualityDialog
 import com.bobbyesp.spowlo.ui.pages.settings.downloader.DownloaderSettingsPage
 import com.bobbyesp.spowlo.ui.pages.settings.general.GeneralSettingsPage
-import com.bobbyesp.spowlo.ui.pages.settings.spotify.SpotifySettingsPage
 import com.bobbyesp.spowlo.ui.pages.settings.updater.UpdaterPage
 import com.bobbyesp.spowlo.utils.DEPENDENCIES_INITIALIZED
 import com.bobbyesp.spowlo.utils.NOTIFICATION_PROMPT_SHOWN
@@ -212,11 +211,6 @@ fun InitialEntry(
             }
             animatedComposable(Route.APP_THEME) {
                 AppThemePreferencesPage {
-                    onBackPressed()
-                }
-            }
-            animatedComposable(Route.SPOTIFY_PREFERENCES) {
-                SpotifySettingsPage {
                     onBackPressed()
                 }
             }
