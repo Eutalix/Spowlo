@@ -496,8 +496,9 @@ object SpotifyWebApi {
 
         val releaseDate = node.optJSONObject("date")?.optString("isoString")
             ?.take(10)
+            ?.takeIf { it.isNotBlank() }
             ?: node.optJSONObject("date")?.optInt("year")?.toString()
-            ?: ""
+            ?: "0"
 
         return JSONObject()
             .put("album_type", node.optString("type", "ALBUM").lowercase())
@@ -598,7 +599,11 @@ object SpotifyWebApi {
     private fun albumJson(node: JSONObject): JSONObject {
         val uri = node.optString("uri")
         val id = uri.substringAfterLast(':')
-        val releaseDate = node.optJSONObject("date")?.optString("isoString")?.take(10).orEmpty()
+        val releaseDate = node.optJSONObject("date")?.optString("isoString")
+            ?.take(10)
+            ?.takeIf { it.isNotBlank() }
+            ?: node.optJSONObject("date")?.optInt("year")?.toString()
+            ?: "0"
         val copyrights = JSONArray()
         val copyrightItems = node.optJSONObject("copyright")?.optJSONArray("items")
         if (copyrightItems != null) {

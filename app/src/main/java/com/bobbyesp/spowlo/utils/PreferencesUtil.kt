@@ -81,6 +81,7 @@ const val FORMAT_SELECTION = "format_selection"
 const val UPDATE_FREQUENCY = "update_frequency"
 const val LAST_UPDATE_CHECK_TIME = "last_update_check_time"
 const val DEPENDENCIES_INITIALIZED = "dependencies_initialized"
+const val HISTORY_IMPORT_DONE = "history_import_done"
 
 // News Constants
 const val ENABLE_NEWS = "enable_news"

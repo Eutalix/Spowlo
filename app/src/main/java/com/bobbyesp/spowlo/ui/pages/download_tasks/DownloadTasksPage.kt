@@ -24,18 +24,24 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.AutoAwesome
 import androidx.compose.material.icons.outlined.Checklist
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.DeleteSweep
 import androidx.compose.material.icons.outlined.DownloadForOffline
+import androidx.compose.material.icons.outlined.Folder
+import androidx.compose.material.icons.outlined.LibraryAdd
 import androidx.compose.material.icons.outlined.NotificationsActive
+import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material3.BottomAppBar
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -58,6 +64,7 @@ import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -84,6 +91,7 @@ import com.bobbyesp.spowlo.ui.dialogs.NotificationPermissionDialog
 import com.bobbyesp.spowlo.ui.dialogs.rememberNotificationPermissionRequest
 import com.bobbyesp.spowlo.utils.FilesUtil
 import com.bobbyesp.spowlo.utils.FilesUtil.getFileSize
+import com.bobbyesp.spowlo.utils.HistoryImporter
 import com.bobbyesp.spowlo.utils.NOTIFICATION
 import com.bobbyesp.spowlo.utils.NOTIFICATION_HINT_DISMISSED
 import com.bobbyesp.spowlo.utils.NOTIFICATION_PERMISSION_REQUESTED
@@ -92,6 +100,7 @@ import com.bobbyesp.spowlo.utils.PreferencesUtil
 import com.bobbyesp.spowlo.utils.ToastUtil
 import com.bobbyesp.spowlo.utils.toFileSizeText
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -119,6 +128,14 @@ fun DownloadTasksPage(
     var showDeleteDialog by remember { mutableStateOf(false) }
     var deleteFile by remember { mutableStateOf(false) }
     var pendingDeleteIds by remember { mutableStateOf<List<Int>>(emptyList()) }
+
+    val scope = rememberCoroutineScope()
+    var isImporting by remember { mutableStateOf(false) }
+    var showStorageAccessDialog by remember { mutableStateOf(false) }
+    val metadataProgress by downloadsViewModel.metadataProgress.collectAsStateWithLifecycle()
+    val isUpdatingMetadata = metadataProgress.isRunning
+    var redownloadTargets by remember { mutableStateOf<List<Int>>(emptyList()) }
+    var showRedownloadDialog by remember { mutableStateOf(false) }
 
     var notificationsOn by remember { mutableStateOf(NotificationsUtil.notificationsEnabled()) }
     var hintDismissed by remember {
@@ -189,8 +206,39 @@ fun DownloadTasksPage(
         selectedItemIds.clear()
     }
 
+    val importExistingFiles: () -> Unit = {
+        when {
+            isImporting -> Unit
+            HistoryImporter.needsStorageAccessToScan() -> showStorageAccessDialog = true
+            else -> {
+                isImporting = true
+                scope.launch {
+                    val result = HistoryImporter.importExistingFiles()
+                    isImporting = false
+                    val message = if (result.imported > 0) {
+                        context.resources.getQuantityString(
+                            R.plurals.imported_songs, result.imported, result.imported
+                        )
+                    } else {
+                        context.getString(R.string.import_no_new_songs)
+                    }
+                    ToastUtil.makeToast(context, message)
+                }
+            }
+        }
+    }
+
     BackHandler(isSelectEnabled) {
         closeSelectionMode()
+    }
+
+    val updateMetadata: (List<Int>) -> Unit = { ids -> downloadsViewModel.updateMetadata(ids) }
+
+    val requestRedownload: (List<Int>) -> Unit = { ids ->
+        if (ids.isNotEmpty()) {
+            redownloadTargets = ids
+            showRedownloadDialog = true
+        }
     }
 
     val playFile = { song: DownloadedSongInfo ->
@@ -235,6 +283,21 @@ fun DownloadTasksPage(
                         }
                     }
                 }, actions = {
+                    if (!isSelectEnabled) {
+                        IconButton(onClick = importExistingFiles, enabled = !isImporting) {
+                            if (isImporting) {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(20.dp),
+                                    strokeWidth = 2.dp
+                                )
+                            } else {
+                                Icon(
+                                    imageVector = Icons.Outlined.LibraryAdd,
+                                    contentDescription = stringResource(R.string.import_existing_files)
+                                )
+                            }
+                        }
+                    }
                     if (!isSelectEnabled && songsList.isNotEmpty()) {
                         IconButton(onClick = { isSelectEnabled = true }) {
                             Icon(
@@ -251,39 +314,66 @@ fun DownloadTasksPage(
                 enter = expandVertically() + fadeIn(),
                 exit = shrinkVertically() + fadeOut()
             ) {
-                BottomAppBar {
-                    TriStateCheckbox(
-                        state = checkBoxState,
-                        onClick = {
-                            when (checkBoxState) {
-                                androidx.compose.ui.state.ToggleableState.On ->
-                                    selectedItemIds.clear()
-
-                                else -> visibleIds
-                                    .filterNot { selectedItemIds.contains(it) }
-                                    .forEach { selectedItemIds.add(it) }
-                            }
-                        },
-                    )
-                    Text(
-                        modifier = Modifier.weight(1f),
-                        text = stringResource(R.string.multiselect_item_count).format(
-                            selectedItemIds.size
-                        ),
-                        style = MaterialTheme.typography.labelLarge
-                    )
-                    IconButton(
-                        onClick = {
-                            pendingDeleteIds = selectedItemIds.toList()
-                            deleteFile = false
-                            showDeleteDialog = true
-                        },
-                        enabled = selectedItemIds.isNotEmpty()
+                Column {
+                    AnimatedVisibility(
+                        isUpdatingMetadata,
+                        enter = expandVertically() + fadeIn(),
+                        exit = shrinkVertically() + fadeOut()
                     ) {
-                        Icon(
-                            imageVector = Icons.Outlined.DeleteSweep,
-                            contentDescription = stringResource(id = R.string.remove)
+                        MetadataUpdateProgress(progress = metadataProgress)
+                    }
+                    BottomAppBar {
+                        TriStateCheckbox(
+                            state = checkBoxState,
+                            onClick = {
+                                when (checkBoxState) {
+                                    androidx.compose.ui.state.ToggleableState.On ->
+                                        selectedItemIds.clear()
+
+                                    else -> visibleIds
+                                        .filterNot { selectedItemIds.contains(it) }
+                                        .forEach { selectedItemIds.add(it) }
+                                }
+                            },
                         )
+                        Text(
+                            modifier = Modifier.weight(1f),
+                            text = stringResource(R.string.multiselect_item_count).format(
+                                selectedItemIds.size
+                            ),
+                            style = MaterialTheme.typography.labelLarge
+                        )
+                        IconButton(
+                            onClick = { requestRedownload(selectedItemIds.toList()) },
+                            enabled = selectedItemIds.isNotEmpty() && !isUpdatingMetadata
+                        ) {
+                            Icon(
+                                imageVector = Icons.Outlined.Refresh,
+                                contentDescription = stringResource(R.string.redownload)
+                            )
+                        }
+                        IconButton(
+                            onClick = { updateMetadata(selectedItemIds.toList()) },
+                            enabled = selectedItemIds.isNotEmpty() && !isUpdatingMetadata
+                        ) {
+                            Icon(
+                                imageVector = Icons.Outlined.AutoAwesome,
+                                contentDescription = stringResource(R.string.update_metadata)
+                            )
+                        }
+                        IconButton(
+                            onClick = {
+                                pendingDeleteIds = selectedItemIds.toList()
+                                deleteFile = false
+                                showDeleteDialog = true
+                            },
+                            enabled = selectedItemIds.isNotEmpty()
+                        ) {
+                            Icon(
+                                imageVector = Icons.Outlined.DeleteSweep,
+                                contentDescription = stringResource(id = R.string.remove)
+                            )
+                        }
                     }
                 }
             }
@@ -300,7 +390,9 @@ fun DownloadTasksPage(
                     EmptyDownloadsState(
                         modifier = Modifier
                             .fillParentMaxSize()
-                            .padding(32.dp)
+                            .padding(32.dp),
+                        isImporting = isImporting,
+                        onImport = importExistingFiles
                     )
                 }
                 return@LazyColumn
@@ -406,6 +498,8 @@ fun DownloadTasksPage(
                         fileSize = fileSizes[song.id],
                         selectionMode = isSelectEnabled,
                         selected = selectedItemIds.contains(song.id),
+                        isUpdatingMetadata = metadataProgress.inProgressId == song.id,
+                        metadataUpdateEnabled = !isUpdatingMetadata,
                         onSelect = {
                             if (!isSelectEnabled) isSelectEnabled = true
                             if (!selectedItemIds.remove(song.id)) selectedItemIds.add(song.id)
@@ -436,6 +530,8 @@ fun DownloadTasksPage(
                             deleteFile = false
                             showDeleteDialog = true
                         },
+                        onRedownload = { requestRedownload(listOf(song.id)) },
+                        onUpdateMetadata = { updateMetadata(listOf(song.id)) },
                     )
                 }
             }
@@ -480,6 +576,66 @@ fun DownloadTasksPage(
             dismissButton = {
                 DismissButton {
                     showDeleteDialog = false
+                }
+            }
+        )
+    }
+
+    if (showRedownloadDialog) {
+        val count = redownloadTargets.size
+        SpowloDialog(
+            onDismissRequest = {
+                showRedownloadDialog = false
+                redownloadTargets = emptyList()
+            },
+            icon = { Icon(Icons.Outlined.Refresh, null) },
+            title = {
+                Text(pluralStringResource(R.plurals.redownload_confirm_title, count, count))
+            },
+            text = {
+                Text(
+                    modifier = Modifier.padding(horizontal = 24.dp),
+                    text = pluralStringResource(R.plurals.redownload_confirm_message, count)
+                )
+            },
+            confirmButton = {
+                ConfirmButton(text = stringResource(R.string.redownload)) {
+                    val ids = redownloadTargets
+                    showRedownloadDialog = false
+                    redownloadTargets = emptyList()
+                    closeSelectionMode()
+                    downloadsViewModel.redownload(ids)
+                }
+            },
+            dismissButton = {
+                DismissButton {
+                    showRedownloadDialog = false
+                    redownloadTargets = emptyList()
+                }
+            }
+        )
+    }
+
+    if (showStorageAccessDialog) {
+        SpowloDialog(
+            onDismissRequest = { showStorageAccessDialog = false },
+            icon = { Icon(Icons.Outlined.Folder, null) },
+            title = { Text(stringResource(R.string.import_storage_access_title)) },
+            text = {
+                Text(
+                    modifier = Modifier.padding(horizontal = 24.dp),
+                    text = stringResource(R.string.import_storage_access_summary)
+                )
+            },
+            confirmButton = {
+                ConfirmButton(text = stringResource(R.string.open_settings)) {
+                    showStorageAccessDialog = false
+                    FilesUtil.openAllFilesAccessSettings()
+                }
+            },
+            dismissButton = {
+                DismissButton {
+                    showStorageAccessDialog = false
                 }
             }
         )
@@ -555,6 +711,38 @@ private fun NotificationHint(
 }
 
 @Composable
+private fun MetadataUpdateProgress(progress: DownloadsViewModel.MetadataProgress) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 8.dp)
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                modifier = Modifier.weight(1f),
+                text = stringResource(R.string.updating_metadata),
+                style = MaterialTheme.typography.labelLarge
+            )
+            Text(
+                text = stringResource(
+                    R.string.metadata_update_count, progress.completed, progress.total
+                ),
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+        Spacer(Modifier.height(6.dp))
+        LinearProgressIndicator(
+            progress = {
+                if (progress.total == 0) 0f
+                else progress.completed.toFloat() / progress.total
+            },
+            modifier = Modifier.fillMaxWidth()
+        )
+    }
+}
+
+@Composable
 private fun SectionHeader(title: String, count: Int) {
     Row(
         modifier = Modifier
@@ -578,7 +766,11 @@ private fun SectionHeader(title: String, count: Int) {
 }
 
 @Composable
-private fun EmptyDownloadsState(modifier: Modifier = Modifier) {
+private fun EmptyDownloadsState(
+    modifier: Modifier = Modifier,
+    isImporting: Boolean = false,
+    onImport: () -> Unit,
+) {
     Column(
         modifier = modifier,
         verticalArrangement = Arrangement.Center,
@@ -606,6 +798,23 @@ private fun EmptyDownloadsState(modifier: Modifier = Modifier) {
             maxLines = 4,
             overflow = TextOverflow.Ellipsis
         )
+        Spacer(Modifier.height(20.dp))
+        TextButton(onClick = onImport, enabled = !isImporting) {
+            if (isImporting) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(18.dp),
+                    strokeWidth = 2.dp
+                )
+            } else {
+                Icon(
+                    imageVector = Icons.Outlined.LibraryAdd,
+                    contentDescription = null,
+                    modifier = Modifier.size(18.dp)
+                )
+            }
+            Spacer(Modifier.size(8.dp))
+            Text(text = stringResource(R.string.import_existing_files))
+        }
     }
 }
 

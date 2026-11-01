@@ -511,6 +511,56 @@ object Downloader {
             }.onFailure { manageDownloadError(it, isFetchingInfo = true) }
         }
 
+    /** Re-downloads a track, forcing spotDL to replace the existing file. */
+    suspend fun redownloadTrack(url: String, name: String, existingPath: String = ""): Boolean {
+        val requestKey = makeKey(url, url.reversed())
+        if (activeParallelDownloads.putIfAbsent(requestKey, true) != null) return false
+        return try {
+            val cleanedUrl = cleanSpotifyUrl(url)
+            if (UrlValidator.classify(cleanedUrl) != UrlValidator.Type.SpotifyTrack) return false
+            val track = SpotifyMetadataFetcher.fetchTrackFromUrl(cleanedUrl) ?: return false
+            DownloaderUtil.executeParallelDownload(
+                songInfo = track.toSpotifySongWithDetails(),
+                name = name.ifBlank { track.name },
+                overwrite = DownloaderUtil.OVERWRITE_FORCE,
+                showToasts = false,
+                overwritePath = existingPath,
+            )
+        } catch (e: Exception) {
+            if (e is CancellationException) throw e
+            Log.e("Downloader", "Redownload failed for $url", e)
+            false
+        } finally {
+            activeParallelDownloads.remove(requestKey)
+        }
+    }
+
+    /** Rewrites the tags of [existingPath] from [track] without downloading the audio again. */
+    suspend fun writeTrackTags(track: Track, existingPath: String, name: String = ""): Boolean {
+        if (!DownloaderUtil.canEmbedMetadata(existingPath)) return false
+        val songInfo = track.toSpotifySongWithDetails()
+        val url = songInfo.url
+        if (url.isBlank()) return false
+
+        val requestKey = makeKey(url, url.reversed())
+        if (activeParallelDownloads.putIfAbsent(requestKey, true) != null) return false
+        return try {
+            DownloaderUtil.executeParallelDownload(
+                songInfo = songInfo,
+                name = name.ifBlank { songInfo.name },
+                overwrite = DownloaderUtil.OVERWRITE_METADATA,
+                showToasts = false,
+                overwritePath = existingPath,
+            )
+        } catch (e: Exception) {
+            if (e is CancellationException) throw e
+            Log.e("Downloader", "Tagging failed for $existingPath", e)
+            false
+        } finally {
+            activeParallelDownloads.remove(requestKey)
+        }
+    }
+
     fun String.toNotificationId(): Int = this.hashCode()
     private fun String.getNumbers(): Int {
         val sb = StringBuilder()

@@ -387,6 +387,7 @@ abstract class SpotDLCore {
             LIST_FIELDS = ("artists", "genres")
             STR_FIELDS = ("album_id", "copyright_text", "cover_url", "isrc", "name", "artist", "album_name", "album_artist", "date", "song_id", "publisher", "url")
             NAME_BYTES = 255
+            PROVENANCE_TAG = "Spowlo (https://github.com/Eutalix/Spowlo)"
 
 
             def register_spotdl_package():
@@ -448,6 +449,96 @@ abstract class SpotDLCore {
                     logger.addHandler(logging.StreamHandler(sys.stderr))
                 except Exception as error:
                     print(f"Error reporting patch skipped: {error}", file=sys.stderr)
+
+
+            def patch_lyrics_embedding():
+                '''Keep timestamps in USLT: Android players ignore SYLT and only show USLT.'''
+                try:
+                    from spotdl.utils import metadata
+                except Exception as error:
+                    print(f"Lyrics patch skipped: {error}", file=sys.stderr)
+                    return
+
+                original = metadata.embed_lyrics
+
+                def embed_lyrics(audio_file, song, encoding):
+                    lyrics = song.lyrics
+                    if encoding != "mp3" or not lyrics:
+                        return original(audio_file, song, encoding)
+
+                    lrc_lines = [
+                        line
+                        for line in lyrics.splitlines()[:5]
+                        if line and metadata.LRC_REGEX.match(line)
+                    ]
+                    if not lrc_lines:
+                        return original(audio_file, song, encoding)
+
+                    audio_file.add(metadata.USLT(encoding=3, text=lyrics))
+                    audio_file.add(
+                        metadata.SYLT(
+                            encoding=3,
+                            text=metadata.parse_lrc_timestamps(lyrics),
+                            format=2,
+                            type=1,
+                        )
+                    )
+                    return audio_file
+
+                metadata.embed_lyrics = embed_lyrics
+
+
+            def patch_provenance_tag():
+                try:
+                    from spotdl.download import downloader as downloader_module
+                except Exception as error:
+                    print(f"Provenance tag patch skipped: {error}", file=sys.stderr)
+                    return
+
+                original = downloader_module.embed_metadata
+
+                def embed_metadata(*args, **kwargs):
+                    result = original(*args, **kwargs)
+                    output_file = kwargs.get("output_file", args[0] if args else None)
+                    try:
+                        tag_provenance(output_file)
+                    except Exception as error:
+                        print(f"Provenance tag skipped: {error}", file=sys.stderr)
+                    return result
+
+                downloader_module.embed_metadata = embed_metadata
+
+
+            def tag_provenance(output_file):
+                from pathlib import Path
+
+                from mutagen._file import File
+                from mutagen.id3 import ID3, TXXX
+                from mutagen.mp4 import MP4
+                from mutagen.wave import WAVE
+
+                path = Path(output_file)
+
+                if path.suffix == ".mp3":
+                    audio = ID3(str(path))
+                    audio.add(TXXX(encoding=3, desc="SPOWLO", text=[PROVENANCE_TAG]))
+                    audio.save(v2_version=3)
+                elif path.suffix == ".m4a":
+                    audio = MP4(str(path))
+                    audio["----:com.apple.iTunes:SPOWLO"] = [PROVENANCE_TAG.encode("utf-8")]
+                    audio.save()
+                elif path.suffix == ".wav":
+                    audio = WAVE(str(path))
+                    if audio.tags is None:
+                        audio.add_tags()
+                    audio.tags.add(TXXX(encoding=3, desc="SPOWLO", text=[PROVENANCE_TAG]))
+                    audio.save()
+                else:
+                    audio = File(str(path))
+                    if audio is None:
+                        return
+                    audio["SPOWLO"] = [PROVENANCE_TAG]
+                    audio.save()
 
 
             def patch_filename_limit():
@@ -600,6 +691,8 @@ abstract class SpotDLCore {
                 from spotdl.utils.config import create_settings
 
                 patch_filename_limit()
+                patch_lyrics_embedding()
+                patch_provenance_tag()
 
                 arguments = parse_arguments()
                 _, downloader_settings, _ = create_settings(arguments)
