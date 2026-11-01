@@ -195,7 +195,7 @@ object Downloader {
                 name,
                 notificationId = key.toNotificationId(),
                 progress = 0,
-                text = currentLine
+                text = context.getString(R.string.downloading)
             )
         }
 
@@ -297,7 +297,7 @@ object Downloader {
             NotificationsUtil.notifyProgress(
                 notificationId = notificationId,
                 progress = if (line.contains('%')) (progress * 100).roundToInt() else null,
-                text = line,
+                text = context.getString(R.string.downloading),
                 title = songInfo.name
             )
         }.onFailure {

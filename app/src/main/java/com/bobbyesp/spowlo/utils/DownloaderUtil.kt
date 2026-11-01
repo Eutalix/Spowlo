@@ -474,7 +474,7 @@ object DownloaderUtil {
                                 notificationId = taskId.hashCode(),
                                 taskId = taskId,
                                 progress = if (text.contains('%')) (progress * 100).roundToInt() else null,
-                                text = text,
+                                text = context.getString(R.string.downloading),
                                 title = name,
                             )
                             Downloader.updateTaskOutput(
@@ -556,7 +556,7 @@ object DownloaderUtil {
                                 notificationId = taskId.hashCode(),
                                 taskId = taskId,
                                 progress = overallProgress(text, progress),
-                                text = text,
+                                text = context.getString(R.string.downloading),
                                 title = taskName,
                             )
                             Downloader.updateTaskOutput(
