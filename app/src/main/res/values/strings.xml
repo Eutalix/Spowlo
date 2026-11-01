@@ -378,4 +378,35 @@
     </plurals>
     <string name="enable_news_title">News &amp; announcements</string>
     <string name="enable_news_summary">Receive in-app notifications about critical updates, fixes, and app news.</string>
+    <string name="import_existing_files">Import existing files</string>
+    <string name="import_no_new_songs">No new songs found</string>
+    <string name="import_storage_access_title">All files access required</string>
+    <string name="import_storage_access_summary">Spowlo needs all files access to list the songs already in your download folder. Grant it in settings, then import again.</string>
+    <plurals name="imported_songs">
+        <item quantity="one">Imported %d song</item>
+        <item quantity="other">Imported %d songs</item>
+    </plurals>
+    <string name="redownload">Redownload</string>
+    <string name="update_metadata">Update metadata</string>
+    <string name="updating_metadata">Updating metadata…</string>
+    <string name="metadata_update_count">%1$d of %2$d</string>
+    <plurals name="redownload_confirm_title">
+        <item quantity="one">Redownload this song?</item>
+        <item quantity="other">Redownload %d songs?</item>
+    </plurals>
+    <plurals name="redownload_confirm_message">
+        <item quantity="one">The file in your download folder will be replaced.</item>
+        <item quantity="other">The files in your download folder will be replaced.</item>
+    </plurals>
+    <plurals name="redownload_started">
+        <item quantity="one">Redownloading 1 song</item>
+        <item quantity="other">Redownloading %d songs</item>
+    </plurals>
+    <string name="redownload_partial">Redownloaded %1$d of %2$d songs</string>
+    <plurals name="metadata_updated">
+        <item quantity="one">Updated metadata for 1 song</item>
+        <item quantity="other">Updated metadata for %d songs</item>
+    </plurals>
+    <string name="metadata_updated_partial">Updated metadata for %1$d of %2$d songs</string>
+    <string name="no_spotify_matches">No Spotify matches found</string>
 </resources>

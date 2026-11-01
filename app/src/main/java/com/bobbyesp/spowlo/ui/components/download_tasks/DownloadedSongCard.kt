@@ -21,18 +21,21 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.AutoAwesome
 import androidx.compose.material.icons.outlined.ContentCopy
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.Link
 import androidx.compose.material.icons.outlined.MoreVert
 import androidx.compose.material.icons.outlined.OpenInNew
 import androidx.compose.material.icons.outlined.PlayArrow
+import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material.icons.outlined.Share
 import androidx.compose.material.icons.outlined.Terminal
 import androidx.compose.material.icons.rounded.MusicNote
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Checkbox
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.FilledIconButton
@@ -72,6 +75,8 @@ fun DownloadedSongCard(
     fileSize: Long?,
     selectionMode: Boolean,
     selected: Boolean,
+    isUpdatingMetadata: Boolean,
+    metadataUpdateEnabled: Boolean,
     onSelect: () -> Unit,
     onPlay: () -> Unit,
     onCopyLink: () -> Unit,
@@ -79,6 +84,8 @@ fun DownloadedSongCard(
     onShare: () -> Unit,
     onOpenInSpotify: () -> Unit,
     onDelete: () -> Unit,
+    onRedownload: () -> Unit,
+    onUpdateMetadata: () -> Unit,
 ) {
     val haptic = LocalHapticFeedback.current
     val isFileAvailable = fileSize == null || fileSize > 0L
@@ -145,6 +152,20 @@ fun DownloadedSongCard(
                         contentScale = ContentScale.Crop
                     )
                 }
+                if (isUpdatingMetadata) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(MaterialTheme.colorScheme.scrim.copy(alpha = 0.6f)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(26.dp),
+                            strokeWidth = 2.dp,
+                            color = MaterialTheme.colorScheme.onPrimary
+                        )
+                    }
+                }
                 FilledIconButton(
                     modifier = Modifier
                         .align(Alignment.BottomEnd)
@@ -186,39 +207,40 @@ fun DownloadedSongCard(
                     )
                 }
                 Spacer(Modifier.height(6.dp))
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(MaterialTheme.shapes.extraSmall)
-                        .clickable(enabled = song.songUrl.isNotBlank(), onClick = onCopyLink),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Icon(
-                        modifier = Modifier.size(16.dp),
-                        imageVector = Icons.Outlined.Link,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary
-                    )
-                    Text(
+                if (song.songUrl.isNotBlank()) {
+                    Row(
                         modifier = Modifier
-                            .weight(1f)
-                            .padding(horizontal = 6.dp),
-                        text = song.songUrl.ifBlank { stringResource(R.string.song_url) },
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.primary,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                    IconButton(
-                        modifier = Modifier.size(28.dp),
-                        onClick = onCopyLink,
-                        enabled = song.songUrl.isNotBlank()
+                            .fillMaxWidth()
+                            .clip(MaterialTheme.shapes.extraSmall)
+                            .clickable(onClick = onCopyLink),
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
                         Icon(
                             modifier = Modifier.size(16.dp),
-                            imageVector = Icons.Outlined.ContentCopy,
-                            contentDescription = stringResource(R.string.copy_link)
+                            imageVector = Icons.Outlined.Link,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary
                         )
+                        Text(
+                            modifier = Modifier
+                                .weight(1f)
+                                .padding(horizontal = 6.dp),
+                            text = song.songUrl,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.primary,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                        IconButton(
+                            modifier = Modifier.size(28.dp),
+                            onClick = onCopyLink
+                        ) {
+                            Icon(
+                                modifier = Modifier.size(16.dp),
+                                imageVector = Icons.Outlined.ContentCopy,
+                                contentDescription = stringResource(R.string.copy_link)
+                            )
+                        }
                     }
                 }
                 Spacer(Modifier.height(4.dp))
@@ -265,6 +287,39 @@ fun DownloadedSongCard(
                         enabled = song.songUrl.isNotBlank()
                     )
                     DropdownMenuItem(
+                        text = { Text(stringResource(R.string.redownload)) },
+                        leadingIcon = { Icon(Icons.Outlined.Refresh, null) },
+                        onClick = {
+                            menuExpanded = false
+                            onRedownload()
+                        }
+                    )
+                    DropdownMenuItem(
+                        text = {
+                            Text(
+                                stringResource(
+                                    if (isUpdatingMetadata) R.string.updating_metadata
+                                    else R.string.update_metadata
+                                )
+                            )
+                        },
+                        leadingIcon = {
+                            if (isUpdatingMetadata) {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(18.dp),
+                                    strokeWidth = 2.dp
+                                )
+                            } else {
+                                Icon(Icons.Outlined.AutoAwesome, null)
+                            }
+                        },
+                        onClick = {
+                            menuExpanded = false
+                            onUpdateMetadata()
+                        },
+                        enabled = metadataUpdateEnabled
+                    )
+                    DropdownMenuItem(
                         text = { Text(stringResource(R.string.share_file)) },
                         leadingIcon = { Icon(Icons.Outlined.Share, null) },
                         onClick = {
@@ -297,11 +352,13 @@ fun DownloadedSongCard(
                     label = stringResource(R.string.play_file),
                     onClick = onPlay
                 )
-                FlatButtonChip(
-                    icon = Icons.Outlined.ContentCopy,
-                    label = stringResource(R.string.copy_link),
-                    onClick = onCopyLink
-                )
+                if (song.songUrl.isNotBlank()) {
+                    FlatButtonChip(
+                        icon = Icons.Outlined.ContentCopy,
+                        label = stringResource(R.string.copy_link),
+                        onClick = onCopyLink
+                    )
+                }
                 FlatButtonChip(
                     icon = Icons.Outlined.Terminal,
                     label = stringResource(R.string.open_log),

@@ -26,6 +26,9 @@ interface SongsInfoDao {
     @Query("SELECT * from downloaded_songs_info WHERE id=:id")
     suspend fun getInfoByIdOrNull(id: Int): DownloadedSongInfo?
 
+    @Update
+    suspend fun updateInfo(info: DownloadedSongInfo)
+
     @Query("DELETE FROM downloaded_songs_info WHERE id = :id")
     suspend fun deleteInfoById(id: Int)
 
@@ -34,6 +37,9 @@ interface SongsInfoDao {
 
     @Query("SELECT * FROM downloaded_songs_info WHERE songPath = :path")
     suspend fun getInfoByPath(path: String): DownloadedSongInfo?
+
+    @Query("SELECT songPath FROM downloaded_songs_info")
+    suspend fun getAllPaths(): List<String>
 
     @Transaction
     suspend fun deleteInfoByPathAndInsert(
@@ -48,9 +54,10 @@ interface SongsInfoDao {
     suspend fun insertInfoDistinctByPath(
         songInfo: DownloadedSongInfo,
         path: String = songInfo.songPath
-    ) {
-        if (getInfoByPath(path) == null)
-            insertAll(songInfo)
+    ): Boolean {
+        if (getInfoByPath(path) != null) return false
+        insertAll(songInfo)
+        return true
     }
 
     @Delete

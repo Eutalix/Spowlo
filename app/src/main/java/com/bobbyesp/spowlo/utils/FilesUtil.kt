@@ -5,8 +5,10 @@ import android.content.Context
 import android.content.Intent
 import android.media.MediaScannerConnection
 import android.net.Uri
+import android.os.Build
 import android.os.Environment
 import android.provider.DocumentsContract
+import android.provider.Settings
 import android.util.Log
 import android.webkit.MimeTypeMap
 import androidx.annotation.CheckResult
@@ -233,6 +235,18 @@ object FilesUtil {
         }
         val last: String = path.split("primary:").last()
         return "/storage/emulated/0/$last"
+    }
+
+    fun hasAllFilesAccess(): Boolean =
+        Build.VERSION.SDK_INT < 30 || Environment.isExternalStorageManager()
+
+    fun openAllFilesAccessSettings() {
+        if (Build.VERSION.SDK_INT < 30) return
+        Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION).apply {
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK
+            data = Uri.parse("package:${context.packageName}")
+            if (resolveActivity(context.packageManager) != null) context.startActivity(this)
+        }
     }
 
     fun inputStreamToString(inputStream: InputStream): String {

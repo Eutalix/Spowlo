@@ -242,6 +242,8 @@ dependencies {
 
     implementation(libs.coil.kt.compose)
 
+    implementation(libs.jaudiotagger)
+
     implementation(libs.kotlinx.serialization.json)
 
     implementation(libs.androidx.hilt.navigation.compose)

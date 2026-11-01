@@ -52,6 +52,7 @@ import com.bobbyesp.spowlo.ui.components.PreferencesHintCard
 import com.bobbyesp.spowlo.ui.components.settings.SettingsItemNew
 import com.bobbyesp.spowlo.ui.components.settings.SettingsSwitchWithDivider
 import com.bobbyesp.spowlo.utils.CUSTOM_PATH
+import com.bobbyesp.spowlo.utils.DatabaseUtil
 import com.bobbyesp.spowlo.utils.FilesUtil
 import com.bobbyesp.spowlo.utils.PreferencesUtil
 import com.bobbyesp.spowlo.utils.PreferencesUtil.getString
@@ -135,7 +136,10 @@ fun DownloadsDirectoriesPage(
                     return@let
                 }
                 val path = FilesUtil.getRealPath(it)
-                App.updateDownloadDir(path)
+                if (path != App.audioDownloadDir) {
+                    App.updateDownloadDir(path)
+                    DatabaseUtil.clearHistory()
+                }
                 audioDirectoryText = path
             }
         }

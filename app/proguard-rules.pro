@@ -51,6 +51,12 @@
 # Keep class and method names so user-submitted crash reports stay readable.
 -dontobfuscate
 
+# jaudiotagger resolves ID3 frame copy constructors reflectively when reading v2.3 tags.
+-keep class !org.jaudiotagger.test.**,org.jaudiotagger.** { *; }
+-dontwarn java.awt.**
+-dontwarn javax.imageio.**
+-dontwarn javax.swing.**
+
 # Commons Compress registers zip extra fields by instantiating them reflectively.
 -keep class * implements org.apache.commons.compress.archivers.zip.ZipExtraField {
     <init>();

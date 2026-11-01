@@ -31,13 +31,26 @@ object DatabaseUtil {
 
     fun getMediaInfo() = dao.getAllMedia()
 
+    fun clearHistory() {
+        applicationScope.launch(Dispatchers.IO) {
+            dao.deleteAllMediaFromDb()
+        }
+    }
+
+    suspend fun getMediaPaths(): List<String> = dao.getAllPaths()
+
+    suspend fun insertImportedInfo(info: DownloadedSongInfo): Boolean =
+        dao.insertInfoDistinctByPath(info)
+
+    suspend fun getInfoByPath(path: String): DownloadedSongInfo? = dao.getInfoByPath(path)
+
+    suspend fun updateSongInfo(info: DownloadedSongInfo) = dao.updateInfo(info)
+
     fun getTemplateFlow() = dao.getTemplateFlow()
 
     fun getCookiesFlow() = dao.getCookieProfileFlow()
 
     fun getShortcuts() = dao.getCommandShortcuts()
-
-    fun clearHistory() = dao.deleteAllMediaFromDb()
 
     suspend fun deleteShortcut(shortcut: CommandShortcut) = dao.deleteShortcut(shortcut)
     suspend fun insertShortcut(shortcut: CommandShortcut) = dao.insertShortcut(shortcut)

@@ -2,6 +2,7 @@ package com.bobbyesp.spowlo.utils
 
 import android.content.Context
 import android.database.sqlite.SQLiteDatabase
+import android.media.MediaScannerConnection
 import android.util.Log
 import android.webkit.CookieManager
 import androidx.annotation.CheckResult
@@ -39,6 +40,9 @@ object DownloaderUtil {
     private const val TAG = "DownloaderUtil"
 
     private const val RETRY_DELAY_MS = 1_500L
+
+    const val OVERWRITE_FORCE = "force"
+    const val OVERWRITE_METADATA = "metadata"
 
     private val ANSI_ESCAPE_REGEX = Regex("\\u001B\\[[0-?]*[ -/]*[@-~]")
 
@@ -88,6 +92,7 @@ object DownloaderUtil {
         val generateLRC: Boolean = PreferencesUtil.getValue(GENERATE_LRC),
         val skipAlbumArt: Boolean = PreferencesUtil.getValue(SKIP_ALBUM_ART),
         val outputFormat: String = OUTPUT_FORMAT.getString(),
+        val overwrite: String? = null,
     )
 
     private fun StringBuilder.buildPathExtensions(downloadPreferences: DownloadPreferences) {
@@ -257,6 +262,8 @@ object DownloaderUtil {
     private fun createDownloadRequest(
         url: String,
         downloadPreferences: DownloadPreferences,
+        outputTemplate: String? = null,
+        formatOverride: String? = null,
     ): SpotDLRequest {
         val request = SpotDLRequest()
         val pathBuilder = StringBuilder()
@@ -266,7 +273,11 @@ object DownloaderUtil {
                 addOption("download", url)
 
                 pathBuilder.append(audioDownloadDir)
-                pathBuilder.buildPathExtensions(downloadPreferences)
+                if (outputTemplate.isNullOrBlank()) {
+                    pathBuilder.buildPathExtensions(downloadPreferences)
+                } else {
+                    pathBuilder.append("/").append(outputTemplate)
+                }
 
                 Log.d(TAG, "Download path configured: $pathBuilder")
 
@@ -274,6 +285,7 @@ object DownloaderUtil {
 
                 if (useCookies) useCookies()
                 useJsRuntime()
+                if (overwrite != null) addOption("--overwrite", overwrite)
                 if (useYtMetadata) addOption("--ytm-data")
                 if (dontFilter) addOption("--dont-filter-results")
 
@@ -296,11 +308,10 @@ object DownloaderUtil {
 
                 if (preserveOriginalAudio) {
                     addOption("--bitrate", "disable")
-                    addAudioFormat()
                 } else {
                     addAudioQuality()
-                    addAudioFormat()
                 }
+                if (formatOverride != null) addOption("--format", formatOverride) else addAudioFormat()
 
                 addAudioProvider(downloadPreferences)
             }
@@ -403,6 +414,15 @@ object DownloaderUtil {
         downloadPath: String,
         consoleOutput: String = "",
     ): List<String> {
+        // A re-download overwrites the file in place, so record that exact path.
+        val target = File(downloadPath)
+        if (target.isFile) {
+            MediaScannerConnection.scanFile(context, arrayOf(target.path), null, null)
+            return listOf(target.path).apply {
+                insertInfoIntoDownloadHistory(songInfo, this, consoleOutput)
+            }
+        }
+
         // Fall back to the downloads root if the output template has unresolved placeholders.
         val scanRoot = downloadPath.takeIf { File(it).exists() } ?: audioDownloadDir
         return FilesUtil.scanFileToMediaLibraryPostDownload(
@@ -437,76 +457,126 @@ object DownloaderUtil {
 
     private const val MAX_STORED_LOG_LENGTH = 100_000
 
-    suspend fun executeParallelDownload(songInfo: SpotifySong, name: String) {
+    suspend fun executeParallelDownload(
+        songInfo: SpotifySong,
+        name: String,
+        overwrite: String? = null,
+        showToasts: Boolean = true,
+        overwritePath: String? = null,
+    ): Boolean {
         val url = songInfo.url
         val taskId = Downloader.makeKey(url, url.reversed())
-        ToastUtil.makeToastSuspend(context.getString(R.string.download_started_msg))
+        val metadataOnly = overwrite == OVERWRITE_METADATA
+        val target = overwritePath?.let { inPlaceTarget(it) }
+        // Tagging needs the existing file; otherwise spotDL would download the audio again.
+        if (metadataOnly && target == null) return false
+        if (showToasts) ToastUtil.makeToastSuspend(context.getString(R.string.download_started_msg))
 
-        val downloadPreferences = DownloadPreferences()
+        val downloadPreferences = DownloadPreferences().let {
+            if (overwrite != null) it.copy(overwrite = overwrite) else it
+        }
         val metadataFile = writeMetadataFile(taskId, listOf(songInfo))
         val pathBuilder = StringBuilder().append(audioDownloadDir).also {
-            it.buildPathExtensions(downloadPreferences)
+            if (target == null) it.buildPathExtensions(downloadPreferences)
+            else it.append("/").append(target.template)
         }
-        val request = createDownloadRequest(metadataFile.absolutePath, downloadPreferences).apply {
+        val request = createDownloadRequest(
+            url = metadataFile.absolutePath,
+            downloadPreferences = downloadPreferences,
+            outputTemplate = target?.template,
+            formatOverride = target?.format,
+        ).apply {
             addOption("--threads", downloadPreferences.threads.toString())
         }
+        val callback: ((Float, Long, String) -> Unit)? = if (metadataOnly) {
+            null
+        } else {
+            { progress, _, text ->
+                NotificationsUtil.makeNotificationForParallelDownloads(
+                    notificationId = taskId.hashCode(),
+                    taskId = taskId,
+                    progress = if (text.contains('%')) (progress * 100).roundToInt() else null,
+                    text = context.getString(R.string.downloading),
+                    title = name,
+                )
+                Downloader.updateTaskOutput(
+                    url = url, line = text, progress = progress, isPlaylist = false
+                )
+            }
+        }
 
-        Downloader.onProcessStarted()
-        Downloader.onTaskStarted(
-            url = url,
-            name = songInfo.name.ifBlank { name },
-            artist = songInfo.artist,
-            artworkUrl = songInfo.cover_url,
-        )
-        
+        if (!metadataOnly) {
+            Downloader.onProcessStarted()
+            Downloader.onTaskStarted(
+                url = url,
+                name = songInfo.name.ifBlank { name },
+                artist = songInfo.artist,
+                artworkUrl = songInfo.cover_url,
+            )
+        }
+
         var downloadSucceeded = false
         runCatching {
             val response = retryTransient(
-                onRetry = { showRetry(taskId, name, url, isPlaylist = false) },
-                shouldRetry = { Downloader.isTaskRunning(url) },
+                onRetry = { if (!metadataOnly) showRetry(taskId, name, url, isPlaylist = false) },
+                shouldRetry = { metadataOnly || Downloader.isTaskRunning(url) },
             ) {
                 runCatching {
                     SpotDL.getInstance().execute(
                         request = request,
                         processId = taskId,
-                        callback = { progress, _, text ->
-                            NotificationsUtil.makeNotificationForParallelDownloads(
-                                notificationId = taskId.hashCode(),
-                                taskId = taskId,
-                                progress = if (text.contains('%')) (progress * 100).roundToInt() else null,
-                                text = context.getString(R.string.downloading),
-                                title = name,
-                            )
-                            Downloader.updateTaskOutput(
-                                url = url, line = text, progress = progress, isPlaylist = false
-                            )
-                        })
+                        callback = callback,
+                    )
                 }
             }.getOrThrow()
-            val finalResponse = removeDuplicateLines(clearLinesWithEllipsis(response.output))
-            onFinishDownloading(
-                preferences = downloadPreferences,
-                songInfo = songInfo,
-                downloadPath = buildPathForDatabase(pathBuilder.toString(), songInfo),
-                consoleOutput = finalResponse,
-            )
-            downloadSucceeded = Downloader.onTaskEnded(url, finalResponse, name)
+            if (metadataOnly) {
+                downloadSucceeded = true
+            } else {
+                val finalResponse = removeDuplicateLines(clearLinesWithEllipsis(response.output))
+                onFinishDownloading(
+                    preferences = downloadPreferences,
+                    songInfo = songInfo,
+                    downloadPath = buildPathForDatabase(pathBuilder.toString(), songInfo, target?.format),
+                    consoleOutput = finalResponse,
+                )
+                downloadSucceeded = Downloader.onTaskEnded(url, finalResponse, name)
+            }
         }.onFailure {
             if (it is CanceledException) return@onFailure
-            Log.e(TAG, "Parallel download failed", it)
-            ToastUtil.makeToastSuspend(context.getString(R.string.download_error_msg))
-            Downloader.onTaskError(
-                message = context.getString(R.string.download_error_msg),
-                details = it.taskDetails(),
-                url = url,
-            )
+            Log.e(TAG, if (metadataOnly) "Metadata update failed" else "Parallel download failed", it)
+            if (!metadataOnly) {
+                ToastUtil.makeToastSuspend(context.getString(R.string.download_error_msg))
+                Downloader.onTaskError(
+                    message = context.getString(R.string.download_error_msg),
+                    details = it.taskDetails(),
+                    url = url,
+                )
+            }
         }
-        Downloader.onProcessEnded()
+        if (!metadataOnly) Downloader.onProcessEnded()
         metadataFile.delete()
-        if (downloadSucceeded) {
+        if (downloadSucceeded && showToasts) {
             ToastUtil.makeToastSuspend(context.getString(R.string.download_finished_msg))
         }
+        return downloadSucceeded
     }
+
+    private data class InPlaceTarget(val template: String, val format: String)
+
+    private fun inPlaceTarget(path: String): InPlaceTarget? {
+        if (path.isBlank()) return null
+        val file = File(path)
+        val format = file.extension.lowercase()
+        if (!file.isFile || format !in AUDIO_EXTENSIONS) return null
+        if (path.contains('{') || path.contains('}') || file.name.startsWith(".")) return null
+        val root = File(audioDownloadDir).path.trimEnd('/')
+        if (!file.path.startsWith("$root/")) return null
+        val name = file.path.removePrefix("$root/").removeSuffix(".${file.extension}")
+        // spotDL drops templates without variables into a folder of that name.
+        return InPlaceTarget("$name.{output-ext}", format)
+    }
+
+    fun canEmbedMetadata(path: String): Boolean = inPlaceTarget(path) != null
 
     private fun overallProgress(text: String, progress: Float): Int? {
         if (!text.contains("Total")) return null
@@ -691,7 +761,11 @@ object DownloaderUtil {
         return input.split("\n").distinct().joinToString("\n")
     }
 
-    fun buildPathForDatabase(path: String, songInfo: SpotifySong = SpotifySong()): String {
+    fun buildPathForDatabase(
+        path: String,
+        songInfo: SpotifySong = SpotifySong(),
+        extension: String? = getExtension(),
+    ): String {
         var newPath = path
 
         newPath = newPath.replace("\\{album\\}".toRegex(), songInfo.album_name)
@@ -701,7 +775,7 @@ object DownloaderUtil {
         newPath = newPath.replace("\\{album-artist\\}".toRegex(), songInfo.album_artist)
         newPath = newPath.replace("\\{genre\\}".toRegex(), songInfo.genres?.joinToString() ?: "")
         newPath = newPath.replace("\\{year\\}".toRegex(), songInfo.year?.toString() ?: "0")
-        newPath = newPath.replace("\\{output-ext\\}".toRegex(), getExtension() ?: "")
+        newPath = newPath.replace("\\{output-ext\\}".toRegex(), extension ?: "")
 
         return newPath
     }

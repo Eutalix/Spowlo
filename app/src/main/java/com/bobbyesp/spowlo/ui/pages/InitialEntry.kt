@@ -64,6 +64,8 @@ import com.bobbyesp.spowlo.ui.pages.settings.downloader.DownloaderSettingsPage
 import com.bobbyesp.spowlo.ui.pages.settings.general.GeneralSettingsPage
 import com.bobbyesp.spowlo.ui.pages.settings.updater.UpdaterPage
 import com.bobbyesp.spowlo.utils.DEPENDENCIES_INITIALIZED
+import com.bobbyesp.spowlo.utils.HISTORY_IMPORT_DONE
+import com.bobbyesp.spowlo.utils.HistoryImporter
 import com.bobbyesp.spowlo.utils.NOTIFICATION_PROMPT_SHOWN
 import com.bobbyesp.spowlo.utils.NotificationsUtil
 import com.bobbyesp.spowlo.utils.PreferencesUtil
@@ -118,6 +120,16 @@ fun InitialEntry(
                 launchSingleTop = true
             }
         }
+    }
+
+    LaunchedEffect(Unit) {
+        if (PreferencesUtil.getValue(HISTORY_IMPORT_DONE) ||
+            !HistoryImporter.hasReadableSource()
+        ) {
+            return@LaunchedEffect
+        }
+        HistoryImporter.importExistingFiles()
+        PreferencesUtil.updateValue(HISTORY_IMPORT_DONE, true)
     }
 
     val downloaderState by Downloader.downloaderState.collectAsStateWithLifecycle()
