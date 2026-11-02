@@ -8,38 +8,99 @@ import com.bobbyesp.spowlo.Downloader
 import com.bobbyesp.spowlo.R
 import com.bobbyesp.spowlo.database.DownloadedSongInfo
 import com.bobbyesp.spowlo.utils.DatabaseUtil
+import com.bobbyesp.spowlo.utils.FilesUtil.getFileSize
 import com.bobbyesp.spowlo.utils.HistoryMetadataMatcher
 import com.bobbyesp.spowlo.utils.HistoryMetadataMatcher.withTrackMetadata
+import com.bobbyesp.spowlo.utils.PreferencesUtil
 import com.bobbyesp.spowlo.utils.ToastUtil
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.text.Normalizer
+import java.time.Instant
+import java.time.ZoneId
+import java.util.Locale
+
+enum class LibrarySort(val persistedValue: Int) {
+    NEWEST(0),
+    OLDEST(1),
+    TITLE(2),
+    ARTIST(3),
+    DURATION(4),
+    SIZE(5);
+
+    companion object {
+        fun fromPersisted(value: Int): LibrarySort =
+            entries.firstOrNull { it.persistedValue == value } ?: NEWEST
+    }
+}
+
+data class LibraryState(
+    val songs: List<DownloadedSongInfo> = emptyList(),
+    val allSongs: List<DownloadedSongInfo> = emptyList(),
+    val sections: List<LibrarySection> = emptyList(),
+    val query: String = "",
+    /** Empty string filters for entries without a known artist, `null` shows every artist. */
+    val author: String? = null,
+    val sort: LibrarySort = LibrarySort.NEWEST,
+) {
+    val totalCount: Int get() = allSongs.size
+    val isFiltered: Boolean get() = query.isNotBlank() || author != null
+    /** Date sorts are grouped under one header per day, other sorts stay a flat list. */
+    val groupedByDay: Boolean get() = sort == LibrarySort.NEWEST || sort == LibrarySort.OLDEST
+}
+
+data class LibrarySection(val dayStart: Long, val songs: List<DownloadedSongInfo>)
+
+data class ArtistEntry(val name: String, val count: Int)
+
+private val DIACRITICS = Regex("\\p{M}+")
 
 class DownloadsViewModel : ViewModel() {
 
     private val mediaInfoFlow = DatabaseUtil.getMediaInfo()
 
-    val songsListFlow = mediaInfoFlow.map { infoList ->
-        infoList.sortedWith(
-            compareByDescending<DownloadedSongInfo> { it.downloadedAt }
-                .thenByDescending { it.id }
-        )
-    }
-
-    val filterSetFlow = mediaInfoFlow.map { infoList ->
-        infoList.map { it.songAuthor }.filter { it.isNotBlank() }.distinct()
-    }
-
-    private val mutableStateFlow = MutableStateFlow(ViewState())
-    val stateFlow = mutableStateFlow.asStateFlow()
-
-    data class ViewState(
-        val activeFilterIndex: Int = -1
+    private val queryFlow = MutableStateFlow("")
+    private val authorFlow = MutableStateFlow<String?>(null)
+    private val sortFlow = MutableStateFlow(
+        LibrarySort.fromPersisted(PreferencesUtil.getLibrarySort())
     )
+
+    val fileSizes: StateFlow<Map<Int, Long>> = mediaInfoFlow
+        .map { songs ->
+            withContext(Dispatchers.IO) {
+                songs.associate { info ->
+                    info.id to runCatching { info.songPath.getFileSize() }.getOrDefault(0L)
+                }
+            }
+        }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyMap())
+
+    val library: StateFlow<LibraryState> = combine(
+        mediaInfoFlow, queryFlow, authorFlow, sortFlow, fileSizes
+    ) { songs, query, author, sort, sizes ->
+        buildLibraryState(songs, query, author, sort, sizes)
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), LibraryState())
+
+    /** Every artist in the library with its song count, unknown artists last. */
+    val artists: StateFlow<List<ArtistEntry>> = mediaInfoFlow
+        .map { songs ->
+            songs.groupingBy { it.songAuthor.trim() }.eachCount()
+                .map { (name, count) -> ArtistEntry(name, count) }
+                .sortedWith(
+                    compareBy<ArtistEntry> { it.name.isEmpty() }
+                        .thenBy(String.CASE_INSENSITIVE_ORDER) { it.name }
+                )
+        }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     data class MetadataProgress(
         val total: Int = 0,
@@ -52,10 +113,22 @@ class DownloadsViewModel : ViewModel() {
     private val _metadataProgress = MutableStateFlow(MetadataProgress())
     val metadataProgress = _metadataProgress.asStateFlow()
 
-    fun clickAuthorFilter(index: Int) {
-        mutableStateFlow.update {
-            it.copy(activeFilterIndex = if (it.activeFilterIndex == index) -1 else index)
-        }
+    fun setQuery(query: String) {
+        queryFlow.value = query
+    }
+
+    fun setAuthor(author: String?) {
+        authorFlow.value = author
+    }
+
+    fun setSort(sort: LibrarySort) {
+        sortFlow.value = sort
+        PreferencesUtil.setLibrarySort(sort.persistedValue)
+    }
+
+    fun clearFilters() {
+        queryFlow.value = ""
+        authorFlow.value = null
     }
 
     fun updateMetadata(ids: List<Int>) {
@@ -125,9 +198,86 @@ class DownloadsViewModel : ViewModel() {
     fun deleteItems(ids: Collection<Int>, deleteFile: Boolean) {
         if (ids.isEmpty()) return
         viewModelScope.launch(Dispatchers.IO) {
-            withContext(Dispatchers.IO) {
-                DatabaseUtil.deleteInfoListByIdList(ids.toList(), deleteFile)
-            }
+            DatabaseUtil.deleteInfoListByIdList(ids.toList(), deleteFile)
         }
     }
+
+    private fun buildLibraryState(
+        songs: List<DownloadedSongInfo>,
+        query: String,
+        author: String?,
+        sort: LibrarySort,
+        sizes: Map<Int, Long>,
+    ): LibraryState {
+        val tokens = normalizeSearchText(query).split(' ').filter { it.isNotBlank() }
+        val visible = songs.filter { song ->
+            (author == null || song.songAuthor.trim() == author) &&
+                (tokens.isEmpty() || song.matchesAll(tokens))
+        }
+        val sorted = visible.sortedWith(comparatorFor(sort, sizes))
+        return LibraryState(
+            songs = sorted,
+            allSongs = songs,
+            sections = if (sort == LibrarySort.NEWEST || sort == LibrarySort.OLDEST) {
+                groupByDay(sorted)
+            } else {
+                listOf(LibrarySection(dayStart = 0L, songs = sorted))
+            },
+            query = query,
+            author = author,
+            sort = sort,
+        )
+    }
+
+    private fun groupByDay(songs: List<DownloadedSongInfo>): List<LibrarySection> =
+        songs.groupBy { dayStartOf(it.downloadedAt) }
+            .map { (dayStart, daySongs) -> LibrarySection(dayStart, daySongs) }
+
+    private fun comparatorFor(
+        sort: LibrarySort,
+        sizes: Map<Int, Long>,
+    ): Comparator<DownloadedSongInfo> = when (sort) {
+        // Entries without a download time stay at the bottom of either date order.
+        LibrarySort.NEWEST -> compareBy<DownloadedSongInfo> { it.downloadedAt <= 0L }
+            .thenByDescending { it.downloadedAt }
+            .thenByDescending { it.id }
+
+        LibrarySort.OLDEST -> compareBy<DownloadedSongInfo> { it.downloadedAt <= 0L }
+            .thenBy { it.downloadedAt }
+            .thenBy { it.id }
+
+        LibrarySort.TITLE -> compareBy(String.CASE_INSENSITIVE_ORDER) { song: DownloadedSongInfo ->
+            song.songName
+        }.thenBy(String.CASE_INSENSITIVE_ORDER) { it.songAuthor }
+
+        LibrarySort.ARTIST -> compareBy(String.CASE_INSENSITIVE_ORDER) { song: DownloadedSongInfo ->
+            song.songAuthor.trim()
+        }.thenBy(String.CASE_INSENSITIVE_ORDER) { it.songName }
+
+        LibrarySort.DURATION -> compareByDescending<DownloadedSongInfo> { it.songDuration }
+            .thenBy(String.CASE_INSENSITIVE_ORDER) { it.songName }
+
+        LibrarySort.SIZE -> compareByDescending<DownloadedSongInfo> { sizes[it.id] ?: 0L }
+            .thenBy(String.CASE_INSENSITIVE_ORDER) { it.songName }
+    }
 }
+
+private fun DownloadedSongInfo.matchesAll(tokens: List<String>): Boolean {
+    val haystack = normalizeSearchText("$songName $songAuthor")
+    return tokens.all { haystack.contains(it) }
+}
+
+/** Local midnight of the day the song was downloaded, `0` when the timestamp is unknown. */
+private fun dayStartOf(timestamp: Long): Long =
+    if (timestamp <= 0L) 0L
+    else Instant.ofEpochMilli(timestamp)
+        .atZone(ZoneId.systemDefault())
+        .toLocalDate()
+        .atStartOfDay(ZoneId.systemDefault())
+        .toInstant()
+        .toEpochMilli()
+
+private fun normalizeSearchText(value: String): String =
+    Normalizer.normalize(value, Normalizer.Form.NFD)
+        .replace(DIACRITICS, "")
+        .lowercase(Locale.ROOT)

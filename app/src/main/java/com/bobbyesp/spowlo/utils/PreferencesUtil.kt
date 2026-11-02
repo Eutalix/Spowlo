@@ -83,6 +83,8 @@ const val LAST_UPDATE_CHECK_TIME = "last_update_check_time"
 const val DEPENDENCIES_INITIALIZED = "dependencies_initialized"
 const val HISTORY_IMPORT_DONE = "history_import_done"
 
+const val LIBRARY_SORT = "library_sort"
+
 // News Constants
 const val ENABLE_NEWS = "enable_news"
 const val LAST_NEWS_ID = "last_news_id"
@@ -183,6 +185,9 @@ object PreferencesUtil {
     
     fun setUpdateFrequency(freq: Int) = kv.encode(UPDATE_FREQUENCY, freq)
     fun getUpdateFrequency(): Int = kv.decodeInt(UPDATE_FREQUENCY, FREQ_DAILY)
+
+    fun getLibrarySort(): Int = LIBRARY_SORT.getInt()
+    fun setLibrarySort(sort: Int) = LIBRARY_SORT.updateInt(sort)
 
     // News Methods
     fun setLastNewsId(id: Int) = kv.encode(LAST_NEWS_ID, id)
