@@ -123,13 +123,14 @@ fun BottomSheet(
     modifier: Modifier = Modifier,
     onDismiss: () -> Unit,
     state: SheetState = androidx.compose.material3.rememberModalBottomSheetState(),
+    dragHandle: @Composable (() -> Unit)? = { BottomSheetDefaults.DragHandle() },
     content: @Composable ColumnScope.() -> Unit
 ) {
     ModalBottomSheet(
         modifier = modifier,
         onDismissRequest = { onDismiss() },
         sheetState = state,
-        dragHandle = { BottomSheetDefaults.DragHandle() },
+        dragHandle = dragHandle,
     ) {
         content()
     }

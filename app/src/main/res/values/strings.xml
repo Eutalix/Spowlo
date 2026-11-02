@@ -409,4 +409,30 @@
     </plurals>
     <string name="metadata_updated_partial">Updated metadata for %1$d of %2$d songs</string>
     <string name="no_spotify_matches">No Spotify matches found</string>
+    <string name="search_downloads">Search downloads</string>
+    <string name="close_search">Close search</string>
+    <string name="clear_search">Clear search</string>
+    <string name="sort_by">Sort by</string>
+    <string name="sort_newest">Newest first</string>
+    <string name="sort_oldest">Oldest first</string>
+    <string name="sort_title">Title A–Z</string>
+    <string name="sort_artist">Artist A–Z</string>
+    <string name="sort_duration">Longest first</string>
+    <string name="sort_size">Largest first</string>
+    <string name="no_matching_songs">No songs match your filters</string>
+    <string name="clear_filters">Clear filters</string>
+    <string name="library_count_filtered">%1$d of %2$d</string>
+    <string name="all_artists">All artists</string>
+    <string name="unknown_artist">Unknown artist</string>
+    <string name="search_artists">Search artists</string>
+    <string name="today">Today</string>
+    <string name="yesterday">Yesterday</string>
+    <string name="unknown_date">Unknown date</string>
+    <string name="export_playlist">Export playlist (.m3u)</string>
+    <string name="export_csv">Export spreadsheet (.csv)</string>
+    <string name="export_failed">Could not export</string>
+    <plurals name="exported_songs">
+        <item quantity="one">Exported 1 song</item>
+        <item quantity="other">Exported %d songs</item>
+    </plurals>
 </resources>

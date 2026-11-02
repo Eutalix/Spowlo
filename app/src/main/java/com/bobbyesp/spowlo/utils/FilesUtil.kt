@@ -93,6 +93,23 @@ object FilesUtil {
         )
     }
 
+    fun createIntentForSharingFiles(paths: List<String>): Intent? {
+        val uris = paths.mapNotNull { createIntentForFile(it)?.data }
+        if (uris.isEmpty()) return null
+        return Intent(Intent.ACTION_SEND_MULTIPLE).apply {
+            type = "audio/*"
+            putParcelableArrayListExtra(Intent.EXTRA_STREAM, ArrayList(uris))
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            clipData = ClipData(
+                null,
+                arrayOf("audio/*"),
+                ClipData.Item(uris.first())
+            ).apply {
+                uris.drop(1).forEach { addItem(ClipData.Item(it)) }
+            }
+        }
+    }
+
     fun Context.getFileProvider() = "$packageName.provider"
 
     fun createIntentForShareAudioFile(path: String?): Intent? = createIntentForFile(path)?.apply {

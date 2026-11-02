@@ -1,13 +1,18 @@
 package com.bobbyesp.spowlo.ui.pages.download_tasks
 
 import android.content.Intent
+import android.net.Uri
 import android.os.Build
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -18,32 +23,54 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.ArrowDropDown
 import androidx.compose.material.icons.outlined.AutoAwesome
 import androidx.compose.material.icons.outlined.Checklist
+import androidx.compose.material.icons.outlined.Clear
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.DeleteSweep
+import androidx.compose.material.icons.outlined.Description
 import androidx.compose.material.icons.outlined.DownloadForOffline
 import androidx.compose.material.icons.outlined.Folder
 import androidx.compose.material.icons.outlined.LibraryAdd
+import androidx.compose.material.icons.outlined.MoreVert
 import androidx.compose.material.icons.outlined.NotificationsActive
+import androidx.compose.material.icons.outlined.Person
+import androidx.compose.material.icons.outlined.QueueMusic
 import androidx.compose.material.icons.outlined.Refresh
-import androidx.compose.material3.BottomAppBar
+import androidx.compose.material.icons.outlined.Search
+import androidx.compose.material.icons.outlined.Share
+import androidx.compose.material.icons.outlined.Sort
+import androidx.compose.material3.AssistChip
+import androidx.compose.material3.AssistChipDefaults
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.InputChip
+import androidx.compose.material3.InputChipDefaults
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -57,16 +84,23 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -78,20 +112,24 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.bobbyesp.spowlo.Downloader
 import com.bobbyesp.spowlo.R
 import com.bobbyesp.spowlo.database.DownloadedSongInfo
-import com.bobbyesp.spowlo.ui.components.AudioFilterChip
 import com.bobbyesp.spowlo.ui.components.BackButton
 import com.bobbyesp.spowlo.ui.components.ConfirmButton
 import com.bobbyesp.spowlo.ui.components.DismissButton
 import com.bobbyesp.spowlo.ui.components.MultiChoiceItem
 import com.bobbyesp.spowlo.ui.components.SpowloDialog
+import com.bobbyesp.spowlo.ui.components.download_tasks.ArtistSheet
 import com.bobbyesp.spowlo.ui.components.download_tasks.DownloadedSongCard
 import com.bobbyesp.spowlo.ui.components.download_tasks.DownloadingTaskItem
+import com.bobbyesp.spowlo.ui.components.download_tasks.SortSheet
 import com.bobbyesp.spowlo.ui.components.download_tasks.TaskState
+import com.bobbyesp.spowlo.ui.components.download_tasks.artistLabel
+import com.bobbyesp.spowlo.ui.components.download_tasks.sortLabel
 import com.bobbyesp.spowlo.ui.dialogs.NotificationPermissionDialog
 import com.bobbyesp.spowlo.ui.dialogs.rememberNotificationPermissionRequest
+import com.bobbyesp.spowlo.utils.ExportFormat
 import com.bobbyesp.spowlo.utils.FilesUtil
-import com.bobbyesp.spowlo.utils.FilesUtil.getFileSize
 import com.bobbyesp.spowlo.utils.HistoryImporter
+import com.bobbyesp.spowlo.utils.LibraryExporter
 import com.bobbyesp.spowlo.utils.NOTIFICATION
 import com.bobbyesp.spowlo.utils.NOTIFICATION_HINT_DISMISSED
 import com.bobbyesp.spowlo.utils.NOTIFICATION_PERMISSION_REQUESTED
@@ -102,8 +140,13 @@ import com.bobbyesp.spowlo.utils.toFileSizeText
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.time.Instant
+import java.time.LocalDate
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
+import java.time.format.FormatStyle
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
 fun DownloadTasksPage(
     onGoBack: () -> Unit = {},
@@ -113,15 +156,18 @@ fun DownloadTasksPage(
     val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior()
     val clipboardManager = LocalClipboardManager.current
     val context = LocalContext.current
+    val focusManager = LocalFocusManager.current
     val uriHandler = LocalUriHandler.current
 
-    val viewState by downloadsViewModel.stateFlow.collectAsStateWithLifecycle()
-    val songsList by downloadsViewModel.songsListFlow.collectAsStateWithLifecycle(
-        initialValue = emptyList()
-    )
-    val filterSet by downloadsViewModel.filterSetFlow.collectAsStateWithLifecycle(
-        initialValue = emptyList()
-    )
+    val library by downloadsViewModel.library.collectAsStateWithLifecycle()
+    val artists by downloadsViewModel.artists.collectAsStateWithLifecycle()
+    val songsList = library.allSongs
+    val fileSizes by downloadsViewModel.fileSizes.collectAsStateWithLifecycle()
+
+    var isSearchActive by rememberSaveable { mutableStateOf(false) }
+    var showSortSheet by remember { mutableStateOf(false) }
+    var showArtistSheet by remember { mutableStateOf(false) }
+    var selectionMenuExpanded by remember { mutableStateOf(false) }
 
     var isSelectEnabled by remember { mutableStateOf(false) }
     val selectedItemIds = remember { mutableStateListOf<Int>() }
@@ -170,28 +216,12 @@ fun DownloadTasksPage(
             }
         }
 
-    val selectedAuthor = filterSet.getOrNull(viewState.activeFilterIndex)
-    val filteredSongs = remember(songsList, selectedAuthor) {
-        if (selectedAuthor.isNullOrBlank()) songsList
-        else songsList.filter { it.songAuthor == selectedAuthor }
-    }
-
-    var fileSizes by remember { mutableStateOf<Map<Int, Long>>(emptyMap()) }
-    LaunchedEffect(songsList) {
-        val sizes = withContext(Dispatchers.IO) {
-            songsList.associate { info ->
-                info.id to runCatching { info.songPath.getFileSize() }.getOrDefault(0L)
-            }
-        }
-        fileSizes = sizes
-    }
-
     LaunchedEffect(songsList) {
         val validIds = songsList.map { it.id }.toSet()
         selectedItemIds.retainAll(validIds)
     }
 
-    val visibleIds = filteredSongs.map { it.id }
+    val visibleIds = library.songs.map { it.id }
     val selectedVisibleCount = selectedItemIds.count { it in visibleIds }
     val checkBoxState = when {
         selectedVisibleCount == 0 -> androidx.compose.ui.state.ToggleableState.Off
@@ -204,6 +234,11 @@ fun DownloadTasksPage(
     val closeSelectionMode = {
         isSelectEnabled = false
         selectedItemIds.clear()
+    }
+
+    val exitSearch = {
+        isSearchActive = false
+        downloadsViewModel.setQuery("")
     }
 
     val importExistingFiles: () -> Unit = {
@@ -228,8 +263,8 @@ fun DownloadTasksPage(
         }
     }
 
-    BackHandler(isSelectEnabled) {
-        closeSelectionMode()
+    BackHandler(isSelectEnabled || isSearchActive) {
+        if (isSelectEnabled) closeSelectionMode() else exitSearch()
     }
 
     val updateMetadata: (List<Int>) -> Unit = { ids -> downloadsViewModel.updateMetadata(ids) }
@@ -252,6 +287,88 @@ fun DownloadTasksPage(
         ToastUtil.makeToast(context, context.getString(R.string.link_copied))
     }
 
+    val songCard: @Composable (DownloadedSongInfo) -> Unit = { song ->
+        DownloadedSongCard(
+            song = song,
+            fileSize = fileSizes[song.id],
+            selectionMode = isSelectEnabled,
+            selected = selectedItemIds.contains(song.id),
+            isUpdatingMetadata = metadataProgress.inProgressId == song.id,
+            metadataUpdateEnabled = !isUpdatingMetadata,
+            onSelect = {
+                if (!isSelectEnabled) isSelectEnabled = true
+                if (!selectedItemIds.remove(song.id)) selectedItemIds.add(song.id)
+            },
+            onPlay = { playFile(song) },
+            onCopyLink = { copyLink(song) },
+            onShowLog = { onNavigateToLog("history_${song.id}") },
+            onShare = {
+                FilesUtil.createIntentForSharingFile(song.songPath)?.let { intent ->
+                    context.startActivity(
+                        Intent.createChooser(
+                            intent,
+                            context.getString(R.string.share_file)
+                        )
+                    )
+                }
+            },
+            onOpenInSpotify = {
+                runCatching { uriHandler.openUri(song.songUrl) }
+                    .onFailure {
+                        ToastUtil.makeToastSuspend(
+                            context.getString(R.string.file_unavailable)
+                        )
+                    }
+            },
+            onDelete = {
+                pendingDeleteIds = listOf(song.id)
+                deleteFile = false
+                showDeleteDialog = true
+            },
+            onRedownload = { requestRedownload(listOf(song.id)) },
+            onUpdateMetadata = { updateMetadata(listOf(song.id)) },
+        )
+    }
+
+    val selectedSongs = songsList.filter { it.id in selectedItemIds }
+
+    val shareSelection: () -> Unit = {
+        val intent = FilesUtil.createIntentForSharingFiles(selectedSongs.map { it.songPath })
+        if (intent == null) {
+            ToastUtil.makeToast(context, context.getString(R.string.file_unavailable))
+        } else {
+            context.startActivity(Intent.createChooser(intent, context.getString(R.string.share)))
+        }
+    }
+
+    val exportSelection: (ExportFormat, Uri) -> Unit = { format, uri ->
+        scope.launch {
+            val written = withContext(Dispatchers.IO) {
+                runCatching {
+                    context.contentResolver.openOutputStream(uri)?.use { stream ->
+                        stream.write(LibraryExporter.build(selectedSongs, format).toByteArray())
+                    } ?: error("Could not open $uri")
+                }.isSuccess
+            }
+            val message = if (written) {
+                context.resources.getQuantityString(
+                    R.plurals.exported_songs, selectedSongs.size, selectedSongs.size
+                )
+            } else {
+                context.getString(R.string.export_failed)
+            }
+            ToastUtil.makeToast(context, message)
+        }
+    }
+
+    val exportM3u = rememberLauncherForActivityResult(
+        ActivityResultContracts.CreateDocument(ExportFormat.M3U.mimeType)
+    ) { uri -> uri?.let { exportSelection(ExportFormat.M3U, it) } }
+
+    val exportCsv = rememberLauncherForActivityResult(
+        ActivityResultContracts.CreateDocument(ExportFormat.CSV.mimeType)
+    ) { uri -> uri?.let { exportSelection(ExportFormat.CSV, it) } }
+
     Scaffold(
         modifier = Modifier
             .fillMaxSize()
@@ -259,51 +376,88 @@ fun DownloadTasksPage(
         topBar = {
             TopAppBar(
                 title = {
-                    Text(
-                        text = if (isSelectEnabled) {
-                            stringResource(R.string.multiselect_item_count).format(
-                                selectedItemIds.size
-                            )
-                        } else {
-                            stringResource(R.string.downloads)
-                        },
-                        style = MaterialTheme.typography.titleMedium.copy(fontSize = 18.sp)
-                    )
+                    if (isSearchActive && !isSelectEnabled) {
+                        SearchField(
+                            query = library.query,
+                            onQueryChange = downloadsViewModel::setQuery,
+                            onSearch = { focusManager.clearFocus() }
+                        )
+                    } else {
+                        Text(
+                            text = if (isSelectEnabled) {
+                                stringResource(R.string.multiselect_item_count).format(
+                                    selectedItemIds.size
+                                )
+                            } else {
+                                stringResource(R.string.downloads)
+                            },
+                            style = MaterialTheme.typography.titleMedium.copy(fontSize = 18.sp)
+                        )
+                    }
                 }, navigationIcon = {
-                    if (isSelectEnabled) {
-                        IconButton(onClick = { closeSelectionMode() }) {
+                    when {
+                        isSelectEnabled -> IconButton(onClick = { closeSelectionMode() }) {
                             Icon(
                                 imageVector = Icons.Outlined.Close,
                                 contentDescription = stringResource(R.string.close)
                             )
                         }
-                    } else {
-                        BackButton {
+
+                        isSearchActive -> IconButton(onClick = exitSearch) {
+                            Icon(
+                                imageVector = Icons.Outlined.Close,
+                                contentDescription = stringResource(R.string.close_search)
+                            )
+                        }
+
+                        else -> BackButton {
                             onGoBack()
                         }
                     }
                 }, actions = {
-                    if (!isSelectEnabled) {
-                        IconButton(onClick = importExistingFiles, enabled = !isImporting) {
-                            if (isImporting) {
-                                CircularProgressIndicator(
-                                    modifier = Modifier.size(20.dp),
-                                    strokeWidth = 2.dp
-                                )
-                            } else {
+                    if (isSearchActive && !isSelectEnabled) {
+                        if (library.query.isNotEmpty()) {
+                            IconButton(onClick = { downloadsViewModel.setQuery("") }) {
                                 Icon(
-                                    imageVector = Icons.Outlined.LibraryAdd,
-                                    contentDescription = stringResource(R.string.import_existing_files)
+                                    imageVector = Icons.Outlined.Clear,
+                                    contentDescription = stringResource(R.string.clear_search)
                                 )
                             }
                         }
-                    }
-                    if (!isSelectEnabled && songsList.isNotEmpty()) {
-                        IconButton(onClick = { isSelectEnabled = true }) {
-                            Icon(
-                                imageVector = Icons.Outlined.Checklist,
-                                contentDescription = stringResource(R.string.multiselect_mode)
-                            )
+                    } else {
+                        if (!isSelectEnabled) {
+                            if (songsList.isNotEmpty()) {
+                                IconButton(onClick = { isSearchActive = true }) {
+                                    Icon(
+                                        imageVector = Icons.Outlined.Search,
+                                        contentDescription = stringResource(R.string.search_downloads)
+                                    )
+                                }
+                            }
+                            IconButton(onClick = importExistingFiles, enabled = !isImporting) {
+                                if (isImporting) {
+                                    CircularProgressIndicator(
+                                        modifier = Modifier.size(20.dp),
+                                        strokeWidth = 2.dp
+                                    )
+                                } else {
+                                    Icon(
+                                        imageVector = Icons.Outlined.LibraryAdd,
+                                        contentDescription = stringResource(R.string.import_existing_files)
+                                    )
+                                }
+                            }
+                        }
+                        if (!isSelectEnabled && songsList.isNotEmpty()) {
+                            IconButton(onClick = {
+                                focusManager.clearFocus()
+                                isSelectEnabled = true
+                            }) {
+                                Icon(
+                                    imageVector = Icons.Outlined.Checklist,
+                                    contentDescription = stringResource(R.string.multiselect_mode)
+                                )
+                            }
                         }
                     }
                 }, scrollBehavior = scrollBehavior
@@ -315,6 +469,7 @@ fun DownloadTasksPage(
                 exit = shrinkVertically() + fadeOut()
             ) {
                 Column {
+                    val selectedSize = selectedItemIds.sumOf { fileSizes[it] ?: 0L }
                     AnimatedVisibility(
                         isUpdatingMetadata,
                         enter = expandVertically() + fadeIn(),
@@ -322,57 +477,121 @@ fun DownloadTasksPage(
                     ) {
                         MetadataUpdateProgress(progress = metadataProgress)
                     }
-                    BottomAppBar {
-                        TriStateCheckbox(
-                            state = checkBoxState,
-                            onClick = {
-                                when (checkBoxState) {
-                                    androidx.compose.ui.state.ToggleableState.On ->
-                                        selectedItemIds.clear()
+                    Surface(
+                        color = MaterialTheme.colorScheme.surfaceContainer,
+                        tonalElevation = 3.dp
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .navigationBarsPadding()
+                                .height(64.dp)
+                                .padding(horizontal = 4.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            TriStateCheckbox(
+                                state = checkBoxState,
+                                onClick = {
+                                    when (checkBoxState) {
+                                        androidx.compose.ui.state.ToggleableState.On ->
+                                            selectedItemIds.clear()
 
-                                    else -> visibleIds
-                                        .filterNot { selectedItemIds.contains(it) }
-                                        .forEach { selectedItemIds.add(it) }
+                                        else -> visibleIds
+                                            .filterNot { selectedItemIds.contains(it) }
+                                            .forEach { selectedItemIds.add(it) }
+                                    }
+                                },
+                            )
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = stringResource(R.string.multiselect_item_count).format(
+                                        selectedItemIds.size
+                                    ),
+                                    style = MaterialTheme.typography.labelLarge,
+                                    maxLines = 1
+                                )
+                                Text(
+                                    text = selectedSize.toFileSizeText(),
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    maxLines = 1
+                                )
+                            }
+                            IconButton(
+                                onClick = { requestRedownload(selectedItemIds.toList()) },
+                                enabled = selectedItemIds.isNotEmpty() && !isUpdatingMetadata
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Outlined.Refresh,
+                                    contentDescription = stringResource(R.string.redownload)
+                                )
+                            }
+                            IconButton(
+                                onClick = { updateMetadata(selectedItemIds.toList()) },
+                                enabled = selectedItemIds.isNotEmpty() && !isUpdatingMetadata
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Outlined.AutoAwesome,
+                                    contentDescription = stringResource(R.string.update_metadata)
+                                )
+                            }
+                            IconButton(
+                                onClick = {
+                                    pendingDeleteIds = selectedItemIds.toList()
+                                    deleteFile = false
+                                    showDeleteDialog = true
+                                },
+                                enabled = selectedItemIds.isNotEmpty()
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Outlined.DeleteSweep,
+                                    contentDescription = stringResource(id = R.string.remove)
+                                )
+                            }
+                            Box {
+                                IconButton(onClick = { selectionMenuExpanded = true }) {
+                                    Icon(
+                                        imageVector = Icons.Outlined.MoreVert,
+                                        contentDescription = stringResource(R.string.show_more_actions)
+                                    )
                                 }
-                            },
-                        )
-                        Text(
-                            modifier = Modifier.weight(1f),
-                            text = stringResource(R.string.multiselect_item_count).format(
-                                selectedItemIds.size
-                            ),
-                            style = MaterialTheme.typography.labelLarge
-                        )
-                        IconButton(
-                            onClick = { requestRedownload(selectedItemIds.toList()) },
-                            enabled = selectedItemIds.isNotEmpty() && !isUpdatingMetadata
-                        ) {
-                            Icon(
-                                imageVector = Icons.Outlined.Refresh,
-                                contentDescription = stringResource(R.string.redownload)
-                            )
-                        }
-                        IconButton(
-                            onClick = { updateMetadata(selectedItemIds.toList()) },
-                            enabled = selectedItemIds.isNotEmpty() && !isUpdatingMetadata
-                        ) {
-                            Icon(
-                                imageVector = Icons.Outlined.AutoAwesome,
-                                contentDescription = stringResource(R.string.update_metadata)
-                            )
-                        }
-                        IconButton(
-                            onClick = {
-                                pendingDeleteIds = selectedItemIds.toList()
-                                deleteFile = false
-                                showDeleteDialog = true
-                            },
-                            enabled = selectedItemIds.isNotEmpty()
-                        ) {
-                            Icon(
-                                imageVector = Icons.Outlined.DeleteSweep,
-                                contentDescription = stringResource(id = R.string.remove)
-                            )
+                                DropdownMenu(
+                                    expanded = selectionMenuExpanded,
+                                    onDismissRequest = { selectionMenuExpanded = false }
+                                ) {
+                                    DropdownMenuItem(
+                                        text = { Text(stringResource(R.string.share)) },
+                                        leadingIcon = { Icon(Icons.Outlined.Share, null) },
+                                        onClick = {
+                                            selectionMenuExpanded = false
+                                            shareSelection()
+                                        },
+                                        enabled = selectedItemIds.isNotEmpty()
+                                    )
+                                    DropdownMenuItem(
+                                        text = { Text(stringResource(R.string.export_playlist)) },
+                                        leadingIcon = { Icon(Icons.Outlined.QueueMusic, null) },
+                                        onClick = {
+                                            selectionMenuExpanded = false
+                                            exportM3u.launch(
+                                                LibraryExporter.suggestedName(ExportFormat.M3U)
+                                            )
+                                        },
+                                        enabled = selectedItemIds.isNotEmpty()
+                                    )
+                                    DropdownMenuItem(
+                                        text = { Text(stringResource(R.string.export_csv)) },
+                                        leadingIcon = { Icon(Icons.Outlined.Description, null) },
+                                        onClick = {
+                                            selectionMenuExpanded = false
+                                            exportCsv.launch(
+                                                LibraryExporter.suggestedName(ExportFormat.CSV)
+                                            )
+                                        },
+                                        enabled = selectedItemIds.isNotEmpty()
+                                    )
+                                }
+                            }
                         }
                     }
                 }
@@ -451,88 +670,53 @@ fun DownloadTasksPage(
             item {
                 SectionHeader(
                     title = stringResource(R.string.downloads_completed),
-                    count = songsList.size
+                    count = library.songs.size,
+                    total = if (library.isFiltered) songsList.size else null
                 )
             }
 
-            if (filterSet.size > 1 && !isSelectEnabled) {
+            if (songsList.size > 1 || isSelectEnabled || library.isFiltered) {
                 item {
-                    Column {
-                        Text(
-                            text = stringResource(R.string.filter_artist),
-                            modifier = Modifier.padding(start = 4.dp, bottom = 2.dp),
-                            color = MaterialTheme.colorScheme.primary,
-                            style = MaterialTheme.typography.labelLarge
-                        )
-                        Row(
-                            modifier = Modifier.horizontalScroll(rememberScrollState())
-                        ) {
-                            filterSet.forEachIndexed { index, author ->
-                                AudioFilterChip(
-                                    selected = viewState.activeFilterIndex == index,
-                                    onClick = { downloadsViewModel.clickAuthorFilter(index) },
-                                    label = author
-                                )
-                            }
-                        }
-                    }
+                    LibraryToolbar(
+                        sort = library.sort,
+                        query = library.query,
+                        author = library.author,
+                        showQueryChip = isSelectEnabled && library.query.isNotBlank(),
+                        onArtistClick = { showArtistSheet = true },
+                        onSortClick = { showSortSheet = true },
+                        onClearQuery = { downloadsViewModel.setQuery("") }
+                    )
                 }
             }
 
-            if (filteredSongs.isEmpty()) {
+            if (library.songs.isEmpty()) {
                 item {
-                    Text(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = 24.dp),
-                        text = stringResource(R.string.downloads_history_empty_state),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        textAlign = TextAlign.Center
-                    )
+                    if (library.isFiltered) {
+                        NoResultsState(onClearFilters = { downloadsViewModel.clearFilters() })
+                    } else {
+                        Text(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 24.dp),
+                            text = stringResource(R.string.downloads_history_empty_state),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            textAlign = TextAlign.Center
+                        )
+                    }
+                }
+            } else if (library.groupedByDay) {
+                library.sections.forEach { section ->
+                    stickyHeader(key = "day_${section.dayStart}") {
+                        DayHeader(dayStart = section.dayStart, count = section.songs.size)
+                    }
+                    items(section.songs, key = { it.id }) { song ->
+                        songCard(song)
+                    }
                 }
             } else {
-                items(filteredSongs, key = { it.id }) { song ->
-                    DownloadedSongCard(
-                        song = song,
-                        fileSize = fileSizes[song.id],
-                        selectionMode = isSelectEnabled,
-                        selected = selectedItemIds.contains(song.id),
-                        isUpdatingMetadata = metadataProgress.inProgressId == song.id,
-                        metadataUpdateEnabled = !isUpdatingMetadata,
-                        onSelect = {
-                            if (!isSelectEnabled) isSelectEnabled = true
-                            if (!selectedItemIds.remove(song.id)) selectedItemIds.add(song.id)
-                        },
-                        onPlay = { playFile(song) },
-                        onCopyLink = { copyLink(song) },
-                        onShowLog = { onNavigateToLog("history_${song.id}") },
-                        onShare = {
-                            FilesUtil.createIntentForSharingFile(song.songPath)?.let { intent ->
-                                context.startActivity(
-                                    Intent.createChooser(
-                                        intent,
-                                        context.getString(R.string.share_file)
-                                    )
-                                )
-                            }
-                        },
-                        onOpenInSpotify = {
-                            runCatching { uriHandler.openUri(song.songUrl) }
-                                .onFailure {
-                                    ToastUtil.makeToastSuspend(
-                                        context.getString(R.string.file_unavailable)
-                                    )
-                                }
-                        },
-                        onDelete = {
-                            pendingDeleteIds = listOf(song.id)
-                            deleteFile = false
-                            showDeleteDialog = true
-                        },
-                        onRedownload = { requestRedownload(listOf(song.id)) },
-                        onUpdateMetadata = { updateMetadata(listOf(song.id)) },
-                    )
+                items(library.songs, key = { it.id }) { song ->
+                    songCard(song)
                 }
             }
         }
@@ -651,6 +835,29 @@ fun DownloadTasksPage(
             }
         )
     }
+
+    if (showSortSheet) {
+        SortSheet(
+            current = library.sort,
+            onSelect = {
+                downloadsViewModel.setSort(it)
+                showSortSheet = false
+            },
+            onDismiss = { showSortSheet = false }
+        )
+    }
+
+    if (showArtistSheet) {
+        ArtistSheet(
+            artists = artists,
+            selected = library.author,
+            onSelect = {
+                downloadsViewModel.setAuthor(it)
+                showArtistSheet = false
+            },
+            onDismiss = { showArtistSheet = false }
+        )
+    }
 }
 
 @Composable
@@ -743,7 +950,7 @@ private fun MetadataUpdateProgress(progress: DownloadsViewModel.MetadataProgress
 }
 
 @Composable
-private fun SectionHeader(title: String, count: Int) {
+private fun SectionHeader(title: String, count: Int, total: Int? = null) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -758,11 +965,187 @@ private fun SectionHeader(title: String, count: Int) {
         )
         Spacer(Modifier.size(6.dp))
         Text(
+            text = if (total == null) count.toString()
+            else stringResource(R.string.library_count_filtered, count, total),
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+    }
+}
+
+@Composable
+private fun DayHeader(dayStart: Long, count: Int) {
+    val today = LocalDate.now()
+    val date = if (dayStart <= 0L) null
+    else Instant.ofEpochMilli(dayStart).atZone(ZoneId.systemDefault()).toLocalDate()
+    val label = when {
+        date == null -> stringResource(R.string.unknown_date)
+        date == today -> stringResource(R.string.today)
+        date == today.minusDays(1) -> stringResource(R.string.yesterday)
+        else -> remember(date) {
+            DateTimeFormatter.ofLocalizedDate(FormatStyle.MEDIUM).format(date)
+        }
+    }
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(MaterialTheme.colorScheme.background)
+            .padding(start = 4.dp, top = 12.dp, bottom = 4.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelLarge,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Spacer(Modifier.size(6.dp))
+        Text(
             text = count.toString(),
             style = MaterialTheme.typography.labelMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
     }
+}
+
+@Composable
+private fun NoResultsState(onClearFilters: () -> Unit) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 32.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Text(
+            text = stringResource(R.string.no_matching_songs),
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.Center
+        )
+        Spacer(Modifier.height(8.dp))
+        TextButton(onClick = onClearFilters) {
+            Text(text = stringResource(R.string.clear_filters))
+        }
+    }
+}
+
+@Composable
+private fun LibraryToolbar(
+    sort: LibrarySort,
+    query: String,
+    author: String?,
+    showQueryChip: Boolean,
+    onArtistClick: () -> Unit,
+    onSortClick: () -> Unit,
+    onClearQuery: () -> Unit,
+) {
+    val label = if (author == null) stringResource(R.string.artist) else artistLabel(author)
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .horizontalScroll(rememberScrollState()),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        FilterChip(
+            selected = author != null,
+            onClick = onArtistClick,
+            label = { Text(text = label) },
+            leadingIcon = {
+                Icon(
+                    imageVector = Icons.Outlined.Person,
+                    contentDescription = null,
+                    modifier = Modifier.size(FilterChipDefaults.IconSize)
+                )
+            },
+            trailingIcon = {
+                Icon(
+                    imageVector = Icons.Outlined.ArrowDropDown,
+                    contentDescription = null
+                )
+            }
+        )
+        Spacer(Modifier.width(8.dp))
+        AssistChip(
+            onClick = onSortClick,
+            label = { Text(text = sortLabel(sort)) },
+            leadingIcon = {
+                Icon(
+                    imageVector = Icons.Outlined.Sort,
+                    contentDescription = null,
+                    modifier = Modifier.size(AssistChipDefaults.IconSize)
+                )
+            },
+            trailingIcon = {
+                Icon(
+                    imageVector = Icons.Outlined.ArrowDropDown,
+                    contentDescription = null
+                )
+            }
+        )
+        if (showQueryChip && query.isNotBlank()) {
+            Spacer(Modifier.width(8.dp))
+            InputChip(
+                selected = false,
+                onClick = onClearQuery,
+                label = { Text(text = query) },
+                leadingIcon = {
+                    Icon(
+                        imageVector = Icons.Outlined.Search,
+                        contentDescription = null,
+                        modifier = Modifier.size(InputChipDefaults.IconSize)
+                    )
+                },
+                trailingIcon = {
+                    Icon(
+                        imageVector = Icons.Outlined.Close,
+                        contentDescription = stringResource(R.string.clear_search),
+                        modifier = Modifier.size(InputChipDefaults.IconSize)
+                    )
+                }
+            )
+        }
+    }
+}
+
+@Composable
+private fun SearchField(
+    query: String,
+    onQueryChange: (String) -> Unit,
+    onSearch: () -> Unit,
+) {
+    val focusRequester = remember { FocusRequester() }
+    LaunchedEffect(Unit) {
+        // Compose focuses the navigation icon first with a hardware keyboard.
+        withFrameNanos { }
+        runCatching { focusRequester.requestFocus() }
+    }
+    BasicTextField(
+        value = query,
+        onValueChange = onQueryChange,
+        modifier = Modifier
+            .fillMaxWidth()
+            .focusRequester(focusRequester),
+        singleLine = true,
+        textStyle = MaterialTheme.typography.titleMedium.copy(
+            color = MaterialTheme.colorScheme.onSurface
+        ),
+        cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
+        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+        keyboardActions = KeyboardActions(onSearch = { onSearch() }),
+        decorationBox = { innerTextField ->
+            Box(contentAlignment = Alignment.CenterStart) {
+                if (query.isEmpty()) {
+                    Text(
+                        text = stringResource(R.string.search_downloads),
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1
+                    )
+                }
+                innerTextField()
+            }
+        }
+    )
 }
 
 @Composable
