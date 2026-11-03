@@ -41,6 +41,7 @@ fun SpotifyItemPage(
     val scrollBehavior = TopAppBarDefaults.enterAlwaysScrollBehavior()
 
     val viewState by playlistPageViewModel.viewStateFlow.collectAsStateWithLifecycle()
+    val downloadedTrackIds by playlistPageViewModel.downloadedTrackIds.collectAsStateWithLifecycle()
 
     LaunchedEffect(id) {
         playlistPageViewModel.loadData(id, typeOfSpotifyDataType(type))
@@ -84,6 +85,10 @@ fun SpotifyItemPage(
                         playlistPageViewModel.downloadTrack(url, name)
                     }
 
+                    val downloadTracksCallback: (List<TrackDownload>) -> Unit = { tracks ->
+                        playlistPageViewModel.downloadTracks(tracks)
+                    }
+
                     with(stateData) {
                         when (typeOfSpotifyDataType(type)) {
                             SpotifyDataType.ALBUM -> {
@@ -93,6 +98,8 @@ fun SpotifyItemPage(
                                         data = it,
                                         modifier = pageModifier,
                                         trackDownloadCallback = trackDownloadCallback,
+                                        downloadedTrackIds = downloadedTrackIds,
+                                        onDownloadTracks = downloadTracksCallback,
                                         isLoadingTracks = viewState.isLoadingTracks
                                     )
                                 }
@@ -101,7 +108,13 @@ fun SpotifyItemPage(
                             SpotifyDataType.ARTIST -> {
                                 val artist = this as? Artist
                                 artist?.let {
-                                    ArtistPage(artist, pageModifier, trackDownloadCallback)
+                                    ArtistPage(
+                                        data = it,
+                                        modifier = pageModifier,
+                                        trackDownloadCallback = trackDownloadCallback,
+                                        downloadedTrackIds = downloadedTrackIds,
+                                        onDownloadTracks = downloadTracksCallback,
+                                    )
                                 }
                             }
 
@@ -112,6 +125,8 @@ fun SpotifyItemPage(
                                         data = it,
                                         modifier = pageModifier,
                                         trackDownloadCallback = trackDownloadCallback,
+                                        downloadedTrackIds = downloadedTrackIds,
+                                        onDownloadTracks = downloadTracksCallback,
                                         isLoadingTracks = viewState.isLoadingTracks
                                     )
                                 }

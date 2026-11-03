@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.MoreVert
@@ -58,6 +59,7 @@ fun TrackComponent(
     hasLyrics: Boolean = false,
     isExplicit: Boolean = false,
     isPlaylist: Boolean = false,
+    isDownloaded: Boolean = false,
     imageUrl: String = "",
     onClick: () -> Unit = { ChromeCustomTabsUtil.openUrl(spotifyUrl) }
 ) {
@@ -134,6 +136,15 @@ fun TrackComponent(
                         LyricsIcon(visible = hasLyrics)
                         Spacer(modifier = Modifier.width(6.dp))
                         ExplicitIcon(visible = isExplicit)
+                        if (isDownloaded) {
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Icon(
+                                imageVector = Icons.Filled.CheckCircle,
+                                contentDescription = stringResource(id = R.string.downloaded),
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(12.dp)
+                            )
+                        }
                     }
                 }
             }

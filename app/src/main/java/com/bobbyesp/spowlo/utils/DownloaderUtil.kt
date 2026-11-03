@@ -92,6 +92,8 @@ object DownloaderUtil {
         val generateLRC: Boolean = PreferencesUtil.getValue(GENERATE_LRC),
         val skipAlbumArt: Boolean = PreferencesUtil.getValue(SKIP_ALBUM_ART),
         val outputFormat: String = OUTPUT_FORMAT.getString(),
+        val playlistTagging: Int = PreferencesUtil.getPlaylistTagging(),
+        val proxy: String = PreferencesUtil.getProxy(),
         val overwrite: String? = null,
     )
 
@@ -305,6 +307,14 @@ object DownloaderUtil {
                 if (skipExplicit) addOption("--skip-explicit")
                 if (generateLRC) addOption("--generate-lrc")
                 if (skipAlbumArt) addOption("--skip-album-art")
+                if (proxy.isNotBlank()) addOption("--proxy", proxy)
+                when (playlistTagging) {
+                    1 -> addOption("--playlist-numbering")
+                    2 -> {
+                        addOption("--playlist-numbering")
+                        addOption("--playlist-retain-track-cover")
+                    }
+                }
 
                 if (preserveOriginalAudio) {
                     addOption("--bitrate", "disable")

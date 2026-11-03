@@ -187,6 +187,26 @@
     <string name="spotify_link">Spotify link</string>
     <string name="link_copied">Link copied</string>
     <string name="delete_multiple_items_msg">Delete the selected items from your download history?</string>
+    <string name="format">Format</string>
+    <string name="all_formats">All formats</string>
+    <string name="missing_count">Missing (%1$d)</string>
+    <string name="missing_files_desc">These files were moved or deleted outside the app.</string>
+    <string name="review_missing_files">Review</string>
+    <string name="show_all_files">Show all</string>
+    <string name="remove_entries">Remove</string>
+    <string name="remove_missing_title">Remove missing entries?</string>
+    <plurals name="missing_files_title">
+        <item quantity="one">%d file is missing</item>
+        <item quantity="other">%d files are missing</item>
+    </plurals>
+    <plurals name="remove_missing_message">
+        <item quantity="one">%d entry will be removed from the library. The file is already gone.</item>
+        <item quantity="other">%d entries will be removed from the library. The files are already gone.</item>
+    </plurals>
+    <plurals name="removed_entries">
+        <item quantity="one">Removed %d entry</item>
+        <item quantity="other">Removed %d entries</item>
+    </plurals>
     <string name="github_logo">GitHub logo</string>
     <string name="github">GitHub</string>
     <string name="head_developer">Lead developer</string>
@@ -364,6 +384,16 @@
     <string name="output_format">Output format</string>
     <string name="output_format_desc">Set the file name format for downloads</string>
     <string name="available_output_formats">Available output format fields</string>
+    <string name="playlist_tagging">Playlist tagging</string>
+    <string name="playlist_tagging_desc">When downloading a playlist, use its name as the album for every song. The playlist cover can also replace each track\'s artwork.</string>
+    <string name="playlist_tagging_off">Off</string>
+    <string name="playlist_tagging_album">Playlist as album</string>
+    <string name="playlist_tagging_album_cover">Playlist as album, keep track art</string>
+    <string name="proxy">Proxy</string>
+    <string name="proxy_desc">Route downloads through an HTTP(S) proxy. Useful when a provider is blocked on your network.</string>
+    <string name="proxy_example">http://host:port</string>
+    <string name="proxy_not_set">Not set</string>
+    <string name="proxy_empty_hint">Leave empty to connect directly.</string>
     <string name="incognito_mode">Incognito mode</string>
     <string name="incognito_mode_desc">Disable download history</string>
     <string name="artist_followers">Followers</string>
@@ -371,6 +401,13 @@
     <string name="artist_top_tracks">Top tracks</string>
     <string name="artist_top_albums">Top albums</string>
     <string name="download_all_songs">Download all songs</string>
+    <string name="download_missing_count">Download missing (%1$d)</string>
+    <string name="downloaded">Downloaded</string>
+    <string name="download_estimate">About %1$s · %2$s free</string>
+    <string name="download_estimate_only">About %1$s</string>
+    <string name="not_enough_space_title">Not enough space</string>
+    <string name="not_enough_space_message">This download needs about %1$s, but only %2$s is free on this device.</string>
+    <string name="download_anyway">Download anyway</string>
     <string name="collection_empty">No playable songs found in this playlist or album.</string>
     <plurals name="song_count">
         <item quantity="one">%d song</item>

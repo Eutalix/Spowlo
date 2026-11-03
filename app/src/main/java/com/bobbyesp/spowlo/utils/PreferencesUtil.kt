@@ -64,6 +64,8 @@ const val DONT_FILTER_RESULTS = "dont_filter_results"
 const val SPLIT_BY_PLAYLIST = "split_by_playlist"
 const val SPLIT_BY_MAIN_ARTIST = "split_by_main_artist"
 const val THREADS = "threads"
+const val PLAYLIST_TAGGING = "playlist_tagging"
+const val PROXY = "proxy"
 
 const val SPOTDL_UPDATE = "spotdl_update"
 const val TEMPLATE_ID = "template_id"
@@ -100,6 +102,7 @@ private val StringPreferenceDefaults =
         EXTRA_DIRECTORY to "",
         LYRIC_PROVIDERS to "",
         AUDIO_PROVIDERS to "",
+        PROXY to "",
     )
 
 private val BooleanPreferenceDefaults =
@@ -156,7 +159,8 @@ object PreferencesUtil {
         AUDIO_QUALITY to 17,
         UPDATE_CHANNEL to STABLE,
         THREADS to 2,
-        UPDATE_FREQUENCY to FREQ_DAILY
+        UPDATE_FREQUENCY to FREQ_DAILY,
+        PLAYLIST_TAGGING to 0
     )
 
     fun String.getInt(default: Int = IntPreferenceDefaults.getOrElse(this) { 0 }): Int =
@@ -204,6 +208,14 @@ object PreferencesUtil {
     }
 
     fun getAudioQuality(): Int = AUDIO_QUALITY.getInt()
+
+    fun getPlaylistTagging(): Int = PLAYLIST_TAGGING.getInt()
+
+    fun setPlaylistTagging(value: Int) = PLAYLIST_TAGGING.updateInt(value)
+
+    fun getProxy(): String = PROXY.getString()
+
+    fun setProxy(value: String) = PROXY.updateString(value.trim())
 
     fun getLyricProviders(): List<String> {
         val lyricProviderString = LYRIC_PROVIDERS.getString()

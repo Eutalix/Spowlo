@@ -40,8 +40,10 @@ import com.bobbyesp.spowlo.R
 import com.bobbyesp.spowlo.features.spotify_api.data.remote.SpotifyApiRequests
 import com.bobbyesp.spowlo.ui.common.AsyncImageImpl
 import com.bobbyesp.spowlo.ui.components.HorizontalDivider
+import com.bobbyesp.spowlo.ui.components.songs.metadata_viewer.CollectionDownloadActions
 import com.bobbyesp.spowlo.ui.components.songs.metadata_viewer.TrackComponent
 import com.bobbyesp.spowlo.ui.components.text.MarqueeText
+import com.bobbyesp.spowlo.ui.pages.metadata_viewer.playlists.TrackDownload
 import com.bobbyesp.spowlo.ui.theme.harmonizeWithPrimary
 import com.bobbyesp.spowlo.utils.ChromeCustomTabsUtil
 import com.bobbyesp.spowlo.utils.GeneralTextUtils
@@ -53,7 +55,9 @@ import kotlinx.coroutines.withContext
 fun ArtistPage(
     data: Artist,
     modifier: Modifier,
-    trackDownloadCallback: (String, String) -> Unit
+    trackDownloadCallback: (String, String) -> Unit,
+    downloadedTrackIds: Set<String> = emptySet(),
+    onDownloadTracks: (List<TrackDownload>) -> Unit = {},
 ) {
     val localConfig = LocalConfiguration.current
     val topTracks = remember { mutableStateOf<List<Track>?>(null) }
@@ -172,6 +176,27 @@ fun ArtistPage(
         }
 
         if (topTracks.value != null) {
+            val missingTracks = topTracks.value!!.mapNotNull { track ->
+                if (track.id in downloadedTrackIds) return@mapNotNull null
+                TrackDownload(
+                    url = track.externalUrls.spotify ?: "https://open.spotify.com/track/${track.id}",
+                    name = "${track.name} - ${track.artists.joinToString(", ") { it.name }}",
+                    durationMs = track.durationMs.toLong()
+                )
+            }
+            if (missingTracks.isNotEmpty()) {
+                item {
+                    CollectionDownloadActions(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 4.dp),
+                        totalDurationMs = missingTracks.sumOf { it.durationMs },
+                        missingTracks = missingTracks,
+                        onDownloadAll = null,
+                        onDownloadMissing = onDownloadTracks,
+                    )
+                }
+            }
             items(topTracks.value!!.size) { index ->
                 val track = topTracks.value!![index]
                 val taskName =
@@ -182,6 +207,7 @@ fun ArtistPage(
                     artists = track.artists.joinToString(", ") { it.name },
                     spotifyUrl = track.externalUrls.spotify ?: "",
                     isExplicit = track.explicit,
+                    isDownloaded = track.id in downloadedTrackIds,
                     onClick = {
                         trackDownloadCallback(track.externalUrls.spotify ?: "", taskName)
                     }

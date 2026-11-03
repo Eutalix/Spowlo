@@ -2,21 +2,36 @@ package com.bobbyesp.spowlo.ui.pages.metadata_viewer.playlists
 
 import android.util.Log
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
+import com.bobbyesp.spowlo.App.Companion.applicationScope
 import com.bobbyesp.spowlo.Downloader
 import com.bobbyesp.spowlo.features.spotify_api.data.remote.SpotifyApiRequests
 import com.bobbyesp.spowlo.features.spotify_api.data.remote.web.SpotifyWebApi
 import com.bobbyesp.spowlo.features.spotify_api.model.SpotifyDataType
+import com.bobbyesp.spowlo.utils.DatabaseUtil
+import com.bobbyesp.spowlo.utils.SpotifyUrls
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import javax.inject.Inject
+
+data class TrackDownload(val url: String, val name: String, val durationMs: Long = 0L)
 
 class PlaylistPageViewModel @Inject constructor() : ViewModel() {
 
     private val mutableViewStateFlow = MutableStateFlow(ViewState())
     val viewStateFlow = mutableViewStateFlow.asStateFlow()
+
+    val downloadedTrackIds: StateFlow<Set<String>> = DatabaseUtil.getMediaInfo()
+        .map { songs -> songs.mapNotNull { SpotifyUrls.trackId(it.songUrl) }.toSet() }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptySet())
 
     data class ViewState(
         val id: String = "",
@@ -119,6 +134,16 @@ class PlaylistPageViewModel @Inject constructor() : ViewModel() {
 
     fun downloadTrack(url: String, name: String) {
         Downloader.executeParallelDownloadWithUrl(url, name)
+    }
+
+    /** Queues missing tracks one after another so a long playlist does not start every process at once. */
+    fun downloadTracks(tracks: List<TrackDownload>) {
+        if (tracks.isEmpty()) return
+        applicationScope.launch(Dispatchers.IO) {
+            tracks.forEach { track ->
+                Downloader.executeParallelDownloadWithUrl(track.url, track.name).join()
+            }
+        }
     }
 
     private companion object {
