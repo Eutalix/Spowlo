@@ -35,13 +35,16 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.ArrowDropDown
+import androidx.compose.material.icons.outlined.AudioFile
 import androidx.compose.material.icons.outlined.AutoAwesome
+import androidx.compose.material.icons.outlined.Check
 import androidx.compose.material.icons.outlined.Checklist
 import androidx.compose.material.icons.outlined.Clear
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.DeleteSweep
 import androidx.compose.material.icons.outlined.Description
 import androidx.compose.material.icons.outlined.DownloadForOffline
+import androidx.compose.material.icons.outlined.ErrorOutline
 import androidx.compose.material.icons.outlined.Folder
 import androidx.compose.material.icons.outlined.LibraryAdd
 import androidx.compose.material.icons.outlined.MoreVert
@@ -174,6 +177,7 @@ fun DownloadTasksPage(
     var showDeleteDialog by remember { mutableStateOf(false) }
     var deleteFile by remember { mutableStateOf(false) }
     var pendingDeleteIds by remember { mutableStateOf<List<Int>>(emptyList()) }
+    var showMissingDeleteDialog by remember { mutableStateOf(false) }
 
     val scope = rememberCoroutineScope()
     var isImporting by remember { mutableStateOf(false) }
@@ -675,15 +679,36 @@ fun DownloadTasksPage(
                 )
             }
 
+            if (library.missingIds.isNotEmpty()) {
+                item {
+                    MissingFilesBanner(
+                        count = library.missingIds.size,
+                        showingMissing = library.missingOnly,
+                        onToggle = {
+                            downloadsViewModel.setMissingOnly(!library.missingOnly)
+                        },
+                        onRemove = { showMissingDeleteDialog = true }
+                    )
+                }
+            }
+
             if (songsList.size > 1 || isSelectEnabled || library.isFiltered) {
                 item {
                     LibraryToolbar(
                         sort = library.sort,
                         query = library.query,
                         author = library.author,
+                        formats = library.formats,
+                        format = library.format,
+                        missingCount = library.missingIds.size,
+                        missingOnly = library.missingOnly,
                         showQueryChip = isSelectEnabled && library.query.isNotBlank(),
                         onArtistClick = { showArtistSheet = true },
                         onSortClick = { showSortSheet = true },
+                        onFormatSelected = downloadsViewModel::setFormat,
+                        onMissingClick = {
+                            downloadsViewModel.setMissingOnly(!library.missingOnly)
+                        },
                         onClearQuery = { downloadsViewModel.setQuery("") }
                     )
                 }
@@ -760,6 +785,36 @@ fun DownloadTasksPage(
             dismissButton = {
                 DismissButton {
                     showDeleteDialog = false
+                }
+            }
+        )
+    }
+
+    if (showMissingDeleteDialog) {
+        val count = library.missingIds.size
+        SpowloDialog(
+            onDismissRequest = { showMissingDeleteDialog = false },
+            icon = { Icon(Icons.Outlined.ErrorOutline, null) },
+            title = { Text(stringResource(R.string.remove_missing_title)) },
+            text = {
+                Text(
+                    modifier = Modifier.padding(horizontal = 24.dp),
+                    text = pluralStringResource(R.plurals.remove_missing_message, count, count)
+                )
+            },
+            confirmButton = {
+                ConfirmButton {
+                    showMissingDeleteDialog = false
+                    downloadsViewModel.deleteItems(library.missingIds.toList(), deleteFile = false)
+                    ToastUtil.makeToast(
+                        context,
+                        context.resources.getQuantityString(R.plurals.removed_entries, count, count)
+                    )
+                }
+            },
+            dismissButton = {
+                DismissButton {
+                    showMissingDeleteDialog = false
                 }
             }
         )
@@ -918,6 +973,75 @@ private fun NotificationHint(
 }
 
 @Composable
+private fun MissingFilesBanner(
+    count: Int,
+    showingMissing: Boolean,
+    onToggle: () -> Unit,
+    onRemove: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Card(
+        modifier = modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.errorContainer,
+            contentColor = MaterialTheme.colorScheme.onErrorContainer
+        )
+    ) {
+        Row(
+            modifier = Modifier.padding(start = 16.dp, top = 12.dp, end = 4.dp, bottom = 4.dp),
+            verticalAlignment = Alignment.Top
+        ) {
+            Icon(
+                imageVector = Icons.Outlined.ErrorOutline,
+                contentDescription = null,
+                modifier = Modifier.padding(top = 2.dp)
+            )
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .padding(horizontal = 12.dp)
+            ) {
+                Text(
+                    text = pluralStringResource(R.plurals.missing_files_title, count, count),
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Bold
+                )
+                Spacer(Modifier.height(2.dp))
+                Text(
+                    text = stringResource(R.string.missing_files_desc),
+                    style = MaterialTheme.typography.bodySmall
+                )
+                Row {
+                    TextButton(
+                        onClick = onToggle,
+                        contentPadding = PaddingValues(horizontal = 0.dp, vertical = 4.dp),
+                        colors = ButtonDefaults.textButtonColors(
+                            contentColor = MaterialTheme.colorScheme.onErrorContainer
+                        )
+                    ) {
+                        Text(
+                            text = stringResource(
+                                if (showingMissing) R.string.show_all_files
+                                else R.string.review_missing_files
+                            )
+                        )
+                    }
+                    TextButton(
+                        onClick = onRemove,
+                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
+                        colors = ButtonDefaults.textButtonColors(
+                            contentColor = MaterialTheme.colorScheme.onErrorContainer
+                        )
+                    ) {
+                        Text(text = stringResource(R.string.remove_entries))
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
 private fun MetadataUpdateProgress(progress: DownloadsViewModel.MetadataProgress) {
     Column(
         modifier = Modifier
@@ -1034,9 +1158,15 @@ private fun LibraryToolbar(
     sort: LibrarySort,
     query: String,
     author: String?,
+    formats: List<LibraryFormat>,
+    format: String?,
+    missingCount: Int,
+    missingOnly: Boolean,
     showQueryChip: Boolean,
     onArtistClick: () -> Unit,
     onSortClick: () -> Unit,
+    onFormatSelected: (String?) -> Unit,
+    onMissingClick: () -> Unit,
     onClearQuery: () -> Unit,
 ) {
     val label = if (author == null) stringResource(R.string.artist) else artistLabel(author)
@@ -1082,6 +1212,29 @@ private fun LibraryToolbar(
                 )
             }
         )
+        if (formats.size > 1) {
+            Spacer(Modifier.width(8.dp))
+            FormatFilterChip(
+                formats = formats,
+                selected = format,
+                onSelect = onFormatSelected
+            )
+        }
+        if (missingCount > 0) {
+            Spacer(Modifier.width(8.dp))
+            FilterChip(
+                selected = missingOnly,
+                onClick = onMissingClick,
+                label = { Text(text = stringResource(R.string.missing_count, missingCount)) },
+                leadingIcon = {
+                    Icon(
+                        imageVector = Icons.Outlined.ErrorOutline,
+                        contentDescription = null,
+                        modifier = Modifier.size(FilterChipDefaults.IconSize)
+                    )
+                }
+            )
+        }
         if (showQueryChip && query.isNotBlank()) {
             Spacer(Modifier.width(8.dp))
             InputChip(
@@ -1103,6 +1256,62 @@ private fun LibraryToolbar(
                     )
                 }
             )
+        }
+    }
+}
+
+@Composable
+private fun FormatFilterChip(
+    formats: List<LibraryFormat>,
+    selected: String?,
+    onSelect: (String?) -> Unit,
+) {
+    var expanded by remember { mutableStateOf(false) }
+    Box {
+        FilterChip(
+            selected = selected != null,
+            onClick = { expanded = true },
+            label = {
+                Text(text = selected ?: stringResource(R.string.format))
+            },
+            leadingIcon = {
+                Icon(
+                    imageVector = Icons.Outlined.AudioFile,
+                    contentDescription = null,
+                    modifier = Modifier.size(FilterChipDefaults.IconSize)
+                )
+            },
+            trailingIcon = {
+                Icon(
+                    imageVector = Icons.Outlined.ArrowDropDown,
+                    contentDescription = null
+                )
+            }
+        )
+        DropdownMenu(
+            expanded = expanded,
+            onDismissRequest = { expanded = false }
+        ) {
+            DropdownMenuItem(
+                text = { Text(stringResource(R.string.all_formats)) },
+                leadingIcon = { if (selected == null) Icon(Icons.Outlined.Check, null) },
+                onClick = {
+                    expanded = false
+                    onSelect(null)
+                }
+            )
+            formats.forEach { entry ->
+                DropdownMenuItem(
+                    text = { Text("${entry.name} (${entry.count})") },
+                    leadingIcon = {
+                        if (selected == entry.name) Icon(Icons.Outlined.Check, null)
+                    },
+                    onClick = {
+                        expanded = false
+                        onSelect(entry.name)
+                    }
+                )
+            }
         }
     }
 }

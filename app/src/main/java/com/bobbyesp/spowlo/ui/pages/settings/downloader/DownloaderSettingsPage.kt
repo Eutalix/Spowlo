@@ -19,6 +19,7 @@ import androidx.compose.material.icons.outlined.HighQuality
 import androidx.compose.material.icons.outlined.Lyrics
 import androidx.compose.material.icons.outlined.MoneyOff
 import androidx.compose.material.icons.outlined.Output
+import androidx.compose.material.icons.outlined.Public
 import androidx.compose.material.icons.outlined.ShuffleOn
 import androidx.compose.material.icons.outlined.SkipNext
 import androidx.compose.material.icons.outlined.Verified
@@ -138,11 +139,21 @@ fun DownloaderSettingsPage(
         )
     }
 
+    var playlistTagging by remember {
+        mutableStateOf(
+            PreferencesUtil.getPlaylistTagging()
+        )
+    }
+
+    var proxy by remember { mutableStateOf(PreferencesUtil.getProxy()) }
+
     var showAudioFormatDialog by remember { mutableStateOf(false) }
     var showAudioQualityDialog by remember { mutableStateOf(false) }
     var showAudioProviderDialog by remember { mutableStateOf(false) }
     var showAudioLyricDialog by remember { mutableStateOf(false) }
     var showOutputFormatDialog by remember { mutableStateOf(false) }
+    var showPlaylistTaggingDialog by remember { mutableStateOf(false) }
+    var showProxyDialog by remember { mutableStateOf(false) }
 
     val scrollBehavior =
         TopAppBarDefaults.exitUntilCollapsedScrollBehavior(
@@ -227,6 +238,28 @@ fun DownloaderSettingsPage(
                         icon = Icons.Outlined.Output,
                         onClick = { showOutputFormatDialog = true },
                         modifier = Modifier.clip(RoundedCornerShape(8.dp)),
+                    )
+                }
+
+                item {
+                    SettingsItemNew(
+                        title = {
+                            Text(
+                                text = stringResource(id = R.string.playlist_tagging),
+                                fontWeight = FontWeight.Bold
+                            )
+                        },
+                        description = {
+                            Text(
+                                text = when (playlistTagging) {
+                                    0 -> stringResource(id = R.string.playlist_tagging_off)
+                                    1 -> stringResource(id = R.string.playlist_tagging_album)
+                                    else -> stringResource(id = R.string.playlist_tagging_album_cover)
+                                }
+                            )
+                        },
+                        icon = Icons.Outlined.Album,
+                        onClick = { showPlaylistTaggingDialog = true },
                     )
                 }
 
@@ -401,6 +434,24 @@ fun DownloaderSettingsPage(
                     }
                 }
                 item {
+                    SettingsItemNew(
+                        title = {
+                            Text(
+                                text = stringResource(id = R.string.proxy),
+                                fontWeight = FontWeight.Bold
+                            )
+                        },
+                        description = {
+                            Text(
+                                text = proxy.ifBlank { stringResource(id = R.string.proxy_not_set) }
+                            )
+                        },
+                        icon = Icons.Outlined.Public,
+                        onClick = { showProxyDialog = true },
+                        modifier = Modifier.clip(RoundedCornerShape(8.dp)),
+                    )
+                }
+                item {
                     SettingsSwitch(
                         onCheckedChange = {
                             useSponsorBlock = !useSponsorBlock
@@ -556,5 +607,17 @@ fun DownloaderSettingsPage(
     }
     if (showOutputFormatDialog) {
         OutputFormatDialog(onDismissRequest = { showOutputFormatDialog = false })
+    }
+    if (showPlaylistTaggingDialog) {
+        PlaylistTaggingDialog(
+            onDismissRequest = { showPlaylistTaggingDialog = false },
+            onConfirm = { playlistTagging = PreferencesUtil.getPlaylistTagging() },
+        )
+    }
+    if (showProxyDialog) {
+        ProxyDialog(
+            onDismissRequest = { showProxyDialog = false },
+            onConfirm = { proxy = PreferencesUtil.getProxy() },
+        )
     }
 }

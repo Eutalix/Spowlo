@@ -51,16 +51,32 @@ data class LibraryState(
     /** Empty string filters for entries without a known artist, `null` shows every artist. */
     val author: String? = null,
     val sort: LibrarySort = LibrarySort.NEWEST,
+    /** `null` shows every file format. */
+    val format: String? = null,
+    val formats: List<LibraryFormat> = emptyList(),
+    val missingOnly: Boolean = false,
+    /** IDs whose file is gone from storage, across the whole library. */
+    val missingIds: Set<Int> = emptySet(),
 ) {
     val totalCount: Int get() = allSongs.size
-    val isFiltered: Boolean get() = query.isNotBlank() || author != null
+    val isFiltered: Boolean
+        get() = query.isNotBlank() || author != null || format != null || missingOnly
     /** Date sorts are grouped under one header per day, other sorts stay a flat list. */
     val groupedByDay: Boolean get() = sort == LibrarySort.NEWEST || sort == LibrarySort.OLDEST
 }
 
+data class LibraryFormat(val name: String, val count: Int)
+
 data class LibrarySection(val dayStart: Long, val songs: List<DownloadedSongInfo>)
 
 data class ArtistEntry(val name: String, val count: Int)
+
+private data class LibraryFilters(
+    val query: String = "",
+    val author: String? = null,
+    val format: String? = null,
+    val missingOnly: Boolean = false,
+)
 
 private val DIACRITICS = Regex("\\p{M}+")
 
@@ -70,9 +86,17 @@ class DownloadsViewModel : ViewModel() {
 
     private val queryFlow = MutableStateFlow("")
     private val authorFlow = MutableStateFlow<String?>(null)
+    private val formatFlow = MutableStateFlow<String?>(null)
+    private val missingOnlyFlow = MutableStateFlow(false)
     private val sortFlow = MutableStateFlow(
         LibrarySort.fromPersisted(PreferencesUtil.getLibrarySort())
     )
+
+    private val filtersFlow = combine(
+        queryFlow, authorFlow, formatFlow, missingOnlyFlow
+    ) { query, author, format, missingOnly ->
+        LibraryFilters(query, author, format, missingOnly)
+    }
 
     val fileSizes: StateFlow<Map<Int, Long>> = mediaInfoFlow
         .map { songs ->
@@ -85,9 +109,9 @@ class DownloadsViewModel : ViewModel() {
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyMap())
 
     val library: StateFlow<LibraryState> = combine(
-        mediaInfoFlow, queryFlow, authorFlow, sortFlow, fileSizes
-    ) { songs, query, author, sort, sizes ->
-        buildLibraryState(songs, query, author, sort, sizes)
+        mediaInfoFlow, filtersFlow, sortFlow, fileSizes
+    ) { songs, filters, sort, sizes ->
+        buildLibraryState(songs, filters, sort, sizes)
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), LibraryState())
 
     /** Every artist in the library with its song count, unknown artists last. */
@@ -121,6 +145,16 @@ class DownloadsViewModel : ViewModel() {
         authorFlow.value = author
     }
 
+    fun setFormat(format: String?) {
+        formatFlow.value = format
+        if (format == null) return
+        missingOnlyFlow.value = false
+    }
+
+    fun setMissingOnly(missingOnly: Boolean) {
+        missingOnlyFlow.value = missingOnly
+    }
+
     fun setSort(sort: LibrarySort) {
         sortFlow.value = sort
         PreferencesUtil.setLibrarySort(sort.persistedValue)
@@ -129,6 +163,8 @@ class DownloadsViewModel : ViewModel() {
     fun clearFilters() {
         queryFlow.value = ""
         authorFlow.value = null
+        formatFlow.value = null
+        missingOnlyFlow.value = false
     }
 
     fun updateMetadata(ids: List<Int>) {
@@ -204,14 +240,18 @@ class DownloadsViewModel : ViewModel() {
 
     private fun buildLibraryState(
         songs: List<DownloadedSongInfo>,
-        query: String,
-        author: String?,
+        filters: LibraryFilters,
         sort: LibrarySort,
         sizes: Map<Int, Long>,
     ): LibraryState {
-        val tokens = normalizeSearchText(query).split(' ').filter { it.isNotBlank() }
+        val missingIds = songs
+            .filter { sizes.containsKey(it.id) && sizes[it.id] == 0L }
+            .mapTo(mutableSetOf()) { it.id }
+        val tokens = normalizeSearchText(filters.query).split(' ').filter { it.isNotBlank() }
         val visible = songs.filter { song ->
-            (author == null || song.songAuthor.trim() == author) &&
+            (filters.author == null || song.songAuthor.trim() == filters.author) &&
+                (filters.format == null || song.fileFormat() == filters.format) &&
+                (!filters.missingOnly || song.id in missingIds) &&
                 (tokens.isEmpty() || song.matchesAll(tokens))
         }
         val sorted = visible.sortedWith(comparatorFor(sort, sizes))
@@ -223,9 +263,16 @@ class DownloadsViewModel : ViewModel() {
             } else {
                 listOf(LibrarySection(dayStart = 0L, songs = sorted))
             },
-            query = query,
-            author = author,
+            query = filters.query,
+            author = filters.author,
             sort = sort,
+            format = filters.format,
+            formats = songs.groupingBy { it.fileFormat() }
+                .eachCount()
+                .map { (name, count) -> LibraryFormat(name, count) }
+                .sortedBy { it.name },
+            missingOnly = filters.missingOnly,
+            missingIds = missingIds,
         )
     }
 
@@ -261,6 +308,9 @@ class DownloadsViewModel : ViewModel() {
             .thenBy(String.CASE_INSENSITIVE_ORDER) { it.songName }
     }
 }
+
+private fun DownloadedSongInfo.fileFormat(): String =
+    songPath.substringAfterLast('.', "").lowercase(Locale.ROOT).ifBlank { "other" }
 
 private fun DownloadedSongInfo.matchesAll(tokens: List<String>): Boolean {
     val haystack = normalizeSearchText("$songName $songAuthor")

@@ -17,11 +17,13 @@ import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.HelpOutline
+import androidx.compose.material.icons.outlined.Album
 import androidx.compose.material.icons.outlined.AudioFile
 import androidx.compose.material.icons.outlined.HighQuality
 import androidx.compose.material.icons.outlined.Lyrics
 import androidx.compose.material.icons.outlined.MusicNote
 import androidx.compose.material.icons.outlined.Output
+import androidx.compose.material.icons.outlined.Public
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.Icon
@@ -360,6 +362,99 @@ fun OutputFormatDialog(
         },
         dismissButton = {
             TextButton(onClick = { onDismissRequest() }) {
+                Text(text = stringResource(id = R.string.dismiss))
+            }
+        }
+    )
+}
+
+@Composable
+fun PlaylistTaggingDialog(onDismissRequest: () -> Unit, onConfirm: () -> Unit = {}) {
+    var tagging by remember { mutableStateOf(PreferencesUtil.getPlaylistTagging()) }
+
+    AlertDialog(
+        onDismissRequest = onDismissRequest,
+        icon = { Icon(Icons.Outlined.Album, null) },
+        title = { Text(stringResource(R.string.playlist_tagging)) },
+        text = {
+            Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
+                Text(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = 12.dp),
+                    text = stringResource(R.string.playlist_tagging_desc),
+                    style = MaterialTheme.typography.bodyLarge
+                )
+                SingleChoiceItem(
+                    text = stringResource(R.string.playlist_tagging_off),
+                    selected = tagging == 0,
+                ) { tagging = 0 }
+                SingleChoiceItem(
+                    text = stringResource(R.string.playlist_tagging_album),
+                    selected = tagging == 1,
+                ) { tagging = 1 }
+                SingleChoiceItem(
+                    text = stringResource(R.string.playlist_tagging_album_cover),
+                    selected = tagging == 2,
+                ) { tagging = 2 }
+            }
+        },
+        confirmButton = {
+            ConfirmButton(onClick = {
+                PreferencesUtil.setPlaylistTagging(tagging)
+                onConfirm()
+                onDismissRequest()
+            })
+        },
+        dismissButton = {
+            TextButton(onClick = onDismissRequest) {
+                Text(text = stringResource(id = R.string.dismiss))
+            }
+        }
+    )
+}
+
+@Composable
+fun ProxyDialog(onDismissRequest: () -> Unit, onConfirm: () -> Unit = {}) {
+    var proxy by remember { mutableStateOf(PreferencesUtil.getProxy()) }
+
+    AlertDialog(
+        onDismissRequest = onDismissRequest,
+        icon = { Icon(Icons.Outlined.Public, null) },
+        title = { Text(stringResource(R.string.proxy)) },
+        text = {
+            Column {
+                Text(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = 12.dp),
+                    text = stringResource(R.string.proxy_desc),
+                    style = MaterialTheme.typography.bodyLarge
+                )
+                TextField(
+                    value = proxy,
+                    onValueChange = { proxy = it },
+                    placeholder = { Text(text = stringResource(R.string.proxy_example)) },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                Text(
+                    modifier = Modifier.padding(top = 8.dp),
+                    text = stringResource(R.string.proxy_empty_hint),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+                )
+            }
+        },
+        confirmButton = {
+            ConfirmButton(onClick = {
+                PreferencesUtil.setProxy(proxy)
+                onConfirm()
+                onDismissRequest()
+            })
+        },
+        dismissButton = {
+            TextButton(onClick = onDismissRequest) {
                 Text(text = stringResource(id = R.string.dismiss))
             }
         }

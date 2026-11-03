@@ -14,11 +14,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.text.selection.SelectionContainer
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Download
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.FilledTonalIconButton
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -36,19 +32,34 @@ import com.adamratzman.spotify.models.Album
 import com.bobbyesp.spowlo.R
 import com.bobbyesp.spowlo.ui.common.AsyncImageImpl
 import com.bobbyesp.spowlo.ui.components.HorizontalDivider
+import com.bobbyesp.spowlo.ui.components.songs.metadata_viewer.CollectionDownloadActions
 import com.bobbyesp.spowlo.ui.components.songs.metadata_viewer.TrackComponent
 import com.bobbyesp.spowlo.ui.components.text.MarqueeText
 import com.bobbyesp.spowlo.ui.pages.metadata_viewer.binders.dataStringToString
+import com.bobbyesp.spowlo.ui.pages.metadata_viewer.playlists.TrackDownload
 
 @Composable
 fun AlbumPage(
     data: Album,
     modifier: Modifier,
     trackDownloadCallback: (String, String) -> Unit,
+    downloadedTrackIds: Set<String> = emptySet(),
+    onDownloadTracks: (List<TrackDownload>) -> Unit = {},
     isLoadingTracks: Boolean = false,
 ) {
     val localConfig = LocalConfiguration.current
     val trackCount = maxOf(data.totalTracks, data.tracks.total)
+    val missingTracks = data.tracks.items.mapNotNull { track ->
+        if (track.id in downloadedTrackIds) return@mapNotNull null
+        TrackDownload(
+            url = track.externalUrls.spotify ?: "https://open.spotify.com/track/${track.id}",
+            name = "${track.name} - ${track.artists.joinToString(", ") { it.name }}",
+            durationMs = track.durationMs.toLong()
+        )
+    }
+    val pendingDurationMs = data.tracks.items
+        .filter { it.id !in downloadedTrackIds }
+        .sumOf { it.durationMs.toLong() }
 
     LazyColumn(
         modifier = modifier.fillMaxSize(),
@@ -124,31 +135,20 @@ fun AlbumPage(
         item {
             Spacer(modifier = Modifier.height(6.dp))
         }
-        if (data.externalUrls.spotify != null) {
+        if (data.externalUrls.spotify != null || missingTracks.isNotEmpty()) {
             item {
-                Row(
+                val downloadAll: (() -> Unit)? = data.externalUrls.spotify?.let { url ->
+                    { trackDownloadCallback(url, data.name) }
+                }
+                CollectionDownloadActions(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(12.dp),
-                    horizontalArrangement = Arrangement.End,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    FilledTonalIconButton(
-                        onClick = {
-                            trackDownloadCallback(data.externalUrls.spotify!!, data.name)
-                        },
-                        modifier = Modifier.size(48.dp),
-                    ) {
-                        Icon(
-                            imageVector = Icons.Filled.Download,
-                            contentDescription = stringResource(R.string.download_all_songs),
-                            modifier = Modifier
-                                .weight(1f)
-                                .padding(14.dp)
-                        )
-                    }
-
-                }
+                    totalDurationMs = pendingDurationMs,
+                    missingTracks = missingTracks,
+                    onDownloadAll = downloadAll,
+                    onDownloadMissing = onDownloadTracks,
+                )
                 HorizontalDivider(
                     modifier = Modifier.padding(
                         horizontal = 16.dp,
@@ -168,6 +168,7 @@ fun AlbumPage(
                     artists = track.artists.joinToString(", ") { it.name },
                     spotifyUrl = track.externalUrls.spotify ?: "",
                     isExplicit = track.explicit,
+                    isDownloaded = track.id in downloadedTrackIds,
                     onClick = {
                         trackDownloadCallback(
                             track.externalUrls.spotify!!,
