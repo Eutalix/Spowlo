@@ -31,6 +31,7 @@ import androidx.compose.material.ContentAlpha
 import androidx.compose.material.ExperimentalMaterialApi
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.FileDownloadDone
+import androidx.compose.material.icons.filled.LibraryMusic
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.outlined.Cancel
 import androidx.compose.material.icons.outlined.ContentCopy
@@ -116,6 +117,7 @@ fun DownloaderPage(
     onSongCardClicked: () -> Unit = {},
     navigateToSearch: (String) -> Unit = {},
     navigateToTasks: () -> Unit = {},
+    navigateToLibrary: () -> Unit = {},
     sheetState: SheetState,
     downloaderViewModel: DownloaderViewModel = viewModel(),
 ) {
@@ -211,6 +213,7 @@ fun DownloaderPage(
         },
         navigateToTasks = navigateToTasks,
         navigateToSearch = navigateToSearch,
+        navigateToLibrary = navigateToLibrary,
         onSongCardClicked = { onSongCardClicked() },
         showOutput = showConsoleOutput,
         showSongCard = true,
@@ -248,6 +251,7 @@ fun DownloaderPageImplementation(
     navigateToSettings: () -> Unit = {},
     navigateToTasks: () -> Unit = {},
     navigateToSearch: (String) -> Unit = {},
+    navigateToLibrary: () -> Unit = {},
     pasteCallback: () -> Unit = {},
     cancelCallback: () -> Unit = {},
     onSongCardClicked: () -> Unit = {},
@@ -266,6 +270,12 @@ fun DownloaderPageImplementation(
                     )
                 }
             }, actions = {
+                IconButton(onClick = { navigateToLibrary() }) {
+                    Icon(
+                        imageVector = Icons.Filled.LibraryMusic,
+                        contentDescription = stringResource(id = R.string.your_library)
+                    )
+                }
                 IconButton(onClick = { navigateToSearch("") }) {
                     Icon(
                         imageVector = Icons.Filled.Search,

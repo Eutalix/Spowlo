@@ -200,8 +200,8 @@
         <item quantity="other">%d files are missing</item>
     </plurals>
     <plurals name="remove_missing_message">
-        <item quantity="one">%d entry will be removed from the library. The file is already gone.</item>
-        <item quantity="other">%d entries will be removed from the library. The files are already gone.</item>
+        <item quantity="one">%d entry will be removed from the library.</item>
+        <item quantity="other">%d entries will be removed from the library.</item>
     </plurals>
     <plurals name="removed_entries">
         <item quantity="one">Removed %d entry</item>
@@ -385,12 +385,12 @@
     <string name="output_format_desc">Set the file name format for downloads</string>
     <string name="available_output_formats">Available output format fields</string>
     <string name="playlist_tagging">Playlist tagging</string>
-    <string name="playlist_tagging_desc">When downloading a playlist, use its name as the album for every song. The playlist cover can also replace each track\'s artwork.</string>
+    <string name="playlist_tagging_desc">Use the playlist name as the album for its songs.</string>
     <string name="playlist_tagging_off">Off</string>
     <string name="playlist_tagging_album">Playlist as album</string>
     <string name="playlist_tagging_album_cover">Playlist as album, keep track art</string>
     <string name="proxy">Proxy</string>
-    <string name="proxy_desc">Route downloads through an HTTP(S) proxy. Useful when a provider is blocked on your network.</string>
+    <string name="proxy_desc">Route downloads through an HTTP(S) proxy.</string>
     <string name="proxy_example">http://host:port</string>
     <string name="proxy_not_set">Not set</string>
     <string name="proxy_empty_hint">Leave empty to connect directly.</string>
@@ -406,7 +406,7 @@
     <string name="download_estimate">About %1$s · %2$s free</string>
     <string name="download_estimate_only">About %1$s</string>
     <string name="not_enough_space_title">Not enough space</string>
-    <string name="not_enough_space_message">This download needs about %1$s, but only %2$s is free on this device.</string>
+    <string name="not_enough_space_message">Needs about %1$s, but only %2$s is free.</string>
     <string name="download_anyway">Download anyway</string>
     <string name="collection_empty">No playable songs found in this playlist or album.</string>
     <plurals name="song_count">
@@ -472,4 +472,15 @@
         <item quantity="one">Exported 1 song</item>
         <item quantity="other">Exported %d songs</item>
     </plurals>
+
+    <string name="your_library">Your Library</string>
+    <string name="liked_songs">Liked Songs</string>
+    <string name="made_for_you">Made for you</string>
+    <string name="your_playlists">Your playlists</string>
+    <string name="no_playlists_yet">No playlists yet.</string>
+    <string name="library_sign_in_body">Sign in to see your liked songs and playlists.</string>
+    <string name="sign_in_with_spotify">Sign in with Spotify</string>
+    <string name="library_error">Couldn\'t load your library.</string>
+    <string name="liked_songs_error">Couldn\'t load your liked songs.</string>
+    <string name="retry">Try again</string>
 </resources>

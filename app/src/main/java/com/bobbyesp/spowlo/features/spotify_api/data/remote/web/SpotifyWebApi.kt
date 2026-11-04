@@ -39,6 +39,9 @@ object SpotifyWebApi {
         "getAlbum" to "0b6ce3511e1b02e4a40fa95440f992acbe85080eb308af9194322d708fc1914f",
         "queryArtistOverview" to "9f8134ef565e78621f1e1793555bd6633c5ac144ae0f89604ed3ae3f80b3c8e6",
         "fetchPlaylist" to "21ea11a6ac75a5f3e01fd365d29c18e0a4a8b7dc09f89bbb5d73910190c6acaf",
+        "profileAttributes" to "08ffb4730af3746e04a8301396f20875dbbce10c75243803091a9274eacc8ac0",
+        "libraryV3" to "390c78e5b951029bad359785e69b07b536a509c581cbcd0aded5e5067f187455",
+        "fetchLibraryTracks" to "087278b20b743578a6262c2b0b4bcd20d879c503cc359a2285baf083ef944240",
     )
 
     private val json = Json {
@@ -230,7 +233,7 @@ object SpotifyWebApi {
         return paging(albums, albums.size, 0, albums.size)
     }
 
-    suspend fun getPlaylist(playlistId: String): Playlist {
+    suspend fun getPlaylist(playlistId: String, account: Boolean = false): Playlist {
         val root = graphql(
             "fetchPlaylist",
             JSONObject()
@@ -238,6 +241,7 @@ object SpotifyWebApi {
                 .put("offset", 0)
                 .put("limit", PLAYLIST_PAGE_SIZE)
                 .put("enableWatchFeedEntrypoint", false),
+            account = account,
         )
         val node = root.optJSONObject("data")?.optJSONObject("playlistV2")
             ?: throw SpotifyWebException(200, "Playlist $playlistId was not found")
@@ -245,7 +249,12 @@ object SpotifyWebApi {
         return decode(playlistJson(node).toString())
     }
 
-    suspend fun getPlaylistTracks(playlistId: String, limit: Int, offset: Int): PagingObject<PlaylistTrack> {
+    suspend fun getPlaylistTracks(
+        playlistId: String,
+        limit: Int,
+        offset: Int,
+        account: Boolean = false,
+    ): PagingObject<PlaylistTrack> {
         val root = graphql(
             "fetchPlaylist",
             JSONObject()
@@ -253,6 +262,7 @@ object SpotifyWebApi {
                 .put("offset", offset)
                 .put("limit", limit)
                 .put("enableWatchFeedEntrypoint", false),
+            account = account,
         )
         val container = root.optJSONObject("data")
             ?.optJSONObject("playlistV2")
@@ -266,6 +276,48 @@ object SpotifyWebApi {
         }
 
         return paging(tracks, container.optInt("totalCount", tracks.size), offset, limit)
+    }
+
+    /** Account operations below go through pathfinder, which the account token is not rate limited on. */
+    suspend fun accountProfile(): JSONObject {
+        val root = graphql("profileAttributes", JSONObject(), account = true)
+        return root.optJSONObject("data")?.optJSONObject("me")?.optJSONObject("profile")
+            ?: throw SpotifyWebException(200, "Spotify did not return the account profile")
+    }
+
+    suspend fun accountPlaylists(limit: Int, offset: Int): JSONObject {
+        val root = graphql(
+            "libraryV3",
+            JSONObject()
+                .put("filters", JSONArray().put("Playlists"))
+                .put("order", JSONObject.NULL)
+                .put("textFilter", "")
+                .put("features", JSONArray())
+                .put("limit", limit)
+                .put("offset", offset)
+                .put("flatten", false)
+                .put("expandedFolders", JSONArray())
+                .put("folderUri", JSONObject.NULL)
+                .put("includeFoldersWhenFlattening", true)
+                .put("withCuration", false),
+            account = true,
+        )
+        return root.optJSONObject("data")?.optJSONObject("me")?.optJSONObject("libraryV3")
+            ?: JSONObject()
+    }
+
+    suspend fun accountLikedTracks(limit: Int, offset: Int): JSONObject {
+        val root = graphql(
+            "fetchLibraryTracks",
+            JSONObject()
+                .put("uri", "spotify:collection:tracks")
+                .put("offset", offset)
+                .put("limit", limit),
+            account = true,
+        )
+        return root.optJSONObject("data")?.optJSONObject("me")?.optJSONObject("library")
+            ?.optJSONObject("tracks")
+            ?: JSONObject()
     }
 
     private suspend fun search(query: String, limit: Int, offset: Int): JSONObject {
@@ -285,21 +337,31 @@ object SpotifyWebApi {
             ?: throw SpotifyWebException(200, "Unexpected search response")
     }
 
-    private suspend fun graphql(operation: String, variables: JSONObject): JSONObject =
-        withContext(Dispatchers.IO) {
-            val hash = OPERATION_HASHES[operation]
-                ?: throw IllegalArgumentException("Unknown Spotify operation: $operation")
+    private suspend fun graphql(
+        operation: String,
+        variables: JSONObject,
+        account: Boolean = false,
+    ): JSONObject = withContext(Dispatchers.IO) {
+        val hash = OPERATION_HASHES[operation]
+            ?: throw IllegalArgumentException("Unknown Spotify operation: $operation")
 
-            var session = SpotifyWebAuth.session()
-            var response = execute(session, operation, hash, variables)
+        var session = SpotifyWebAuth.session()
+        val accountToken = if (account) SpotifyUserSession.accessToken() else null
+        var accessToken = accountToken ?: session.accessToken
+        var response = execute(session, operation, hash, variables, accessToken)
 
-            // The client token expires independently of the access token.
-            if (response.code == 401 || response.code == 400 || response.code == 403) {
-                Log.w(TAG, "$operation returned HTTP ${response.code}, refreshing session")
+        // The client token expires independently of the access token.
+        if (response.code == 401 || response.code == 400 || response.code == 403) {
+            Log.w(TAG, "$operation returned HTTP ${response.code}, refreshing token")
+            accessToken = if (accountToken != null) {
+                SpotifyUserSession.accessToken(forceRefresh = true)
+                    ?: SpotifyWebAuth.session(forceRefresh = true).accessToken
+            } else {
                 SpotifyWebAuth.invalidate()
-                session = SpotifyWebAuth.session(forceRefresh = true)
-                response = execute(session, operation, hash, variables)
+                SpotifyWebAuth.session(forceRefresh = true).accessToken
             }
+            response = execute(session, operation, hash, variables, accessToken)
+        }
 
             val body = response.body
             Log.d(TAG, "← $operation HTTP ${response.code} bodyLen=${body.length}")
@@ -320,6 +382,7 @@ object SpotifyWebApi {
         operation: String,
         hash: String,
         variables: JSONObject,
+        accessToken: String = session.accessToken,
     ): WebResponse {
         val url = "https://api-partner.spotify.com/pathfinder/v1/query?".toHttpUrl().newBuilder()
             .addQueryParameter("operationName", operation)
@@ -337,7 +400,7 @@ object SpotifyWebApi {
         return SpotifyWebTransport.fetch(
             url,
             buildMap {
-                put("Authorization", "Bearer ${session.accessToken}")
+                put("Authorization", "Bearer $accessToken")
                 if (session.clientToken.isNotBlank()) put("Client-Token", session.clientToken)
                 if (session.deviceId.isNotBlank()) put("Cookie", "sp_t=${session.deviceId}")
                 put("Spotify-App-Version", session.clientVersion)

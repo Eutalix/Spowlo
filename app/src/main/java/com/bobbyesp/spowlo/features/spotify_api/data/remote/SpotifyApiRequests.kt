@@ -46,9 +46,9 @@ object SpotifyApiRequests {
         }.getOrDefault(emptyList())
     }
 
-    suspend fun provideGetPlaylistById(id: String): Playlist? {
+    suspend fun provideGetPlaylistById(id: String, account: Boolean = false): Playlist? {
         return runCatching {
-            SpotifyWebApi.getPlaylist(id)
+            SpotifyWebApi.getPlaylist(id, account)
         }.onSuccess {
             Log.d(TAG, "Playlist found: ${it.name}")
         }.onFailure {
@@ -60,9 +60,10 @@ object SpotifyApiRequests {
         id: String,
         limit: Int = SpotifyWebApi.PLAYLIST_PAGE_SIZE,
         offset: Int,
+        account: Boolean = false,
     ): PagingObject<PlaylistTrack> {
         return runCatching {
-            SpotifyWebApi.getPlaylistTracks(id, limit, offset)
+            SpotifyWebApi.getPlaylistTracks(id, limit, offset, account)
         }.onFailure {
             Log.e(TAG, "getPlaylistTracks($id, $offset) failed: ${it.message}", it)
         }.getOrDefault(PagingObject("", emptyList(), limit, null, offset, null, 0))

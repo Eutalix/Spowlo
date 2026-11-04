@@ -39,7 +39,11 @@ class PlaylistPageViewModel @Inject constructor() : ViewModel() {
         val isLoadingTracks: Boolean = false,
     )
 
-    suspend fun loadData(id: String, type: SpotifyDataType = SpotifyDataType.TRACK) {
+    suspend fun loadData(
+        id: String,
+        type: SpotifyDataType = SpotifyDataType.TRACK,
+        account: Boolean = false,
+    ) {
         mutableViewStateFlow.update {
             ViewState(id = id, state = PlaylistDataState.Loading)
         }
@@ -51,7 +55,7 @@ class PlaylistPageViewModel @Inject constructor() : ViewModel() {
                         ?.let { PlaylistDataState.Loaded(it) }
 
                     SpotifyDataType.ALBUM -> loadAlbum(id)
-                    SpotifyDataType.PLAYLIST -> loadPlaylist(id)
+                    SpotifyDataType.PLAYLIST -> loadPlaylist(id, account)
                     SpotifyDataType.ARTIST -> SpotifyApiRequests.provideGetArtistById(id)
                         ?.let { PlaylistDataState.Loaded(it) }
                 } ?: throw Exception("Error while loading data")
@@ -70,8 +74,8 @@ class PlaylistPageViewModel @Inject constructor() : ViewModel() {
         }
     }
 
-    private suspend fun loadPlaylist(id: String): PlaylistDataState.Loaded {
-        var complete = SpotifyApiRequests.provideGetPlaylistById(id)
+    private suspend fun loadPlaylist(id: String, account: Boolean): PlaylistDataState.Loaded {
+        var complete = SpotifyApiRequests.provideGetPlaylistById(id, account)
             ?: throw Exception("Error while loading playlist")
 
         publish(id, PlaylistDataState.Loaded(complete), isLoadingTracks = true)
@@ -79,7 +83,11 @@ class PlaylistPageViewModel @Inject constructor() : ViewModel() {
         val tracks = complete.tracks.items.toMutableList()
         var offset = 0
         while (offset < MAX_TRACKS) {
-            val page = SpotifyApiRequests.provideGetPlaylistTracksPage(id, offset = offset)
+            val page = SpotifyApiRequests.provideGetPlaylistTracksPage(
+                id,
+                offset = offset,
+                account = account
+            )
             if (page.items.isEmpty()) break
             tracks.addAll(page.items)
             offset += SpotifyWebApi.PLAYLIST_PAGE_SIZE

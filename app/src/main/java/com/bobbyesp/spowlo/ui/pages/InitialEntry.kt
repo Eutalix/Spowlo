@@ -45,6 +45,8 @@ import com.bobbyesp.spowlo.ui.pages.download_tasks.DownloadTasksPage
 import com.bobbyesp.spowlo.ui.pages.download_tasks.FullscreenConsoleOutput
 import com.bobbyesp.spowlo.ui.pages.downloader.DownloaderPage
 import com.bobbyesp.spowlo.ui.pages.downloader.DownloaderViewModel
+import com.bobbyesp.spowlo.ui.pages.library.LikedSongsPage
+import com.bobbyesp.spowlo.ui.pages.library.UserLibraryPage
 import com.bobbyesp.spowlo.ui.pages.metadata_viewer.playlists.PlaylistPageViewModel
 import com.bobbyesp.spowlo.ui.pages.metadata_viewer.playlists.SpotifyItemPage
 import com.bobbyesp.spowlo.ui.pages.playlist.PlaylistMetadataPage
@@ -190,6 +192,9 @@ fun InitialEntry(
                     navigateToTasks = {
                         navController.navigate(Route.DownloadTasksNavi)
                     },
+                    navigateToLibrary = {
+                        navController.navigate(Route.LIBRARY)
+                    },
                     navigateToSearch = { query ->
                         if (query.isBlank()) {
                             navController.navigate(Route.SearcherNavi)
@@ -207,6 +212,23 @@ fun InitialEntry(
                 SettingsPage(
                     navController = navController
                 )
+            }
+            animatedComposable(Route.LIBRARY) {
+                UserLibraryPage(
+                    onBackPressed = onBackPressed,
+                    onOpenPlaylist = { id ->
+                        navController.navigate(
+                            Route.PLAYLIST_PAGE + "/playlist/" + id + "?account=true",
+                            navOptions = navOptions {
+                                launchSingleTop = true
+                                restoreState = true
+                            })
+                    },
+                    onOpenLikedSongs = { navController.navigate(Route.LIKED_SONGS) },
+                )
+            }
+            animatedComposable(Route.LIKED_SONGS) {
+                LikedSongsPage(onBackPressed)
             }
             animatedComposable(Route.GENERAL_DOWNLOAD_PREFERENCES) {
                 GeneralSettingsPage(
@@ -305,23 +327,31 @@ fun InitialEntry(
                 type = NavType.StringType
             }
 
+            val accountArg = navArgument("account") {
+                type = NavType.BoolType
+                defaultValue = false
+            }
+
             //We build the route with the type of the destination and the id of it
             val routeWithIdPattern: String =
                 StringBuilder().append(Route.PLAYLIST_PAGE).append("/{type}")
-                    .append("/{id}").toString()
+                    .append("/{id}")
+                    .append("?account={account}").toString()
 
             //We create the composable with the route and the arguments
             animatedComposableVariant(
-                routeWithIdPattern, arguments = listOf(typeArg, idArg)
+                routeWithIdPattern, arguments = listOf(typeArg, idArg, accountArg)
             ) { backStackEntry ->
                 val id = backStackEntry.arguments?.getString("id") ?: "SOMETHING WENT WRONG"
                 val type =
                     backStackEntry.arguments?.getString("type") ?: "SOMETHING WENT WRONG"
+                val account = backStackEntry.arguments?.getBoolean("account") ?: false
 
                 SpotifyItemPage(
                     onBackPressed,
                     id = id,
                     type = type,
+                    account = account,
                     playlistPageViewModel = playlistPageViewModel,
                 )
             }

@@ -83,6 +83,16 @@ internal object SpotifyWebAuth {
         session = null
     }
 
+    suspend fun signedTokenUrl(): String {
+        val (version, secret) = withContext(Dispatchers.IO) { totpSecret() }
+        val code = generateTotp(secret)
+        return tokenUrl(code, version)
+    }
+
+    private fun tokenUrl(code: String, version: Int) =
+        "https://open.spotify.com/api/token?" +
+            "reason=init&productType=web-player&totp=$code&totpVer=$version&totpServer=$code"
+
     private fun fetchSession(): SpotifyWebSession {
         val (html, deviceId) = fetchWebPlayerConfig()
 
@@ -102,12 +112,9 @@ internal object SpotifyWebAuth {
         val (version, secret) = totpSecret()
         val code = generateTotp(secret)
 
-        val tokenUrl = "https://open.spotify.com/api/token?" +
-            "reason=init&productType=web-player&totp=$code&totpVer=$version&totpServer=$code"
-
         val tokenResponse = client.newCall(
             Request.Builder()
-                .url(tokenUrl)
+                .url(tokenUrl(code, version))
                 .header("User-Agent", USER_AGENT)
                 .header("Accept", "application/json")
                 .header("Accept-Language", "en-US,en;q=0.9")

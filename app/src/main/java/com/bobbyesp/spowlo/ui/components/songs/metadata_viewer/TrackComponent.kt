@@ -116,6 +116,15 @@ fun TrackComponent(
                                 alpha = 0.8f
                             ),
                         )
+                        if (isDownloaded) {
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Icon(
+                                imageVector = Icons.Filled.CheckCircle,
+                                contentDescription = stringResource(id = R.string.downloaded),
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(12.dp)
+                            )
+                        }
                     }
                     Spacer(Modifier.height(6.dp))
                     Row(
@@ -136,15 +145,6 @@ fun TrackComponent(
                         LyricsIcon(visible = hasLyrics)
                         Spacer(modifier = Modifier.width(6.dp))
                         ExplicitIcon(visible = isExplicit)
-                        if (isDownloaded) {
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Icon(
-                                imageVector = Icons.Filled.CheckCircle,
-                                contentDescription = stringResource(id = R.string.downloaded),
-                                tint = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.size(12.dp)
-                            )
-                        }
                     }
                 }
             }
