@@ -37,14 +37,15 @@ fun SpotifyItemPage(
     playlistPageViewModel: PlaylistPageViewModel = viewModel(),
     id: String,
     type: String,
+    account: Boolean = false,
 ) {
     val scrollBehavior = TopAppBarDefaults.enterAlwaysScrollBehavior()
 
     val viewState by playlistPageViewModel.viewStateFlow.collectAsStateWithLifecycle()
     val downloadedTrackIds by playlistPageViewModel.downloadedTrackIds.collectAsStateWithLifecycle()
 
-    LaunchedEffect(id) {
-        playlistPageViewModel.loadData(id, typeOfSpotifyDataType(type))
+    LaunchedEffect(id, account) {
+        playlistPageViewModel.loadData(id, typeOfSpotifyDataType(type), account)
     }
 
     with(viewState) {

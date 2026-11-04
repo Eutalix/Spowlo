@@ -26,6 +26,8 @@ object Route {
     const val DOWNLOAD_TASKS = "download_tasks"
     const val DownloadTasksNavi = "download_tasks_navi"
     const val PLAYLIST_PAGE = "playlist_page"
+    const val LIBRARY = "library_page"
+    const val LIKED_SONGS = "liked_songs_page"
 
     const val APPEARANCE = "appearance"
     const val APP_THEME = "app_theme"
