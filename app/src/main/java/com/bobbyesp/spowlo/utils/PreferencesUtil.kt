@@ -37,7 +37,6 @@ const val EXTRA_DIRECTORY = "extra_dir"
 const val ORIGINAL_AUDIO = "original_audio"
 const val SDCARD_DOWNLOAD = "sdcard_download"
 const val SDCARD_URI = "sd_card_uri"
-const val PLAYLIST = "playlist"
 const val LANGUAGE = "language"
 const val NOTIFICATION = "notification"
 const val NOTIFICATION_PERMISSION_REQUESTED = "notification_permission_requested"
@@ -45,7 +44,6 @@ const val NOTIFICATION_PROMPT_SHOWN = "notification_prompt_shown"
 const val NOTIFICATION_HINT_DISMISSED = "notification_hint_dismissed"
 private const val THEME_COLOR = "theme_color"
 const val PALETTE_STYLE = "palette_style"
-const val CUSTOM_PATH = "custom_path"
 
 const val USE_YT_METADATA = "use_yt_metadata"
 const val DOWNLOAD_LYRICS = "download_lyrics"
@@ -68,13 +66,12 @@ const val PLAYLIST_TAGGING = "playlist_tagging"
 const val PROXY = "proxy"
 
 const val SPOTDL_UPDATE = "spotdl_update"
-const val TEMPLATE_ID = "template_id"
-const val MAX_FILE_SIZE = "max_file_size"
 const val COOKIES = "cookies"
 const val AUTO_UPDATE = "auto_update"
 const val UPDATE_CHANNEL = "update_channel"
 const val INCOGNITO_MODE = "incognito_mode"
 private const val DYNAMIC_COLOR = "dynamic_color"
+private const val BOTTOM_BAR = "bottom_bar"
 const val CELLULAR_DOWNLOAD = "cellular_download"
 private const val HIGH_CONTRAST = "high_contrast"
 const val FORMAT_SELECTION = "format_selection"
@@ -152,7 +149,6 @@ object PreferencesUtil {
     private val kv = MMKV.defaultMMKV()
 
     private val IntPreferenceDefaults = mapOf(
-        TEMPLATE_ID to 0,
         LANGUAGE to SYSTEM_DEFAULT,
         PALETTE_STYLE to 0,
         DARK_THEME_VALUE to DarkThemePreference.FOLLOW_SYSTEM,
@@ -271,6 +267,9 @@ object PreferencesUtil {
     fun isNetworkAvailableForDownload() =
         !com.bobbyesp.spowlo.App.connectivityManager.isActiveNetworkMetered
 
+    fun isDownloadNetworkAllowed(): Boolean =
+        isNetworkAvailableForDownload() || getValue(CELLULAR_DOWNLOAD)
+
     fun isNetworkAvailable() = com.bobbyesp.spowlo.App.connectivityManager.activeNetworkInfo?.isConnected == true
 
     fun isAutoUpdateEnabled() = AUTO_UPDATE.getBoolean(!com.bobbyesp.spowlo.App.isFDroidBuild())
@@ -295,9 +294,10 @@ object PreferencesUtil {
     data class AppSettings(
         val darkTheme: DarkThemePreference = DarkThemePreference(),
         val isDynamicColorEnabled: Boolean = false,
+        val isBottomBarEnabled: Boolean = false,
         val seedColor: Int = DEFAULT_SEED_COLOR,
         val paletteStyleIndex: Int = 0,
-        val metadataArtworkColors: Boolean = true
+        val metadataArtworkColors: Boolean = false
     )
 
     private val mutableAppSettingsStateFlow = MutableStateFlow(
@@ -312,9 +312,10 @@ object PreferencesUtil {
                 DYNAMIC_COLOR,
                 DynamicColors.isDynamicColorAvailable()
             ),
+            isBottomBarEnabled = kv.decodeBool(BOTTOM_BAR, false),
             seedColor = kv.decodeInt(THEME_COLOR, DEFAULT_SEED_COLOR),
             paletteStyleIndex = kv.decodeInt(PALETTE_STYLE, 0),
-            metadataArtworkColors = kv.decodeBool(METADATA_ARTWORK_COLORS, true)
+            metadataArtworkColors = kv.decodeBool(METADATA_ARTWORK_COLORS, false)
         )
     )
     val AppSettingsStateFlow = mutableAppSettingsStateFlow.asStateFlow()
@@ -353,6 +354,15 @@ object PreferencesUtil {
                 it.copy(isDynamicColorEnabled = enabled)
             }
             kv.encode(DYNAMIC_COLOR, enabled)
+        }
+    }
+
+    fun switchBottomBar(enabled: Boolean = !mutableAppSettingsStateFlow.value.isBottomBarEnabled) {
+        applicationScope.launch(Dispatchers.IO) {
+            mutableAppSettingsStateFlow.update {
+                it.copy(isBottomBarEnabled = enabled)
+            }
+            kv.encode(BOTTOM_BAR, enabled)
         }
     }
 

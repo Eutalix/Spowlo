@@ -150,6 +150,7 @@
     <string name="use_yt_metadata_desc">Use YouTube Music metadata instead of Spotify when downloading from YouTube Music.</string>
     <string name="preserve_original_audio_warning">When preserving the original audio, OPUS or M4A is recommended.</string>
     <string name="additional_settings">Additional settings</string>
+    <string name="navigation">Navigation</string>
     <string name="high_contrast">High contrast theme (AMOLED)</string>
     <string name="filter_artist">Filter by artist</string>
     <string name="loading">Loading…</string>
@@ -384,6 +385,26 @@
     <string name="split_playlist_desc">Put downloads into folders named after their playlist.</string>
     <string name="split_by_main_artist">Split by main artist</string>
     <string name="split_by_main_artist_desc">Put downloads into folders named after each song\'s main artist.</string>
+    <string name="cellular_download">Download on mobile data</string>
+    <string name="cellular_download_desc">Allow downloads while connected to mobile data.</string>
+    <string name="mobile_data_downloads_disabled">Downloads are disabled on mobile data.</string>
+    <string name="section_metadata">Metadata &amp; lyrics</string>
+    <string name="section_organisation">Organisation</string>
+    <string name="section_matching">Matching</string>
+    <string name="section_privacy">Privacy</string>
+    <string name="section_performance">Performance</string>
+    <string name="section_maintenance">Maintenance</string>
+    <string name="section_notifications">Notifications</string>
+    <string name="section_profiles">Profiles</string>
+    <string name="section_storage">Storage</string>
+    <string name="other">Other</string>
+    <string name="app_language">App language</string>
+    <string name="section_app">App</string>
+    <string name="section_behavior">Behaviour</string>
+    <string name="cookies_profiles_hint">Tap a profile to edit it, long-press to remove it.</string>
+    <string name="not_configured">Not configured</string>
+    <string name="accent_color_unavailable">Disable dynamic color to choose a custom accent color</string>
+    <string name="audio_quality_unavailable">Turn off \"Preserve original audio\" to pick a bitrate</string>
     <string name="mods_downloader_banned">The mods downloader has been removed because Firebase (a Google hosting service) no longer allows APK downloads on its free plan. Consider using xManager instead.</string>
     <string name="lyric_providers">Lyrics providers</string>
     <string name="lyric_providers_desc">Choose where to get lyrics from</string>
@@ -503,6 +524,8 @@
     </plurals>
 
     <string name="your_library">Your Library</string>
+    <string name="bottom_bar">Bottom navigation bar</string>
+    <string name="bottom_bar_desc">Coming soon. It sucks -SomeRedstone</string>
     <string name="liked_songs">Liked Songs</string>
     <string name="made_for_you">Made for you</string>
     <string name="your_playlists">Your playlists</string>

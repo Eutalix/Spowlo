@@ -525,7 +525,7 @@ fun PreferencesHintCard(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 12.dp)
+            .padding(vertical = 12.dp)
             .clip(MaterialTheme.shapes.small)
             .background(backgroundColor)
             .clickable { onClick() }
@@ -810,7 +810,7 @@ fun PreferenceInfo(
             else this
         }) {
         Icon(
-            modifier = Modifier.padding(end = 8.dp),
+            modifier = Modifier.padding(end = 16.dp),
             imageVector = icon,
             contentDescription = null
         )

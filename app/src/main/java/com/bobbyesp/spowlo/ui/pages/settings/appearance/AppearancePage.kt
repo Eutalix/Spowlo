@@ -28,6 +28,7 @@ import androidx.compose.material.icons.outlined.ColorLens
 import androidx.compose.material.icons.outlined.DarkMode
 import androidx.compose.material.icons.outlined.Image
 import androidx.compose.material.icons.outlined.Language
+import androidx.compose.material.icons.outlined.ViewAgenda
 import androidx.compose.material.icons.outlined.Wallpaper
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -58,6 +59,7 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.navigation.NavHostController
 import com.bobbyesp.spowlo.R
+import com.bobbyesp.spowlo.ui.common.LocalBottomBarEnabled
 import com.bobbyesp.spowlo.ui.common.LocalDarkTheme
 import com.bobbyesp.spowlo.ui.common.LocalDynamicColorSwitch
 import com.bobbyesp.spowlo.ui.common.LocalMetadataArtworkColors
@@ -66,8 +68,11 @@ import com.bobbyesp.spowlo.ui.common.LocalSeedColor
 import com.bobbyesp.spowlo.ui.common.Route
 import com.bobbyesp.spowlo.ui.components.BackButton
 import com.bobbyesp.spowlo.ui.components.LargeTopAppBar
-import com.bobbyesp.spowlo.ui.components.PreferenceSubtitle
+import com.bobbyesp.spowlo.ui.components.settings.SettingsChevron
+import com.bobbyesp.spowlo.ui.components.settings.SettingsDivider
+import com.bobbyesp.spowlo.ui.components.settings.SettingsGroup
 import com.bobbyesp.spowlo.ui.components.settings.SettingsItemNew
+import com.bobbyesp.spowlo.ui.components.settings.SettingsSectionHeader
 import com.bobbyesp.spowlo.ui.components.settings.SettingsSwitch
 import com.bobbyesp.spowlo.ui.components.settings.SettingsSwitchWithDivider
 import com.bobbyesp.spowlo.utils.DarkThemePreference.Companion.OFF
@@ -119,107 +124,149 @@ fun AppearancePage(
         content = { paddingValues ->
             LazyColumn(
                 modifier = Modifier
-                    .padding(paddingValues)
-                    .fillMaxSize(),
-                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
+                    .fillMaxSize()
+                    .padding(paddingValues),
+                contentPadding = PaddingValues(
+                    start = 16.dp,
+                    end = 16.dp,
+                    top = 8.dp,
+                    bottom = 32.dp,
+                ),
             ) {
                 item {
-                    PreferenceSubtitle(text = stringResource(id = R.string.theme))
+                    SettingsSectionHeader(stringResource(id = R.string.theme))
                 }
                 item {
-                    SettingsSwitchWithDivider(onCheckedChange = {
-                        PreferencesUtil.modifyDarkThemePreference(if (isDarkTheme) OFF else ON)
-                    },
-                        checked = isDarkTheme,
-                        title = {
-                            Text(
-                                text = stringResource(id = R.string.dark_theme),
-                                fontWeight = FontWeight.Bold
-                            )
-                        },
-                        description = { Text(text = darkTheme.getDarkThemeDesc()) },
-                        icon = Icons.Outlined.DarkMode,
-                        onClick = { navController.navigate(Route.APP_THEME) },
-                        modifier = Modifier.clip(
-                            RoundedCornerShape(topStart = 8.dp, topEnd = 8.dp)
-                        )
-                    )
-                }
-                if (DynamicColors.isDynamicColorAvailable()) {
-                    item {
-                        SettingsSwitch(
-                            onCheckedChange = { PreferencesUtil.switchDynamicColor(it) },
-                            checked = dynamicColorEnabled,
+                    SettingsGroup {
+                        SettingsSwitchWithDivider(
+                            onCheckedChange = {
+                                PreferencesUtil.modifyDarkThemePreference(
+                                    if (isDarkTheme) OFF else ON
+                                )
+                            },
+                            checked = isDarkTheme,
                             title = {
                                 Text(
-                                    text = stringResource(id = R.string.dynamic_color),
+                                    text = stringResource(id = R.string.dark_theme),
                                     fontWeight = FontWeight.Bold
                                 )
                             },
-                            description = { Text(text = stringResource(id = R.string.dynamic_color_desc)) },
-                            icon = Icons.Outlined.Wallpaper,
+                            description = { Text(text = darkTheme.getDarkThemeDesc()) },
+                            icon = Icons.Outlined.DarkMode,
+                            onClick = { navController.navigate(Route.APP_THEME) },
+                            addTonalElevation = false,
+                        )
+                        if (DynamicColors.isDynamicColorAvailable()) {
+                            SettingsDivider()
+                            SettingsSwitch(
+                                onCheckedChange = { PreferencesUtil.switchDynamicColor(it) },
+                                checked = dynamicColorEnabled,
+                                title = {
+                                    Text(
+                                        text = stringResource(id = R.string.dynamic_color),
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                },
+                                description = { Text(text = stringResource(id = R.string.dynamic_color_desc)) },
+                                icon = Icons.Outlined.Wallpaper,
+                                addTonalElevation = false,
+                            )
+                        }
+                        SettingsDivider()
+                        SettingsItemNew(
+                            onClick = { showColorPicker = true },
+                            enabled = !dynamicColorEnabled,
+                            title = {
+                                Text(
+                                    text = stringResource(id = R.string.accent_color),
+                                    fontWeight = FontWeight.Bold
+                                )
+                            },
+                            description = {
+                                Text(
+                                    text = stringResource(
+                                        if (dynamicColorEnabled) {
+                                            R.string.accent_color_unavailable
+                                        } else {
+                                            R.string.accent_color_desc
+                                        }
+                                    )
+                                )
+                            },
+                            icon = Icons.Outlined.ColorLens,
+                            trailing = { ThemeSwatch() },
+                            addTonalElevation = false,
                         )
                     }
                 }
-                item {
-                    SettingsItemNew(
-                        onClick = { showColorPicker = true },
-                        enabled = !dynamicColorEnabled,
-                        title = {
-                            Text(
-                                text = stringResource(id = R.string.accent_color),
-                                fontWeight = FontWeight.Bold
-                            )
-                        },
-                        description = { Text(text = stringResource(id = R.string.accent_color_desc)) },
-                        icon = Icons.Outlined.ColorLens,
-                        trailing = { ThemeSwatch() },
-                        modifier = Modifier.clip(
-                            RoundedCornerShape(bottomStart = 8.dp, bottomEnd = 8.dp)
-                        )
-                    )
-                }
 
                 item {
-                    PreferenceSubtitle(text = stringResource(id = R.string.metadata_pages))
+                    SettingsSectionHeader(stringResource(id = R.string.metadata_pages))
                 }
                 item {
-                    SettingsSwitch(
-                        onCheckedChange = { PreferencesUtil.switchMetadataArtworkColors(it) },
-                        checked = LocalMetadataArtworkColors.current,
-                        title = {
-                            Text(
-                                text = stringResource(id = R.string.metadata_artwork_colors),
-                                fontWeight = FontWeight.Bold
-                            )
-                        },
-                        description = {
-                            Text(text = stringResource(id = R.string.metadata_artwork_colors_desc))
-                        },
-                        icon = Icons.Outlined.Image,
-                        modifier = Modifier.clip(RoundedCornerShape(8.dp))
-                    )
-                }
-
-                item {
-                    PreferenceSubtitle(text = stringResource(id = R.string.additional_settings))
-                }
-                if (Build.VERSION.SDK_INT >= 24) {
-                    item {
-                        SettingsItemNew(
+                    SettingsGroup {
+                        SettingsSwitch(
+                            onCheckedChange = { PreferencesUtil.switchMetadataArtworkColors(it) },
+                            checked = LocalMetadataArtworkColors.current,
                             title = {
                                 Text(
-                                    text = stringResource(id = R.string.language),
+                                    text = stringResource(id = R.string.metadata_artwork_colors),
                                     fontWeight = FontWeight.Bold
                                 )
                             },
-                            icon = Icons.Outlined.Language,
                             description = {
-                                Text(text = com.bobbyesp.spowlo.utils.getLanguageDesc())
+                                Text(text = stringResource(id = R.string.metadata_artwork_colors_desc))
                             },
-                            onClick = { navController.navigate(Route.LANGUAGES) },
-                            modifier = Modifier.clip(RoundedCornerShape(8.dp))
+                            icon = Icons.Outlined.Image,
+                            addTonalElevation = false,
                         )
+                    }
+                }
+
+                item {
+                    SettingsSectionHeader(stringResource(id = R.string.navigation))
+                }
+                item {
+                    SettingsGroup {
+                        SettingsSwitch(
+                            onCheckedChange = { PreferencesUtil.switchBottomBar(it) },
+                            checked = LocalBottomBarEnabled.current,
+                            enabled = false,
+                            title = {
+                                Text(
+                                    text = stringResource(id = R.string.bottom_bar),
+                                    fontWeight = FontWeight.Bold
+                                )
+                            },
+                            description = { Text(text = stringResource(id = R.string.bottom_bar_desc)) },
+                            icon = Icons.Outlined.ViewAgenda,
+                            addTonalElevation = false,
+                        )
+                    }
+                }
+
+                item {
+                    SettingsSectionHeader(stringResource(id = R.string.additional_settings))
+                }
+                if (Build.VERSION.SDK_INT >= 24) {
+                    item {
+                        SettingsGroup {
+                            SettingsItemNew(
+                                title = {
+                                    Text(
+                                        text = stringResource(id = R.string.language),
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                },
+                                icon = Icons.Outlined.Language,
+                                description = {
+                                    Text(text = com.bobbyesp.spowlo.utils.getLanguageDesc())
+                                },
+                                trailing = { SettingsChevron() },
+                                addTonalElevation = false,
+                                onClick = { navController.navigate(Route.LANGUAGES) },
+                            )
+                        }
                     }
                 }
             }

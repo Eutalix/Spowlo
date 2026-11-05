@@ -1,15 +1,13 @@
 package com.bobbyesp.spowlo.ui.pages.settings.appearance
 
-import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.selection.selectableGroup
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Translate
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.LargeTopAppBar
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBarDefaults
@@ -20,7 +18,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.res.stringResource
@@ -30,8 +27,12 @@ import com.bobbyesp.spowlo.MainActivity
 import com.bobbyesp.spowlo.R
 import com.bobbyesp.spowlo.ui.common.LocalDarkTheme
 import com.bobbyesp.spowlo.ui.components.BackButton
+import com.bobbyesp.spowlo.ui.components.LargeTopAppBar
 import com.bobbyesp.spowlo.ui.components.PreferencesHintCard
+import com.bobbyesp.spowlo.ui.components.settings.SettingsDivider
+import com.bobbyesp.spowlo.ui.components.settings.SettingsGroup
 import com.bobbyesp.spowlo.ui.components.settings.SettingsNewSingleChoiceItem
+import com.bobbyesp.spowlo.ui.components.settings.SettingsSectionHeader
 import com.bobbyesp.spowlo.utils.ChromeCustomTabsUtil
 import com.bobbyesp.spowlo.utils.LANGUAGE
 import com.bobbyesp.spowlo.utils.PreferencesUtil
@@ -65,7 +66,6 @@ fun LanguagePage(onBackPressed: () -> Unit) {
             LargeTopAppBar(
                 title = {
                     Text(
-                        modifier = Modifier,
                         text = stringResource(id = R.string.language), fontWeight = FontWeight.Bold
                     )
                 }, navigationIcon = {
@@ -74,12 +74,17 @@ fun LanguagePage(onBackPressed: () -> Unit) {
                     }
                 }, scrollBehavior = scrollBehavior
             )
-        }, content = {
+        }, content = { paddingValues ->
             LazyColumn(
                 modifier = Modifier
-                    .padding(it)
-                    .padding(horizontal = 16.dp)
-                    .selectableGroup()
+                    .fillMaxSize()
+                    .padding(paddingValues),
+                contentPadding = PaddingValues(
+                    start = 16.dp,
+                    end = 16.dp,
+                    top = 8.dp,
+                    bottom = 32.dp,
+                )
             ) {
                 item {
                     PreferencesHintCard(
@@ -90,38 +95,23 @@ fun LanguagePage(onBackPressed: () -> Unit) {
                     ) { ChromeCustomTabsUtil.openUrl(spowloWeblateUrl) }
                 }
                 item {
-                    Column(modifier = Modifier.padding(vertical = 16.dp)) {
+                    SettingsSectionHeader(stringResource(R.string.app_language))
+                }
+                item {
+                    SettingsGroup(modifier = Modifier.selectableGroup()) {
                         SettingsNewSingleChoiceItem(
                             text = stringResource(R.string.follow_system),
                             selected = language == SYSTEM_DEFAULT,
-                            modifier = Modifier.clip(RoundedCornerShape(8.dp))
+                            wantsTonalElevation = false,
                         ) { setLanguage(SYSTEM_DEFAULT) }
-                    }
-
-                }
-                for ((index, languageData) in languageMap.entries.withIndex()) {
-                    item {
-                        SettingsNewSingleChoiceItem(
-                            text = getLanguageDesc(languageData.key),
-                            selected = language == languageData.key,
-                            modifier = when (index) {
-                                0 -> Modifier.clip(
-                                    RoundedCornerShape(
-                                        topStart = 8.dp,
-                                        topEnd = 8.dp
-                                    )
-                                )
-
-                                languageMap.size - 1 -> Modifier.clip(
-                                    RoundedCornerShape(
-                                        bottomStart = 8.dp,
-                                        bottomEnd = 8.dp
-                                    )
-                                )
-
-                                else -> Modifier
-                            }
-                        ) { setLanguage(languageData.key) }
+                        for ((languageKey, _) in languageMap.entries) {
+                            SettingsDivider(indent = 16.dp)
+                            SettingsNewSingleChoiceItem(
+                                text = getLanguageDesc(languageKey),
+                                selected = language == languageKey,
+                                wantsTonalElevation = false,
+                            ) { setLanguage(languageKey) }
+                        }
                     }
                 }
             }

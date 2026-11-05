@@ -9,12 +9,11 @@ import android.os.Environment
 import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.SdCardAlert
 import androidx.compose.material.icons.outlined.LibraryMusic
@@ -34,7 +33,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
@@ -47,11 +45,13 @@ import com.bobbyesp.spowlo.R
 import com.bobbyesp.spowlo.ui.common.LocalDarkTheme
 import com.bobbyesp.spowlo.ui.components.BackButton
 import com.bobbyesp.spowlo.ui.components.LargeTopAppBar
-import com.bobbyesp.spowlo.ui.components.PreferenceInfo
 import com.bobbyesp.spowlo.ui.components.PreferencesHintCard
+import com.bobbyesp.spowlo.ui.components.settings.SettingsChevron
+import com.bobbyesp.spowlo.ui.components.settings.SettingsDivider
+import com.bobbyesp.spowlo.ui.components.settings.SettingsGroup
 import com.bobbyesp.spowlo.ui.components.settings.SettingsItemNew
+import com.bobbyesp.spowlo.ui.components.settings.SettingsSectionHeader
 import com.bobbyesp.spowlo.ui.components.settings.SettingsSwitchWithDivider
-import com.bobbyesp.spowlo.utils.CUSTOM_PATH
 import com.bobbyesp.spowlo.utils.DatabaseUtil
 import com.bobbyesp.spowlo.utils.FilesUtil
 import com.bobbyesp.spowlo.utils.PreferencesUtil
@@ -86,9 +86,6 @@ fun DownloadsDirectoriesPage(
     )
     val context = LocalContext.current
     val snackbarHostState = remember { SnackbarHostState() }
-
-    var isCustomPathEnabled
-            by remember { mutableStateOf(PreferencesUtil.getValue(CUSTOM_PATH)) }
 
     var audioDirectoryText by remember {
         mutableStateOf(App.audioDownloadDir)
@@ -174,16 +171,18 @@ fun DownloadsDirectoriesPage(
                     }
                 }, scrollBehavior = scrollBehavior
             )
-        }, content = {
+        }, content = { paddingValues ->
             LazyColumn(
                 modifier = Modifier
-                    .padding(it)
-                    .padding(horizontal = 16.dp)
+                    .fillMaxSize()
+                    .padding(paddingValues),
+                contentPadding = PaddingValues(
+                    start = 16.dp,
+                    end = 16.dp,
+                    top = 8.dp,
+                    bottom = 32.dp,
+                )
             ) {
-                if (sdcardUri.isEmpty())
-                    item {
-                        PreferenceInfo(text = stringResource(id = R.string.sdcard_not_activable_hint))
-                    }
                 if (showDirectoryAlert)
                     item {
                         PreferencesHintCard(
@@ -203,64 +202,56 @@ fun DownloadsDirectoriesPage(
                         }
                     }
                 item {
-                    Text(
-                        text = stringResource(id = R.string.general),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(start = 2.dp, top = 12.dp, bottom = 4.dp),
-                        color = MaterialTheme.colorScheme.primary,
-                        style = MaterialTheme.typography.labelLarge
-                    )
+                    SettingsSectionHeader(stringResource(id = R.string.section_storage))
                 }
                 item {
-                    SettingsItemNew(
-                        onClick = {
-                            editingDirectory = Directory.AUDIO
-                            openDirectoryChooser()
-                        },
-                        title = {
-                            Text(
-                                text = stringResource(id = R.string.audio_directory),
-                                fontWeight = FontWeight.Bold
-                            )
-                        },
-                        description = { Text(text = audioDirectoryText) },
-                        icon = Icons.Outlined.LibraryMusic,
-                        modifier = Modifier.clip(RoundedCornerShape(topStart = 8.dp, topEnd = 8.dp))
-                    )
-                }
-                item {
-                    SettingsSwitchWithDivider(
-                        onCheckedChange = {
-                            sdcardDownload = !sdcardDownload
-                            PreferencesUtil.updateValue(SDCARD_DOWNLOAD, sdcardDownload)
-                        },
-                        checked = sdcardDownload,
-                        title = {
-                            Text(
-                                text = stringResource(id = R.string.sdcard_directory),
-                                fontWeight = FontWeight.Bold
-                            )
-                        },
-                        description = {
-                            Text(
-                                text = sdcardUri,
-                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
-                            )
-                        },
-                        enabled = sdcardUri.isNotBlank(),
-                        icon = Icons.Outlined.SdCard,
-                        onClick = {
-                            editingDirectory = Directory.SDCARD
-                            openDirectoryChooser()
-                        },
-                        modifier = Modifier.clip(
-                            RoundedCornerShape(
-                                bottomStart = 8.dp,
-                                bottomEnd = 8.dp
-                            )
+                    SettingsGroup {
+                        SettingsItemNew(
+                            onClick = {
+                                editingDirectory = Directory.AUDIO
+                                openDirectoryChooser()
+                            },
+                            title = {
+                                Text(
+                                    text = stringResource(id = R.string.audio_directory),
+                                    fontWeight = FontWeight.Bold
+                                )
+                            },
+                            description = { Text(text = audioDirectoryText) },
+                            icon = Icons.Outlined.LibraryMusic,
+                            trailing = { SettingsChevron() },
+                            addTonalElevation = false,
                         )
-                    )
+                        SettingsDivider()
+                        SettingsSwitchWithDivider(
+                            onCheckedChange = {
+                                sdcardDownload = !sdcardDownload
+                                PreferencesUtil.updateValue(SDCARD_DOWNLOAD, sdcardDownload)
+                            },
+                            checked = sdcardDownload,
+                            title = {
+                                Text(
+                                    text = stringResource(id = R.string.sdcard_directory),
+                                    fontWeight = FontWeight.Bold
+                                )
+                            },
+                            description = {
+                                Text(
+                                    text = sdcardUri.ifBlank {
+                                        stringResource(R.string.not_configured)
+                                    },
+                                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                                )
+                            },
+                            enabled = sdcardUri.isNotBlank(),
+                            icon = Icons.Outlined.SdCard,
+                            onClick = {
+                                editingDirectory = Directory.SDCARD
+                                openDirectoryChooser()
+                            },
+                            addTonalElevation = false,
+                        )
+                    }
                 }
             }
         })

@@ -9,7 +9,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Update
 import androidx.compose.material3.ButtonDefaults
@@ -17,7 +17,6 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
-import androidx.compose.material3.LargeTopAppBar
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBarDefaults
@@ -30,7 +29,6 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
@@ -41,11 +39,13 @@ import com.bobbyesp.spowlo.R
 import com.bobbyesp.spowlo.ui.common.booleanState
 import com.bobbyesp.spowlo.ui.common.intState
 import com.bobbyesp.spowlo.ui.components.BackButton
-import com.bobbyesp.spowlo.ui.components.HorizontalDivider
+import com.bobbyesp.spowlo.ui.components.LargeTopAppBar
 import com.bobbyesp.spowlo.ui.components.PreferenceInfo
-import com.bobbyesp.spowlo.ui.components.PreferenceSubtitle
-import com.bobbyesp.spowlo.ui.components.PreferenceSwitchWithContainer
+import com.bobbyesp.spowlo.ui.components.settings.SettingsDivider
+import com.bobbyesp.spowlo.ui.components.settings.SettingsGroup
 import com.bobbyesp.spowlo.ui.components.settings.SettingsNewSingleChoiceItem
+import com.bobbyesp.spowlo.ui.components.settings.SettingsSectionHeader
+import com.bobbyesp.spowlo.ui.components.settings.SettingsSwitch
 import com.bobbyesp.spowlo.ui.dialogs.UpdateDialog
 import com.bobbyesp.spowlo.utils.AUTO_UPDATE
 import com.bobbyesp.spowlo.utils.PRE_RELEASE
@@ -90,50 +90,69 @@ fun UpdaterPage(onBackPressed: () -> Unit) {
         }, scrollBehavior = scrollBehavior
         )
     }, content = { paddings ->
-        LazyColumn(modifier = Modifier.padding(paddings)) {
+        LazyColumn(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(paddings),
+            contentPadding = PaddingValues(
+                start = 16.dp,
+                end = 16.dp,
+                top = 8.dp,
+                bottom = 32.dp,
+            )
+        ) {
             item {
-                PreferenceSwitchWithContainer(
-                    title = stringResource(id = R.string.enable_auto_update),
-                    icon = null,
-                    isChecked = autoUpdate
-                ) {
-                    autoUpdate = !autoUpdate
-                    AUTO_UPDATE.updateBoolean(autoUpdate)
-                }
+                SettingsSectionHeader(stringResource(id = R.string.auto_update))
             }
             item {
-                PreferenceSubtitle(
-                    modifier = Modifier.padding(horizontal = 4.dp),
-                    text = stringResource(id = R.string.update_channel)
-                )
-            }
-            item {
-                SettingsNewSingleChoiceItem(
-                    text = stringResource(id = R.string.stable_channel),
-                    selected = updateChannel == STABLE,
-                    contentPadding = PaddingValues(horizontal = 12.dp),
-                    modifier = Modifier.clip(RoundedCornerShape(topStart = 8.dp, topEnd = 8.dp))
-                ) {
-                    updateChannel = STABLE
-                    UPDATE_CHANNEL.updateInt(updateChannel)
-                }
-            }
-
-            item {
-                SettingsNewSingleChoiceItem(
-                    text = stringResource(id = R.string.pre_release_channel),
-                    selected = updateChannel == PRE_RELEASE,
-                    contentPadding = PaddingValues(horizontal = 12.dp),
-                    modifier = Modifier.clip(
-                        RoundedCornerShape(
-                            bottomStart = 8.dp,
-                            bottomEnd = 8.dp
-                        )
+                SettingsGroup {
+                    SettingsSwitch(
+                        onCheckedChange = {
+                            autoUpdate = !autoUpdate
+                            AUTO_UPDATE.updateBoolean(autoUpdate)
+                        },
+                        checked = autoUpdate,
+                        title = {
+                            Text(
+                                text = stringResource(id = R.string.enable_auto_update),
+                                fontWeight = FontWeight.Bold
+                            )
+                        },
+                        icon = Icons.Outlined.Update,
+                        addTonalElevation = false,
                     )
-                ) {
-                    updateChannel = PRE_RELEASE
-                    UPDATE_CHANNEL.updateInt(updateChannel)
                 }
+            }
+            item {
+                SettingsSectionHeader(stringResource(id = R.string.update_channel))
+            }
+            item {
+                SettingsGroup(modifier = Modifier.selectableGroup()) {
+                    SettingsNewSingleChoiceItem(
+                        text = stringResource(id = R.string.stable_channel),
+                        selected = updateChannel == STABLE,
+                        wantsTonalElevation = false,
+                    ) {
+                        updateChannel = STABLE
+                        UPDATE_CHANNEL.updateInt(updateChannel)
+                    }
+                    SettingsDivider(indent = 16.dp)
+                    SettingsNewSingleChoiceItem(
+                        text = stringResource(id = R.string.pre_release_channel),
+                        selected = updateChannel == PRE_RELEASE,
+                        wantsTonalElevation = false,
+                    ) {
+                        updateChannel = PRE_RELEASE
+                        UPDATE_CHANNEL.updateInt(updateChannel)
+                    }
+                }
+            }
+            item {
+                PreferenceInfo(
+                    modifier = Modifier.padding(vertical = 8.dp),
+                    text = stringResource(id = R.string.update_channel_desc),
+                    applyPaddings = false,
+                )
             }
             item {
                 var isLoading by remember { mutableStateOf(false) }
@@ -145,7 +164,7 @@ fun UpdaterPage(onBackPressed: () -> Unit) {
                 ) {
                     ProgressIndicatorButton(
                         modifier = Modifier
-                            .padding(horizontal = 24.dp)
+                            .padding(horizontal = 8.dp)
                             .padding(top = 6.dp)
                             .padding(bottom = 12.dp),
                         text = stringResource(
@@ -174,14 +193,6 @@ fun UpdaterPage(onBackPressed: () -> Unit) {
                             }
                     }
                 }
-                HorizontalDivider()
-            }
-            item {
-                PreferenceInfo(
-                    modifier = Modifier
-                        .padding(horizontal = 4.dp),
-                    text = stringResource(id = R.string.update_channel_desc)
-                )
             }
         }
     })

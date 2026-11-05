@@ -2,6 +2,7 @@ package com.bobbyesp.spowlo.ui.pages.settings.general
 
 import android.os.Build
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -10,7 +11,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Campaign
 import androidx.compose.material.icons.outlined.CheckCircle
@@ -42,7 +42,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
@@ -56,10 +55,11 @@ import com.bobbyesp.spowlo.R
 import com.bobbyesp.spowlo.ui.common.booleanState
 import com.bobbyesp.spowlo.ui.components.BackButton
 import com.bobbyesp.spowlo.ui.components.LargeTopAppBar
-import com.bobbyesp.spowlo.ui.components.PreferenceSubtitle
 import com.bobbyesp.spowlo.ui.components.SingleChoiceItem
-import com.bobbyesp.spowlo.ui.components.settings.ElevatedSettingsCard
+import com.bobbyesp.spowlo.ui.components.settings.SettingsDivider
+import com.bobbyesp.spowlo.ui.components.settings.SettingsGroup
 import com.bobbyesp.spowlo.ui.components.settings.SettingsItemNew
+import com.bobbyesp.spowlo.ui.components.settings.SettingsSectionHeader
 import com.bobbyesp.spowlo.ui.components.settings.SettingsSwitch
 import com.bobbyesp.spowlo.ui.dialogs.NotificationPermissionDialog
 import com.bobbyesp.spowlo.ui.dialogs.rememberNotificationPermissionRequest
@@ -136,9 +136,10 @@ fun GeneralSettingsPage(
 
     var showFreqDialog by remember { mutableStateOf(false) }
 
-    Scaffold(modifier = Modifier
-        .fillMaxSize()
-        .nestedScroll(scrollBehavior.nestedScrollConnection),
+    Scaffold(
+        modifier = Modifier
+            .fillMaxSize()
+            .nestedScroll(scrollBehavior.nestedScrollConnection),
         topBar = {
             LargeTopAppBar(title = {
                 Text(
@@ -149,20 +150,27 @@ fun GeneralSettingsPage(
             }, scrollBehavior = scrollBehavior
             )
         },
-        content = {
+        content = { paddingValues ->
             LazyColumn(
                 modifier = Modifier
-                    .padding(it)
-                    .padding(horizontal = 20.dp, vertical = 10.dp)
+                    .fillMaxSize()
+                    .padding(paddingValues),
+                contentPadding = PaddingValues(
+                    start = 16.dp,
+                    end = 16.dp,
+                    top = 8.dp,
+                    bottom = 32.dp,
+                )
             ) {
-                
                 item {
-                    ElevatedSettingsCard {
+                    SettingsSectionHeader(stringResource(id = R.string.section_maintenance))
+                }
+                item {
+                    SettingsGroup {
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
                             modifier = Modifier.fillMaxWidth()
                         ) {
-                            // Main Update Action
                             SettingsItemNew(
                                 modifier = Modifier.weight(1f),
                                 onClick = {
@@ -190,8 +198,8 @@ fun GeneralSettingsPage(
                                         }
                                     }
                                 },
-                                icon = when(uiState.status) {
-                                    GeneralSettingsViewModel.UpdateStatus.Updating -> Icons.Outlined.Sync 
+                                icon = when (uiState.status) {
+                                    GeneralSettingsViewModel.UpdateStatus.Updating -> Icons.Outlined.Sync
                                     GeneralSettingsViewModel.UpdateStatus.Updated -> Icons.Outlined.CheckCircle
                                     else -> Icons.Outlined.Info
                                 },
@@ -209,10 +217,10 @@ fun GeneralSettingsPage(
                                         }
                                     }
                                 },
+                                addTonalElevation = false,
                                 highlightIcon = uiState.updateAvailable
                             )
 
-                            // Settings Gear for Frequency
                             IconButton(
                                 onClick = { showFreqDialog = true },
                                 modifier = Modifier.padding(end = 8.dp)
@@ -228,143 +236,145 @@ fun GeneralSettingsPage(
                 }
 
                 item {
-                    PreferenceSubtitle(text = stringResource(id = R.string.general_settings))
+                    SettingsSectionHeader(stringResource(id = R.string.section_behavior))
                 }
-                
-                item{
-                    SettingsSwitch(
-                        onCheckedChange = {
-                            displayErrorReport = !displayErrorReport
-                            PreferencesUtil.updateValue(DEBUG, displayErrorReport)
-                        },
-                        checked = displayErrorReport,
-                        title = {
-                            Text(
-                                text = stringResource(R.string.print_details),
-                                fontWeight = FontWeight.Bold
-                            )
-                        },
-                        icon = if (displayErrorReport) Icons.Outlined.Print else Icons.Outlined.PrintDisabled,
-                        description = { Text(text = stringResource(R.string.print_details_desc)) },
-                        modifier = Modifier.clip(
-                            RoundedCornerShape(
-                                topStart = 8.dp, topEnd = 8.dp,
-                                bottomEnd = 0.dp, bottomStart = 0.dp
-                            )
-                        ),
-                    )
-                }
-
                 item {
-                    SettingsSwitch(
-                        onCheckedChange = {
-                            enableNews = !enableNews
-                            PreferencesUtil.updateValue(ENABLE_NEWS, enableNews)
-                        },
-                        checked = enableNews,
-                        title = {
-                            Text(
-                                text = stringResource(R.string.enable_news_title),
-                                fontWeight = FontWeight.Bold
-                            )
-                        },
-                        icon = Icons.Outlined.Campaign,
-                        description = { Text(text = stringResource(R.string.enable_news_summary)) }
-                    )
-                }
-
-                item {
-                    SettingsSwitch(
-                        onCheckedChange = {
-                            if (useNotifications && notificationsAllowed) {
-                                useNotifications = false
-                                PreferencesUtil.updateValue(NOTIFICATION, false)
-                                NotificationsUtil.cancelAllNotifications()
-                            } else if (!notificationsAllowed) {
-                                if (Build.VERSION.SDK_INT >= 33 && !permissionRequested) {
-                                    showNotificationDialog = true
-                                } else {
-                                    PreferencesUtil.updateValue(NOTIFICATION, true)
-                                    NotificationsUtil.openNotificationSettings()
-                                }
-                            } else {
-                                useNotifications = true
-                                PreferencesUtil.updateValue(NOTIFICATION, true)
-                            }
-                        },
-                        checked = useNotifications && notificationsAllowed,
-                        title = {
-                            Text(
-                                text = stringResource(R.string.use_notifications),
-                                fontWeight = FontWeight.Bold
-                            )
-                        },
-                        icon = if (useNotifications && notificationsAllowed) {
-                            Icons.Outlined.NotificationsActive
-                        } else {
-                            Icons.Outlined.NotificationsOff
-                        },
-                        description = {
-                            Text(
-                                text = stringResource(
-                                    if (permissionRequested && !notificationsAllowed) {
-                                        R.string.notifications_blocked_desc
-                                    } else {
-                                        R.string.use_notifications_desc
-                                    }
+                    SettingsGroup {
+                        SettingsSwitch(
+                            onCheckedChange = {
+                                displayErrorReport = !displayErrorReport
+                                PreferencesUtil.updateValue(DEBUG, displayErrorReport)
+                            },
+                            checked = displayErrorReport,
+                            title = {
+                                Text(
+                                    text = stringResource(R.string.print_details),
+                                    fontWeight = FontWeight.Bold
                                 )
-                            )
-                        },
-                    )
+                            },
+                            icon = if (displayErrorReport) Icons.Outlined.Print else Icons.Outlined.PrintDisabled,
+                            description = { Text(text = stringResource(R.string.print_details_desc)) },
+                            addTonalElevation = false,
+                        )
+                        SettingsDivider()
+                        SettingsSwitch(
+                            onCheckedChange = {
+                                enableNews = !enableNews
+                                PreferencesUtil.updateValue(ENABLE_NEWS, enableNews)
+                            },
+                            checked = enableNews,
+                            title = {
+                                Text(
+                                    text = stringResource(R.string.enable_news_title),
+                                    fontWeight = FontWeight.Bold
+                                )
+                            },
+                            icon = Icons.Outlined.Campaign,
+                            description = { Text(text = stringResource(R.string.enable_news_summary)) },
+                            addTonalElevation = false,
+                        )
+                        SettingsDivider()
+                        SettingsSwitch(
+                            onCheckedChange = {
+                                configureBeforeDownload = !configureBeforeDownload
+                                PreferencesUtil.updateValue(CONFIGURE, configureBeforeDownload)
+                            },
+                            checked = configureBeforeDownload,
+                            title = {
+                                Text(
+                                    text = stringResource(R.string.pre_configure_download),
+                                    fontWeight = FontWeight.Bold
+                                )
+                            },
+                            icon = Icons.Outlined.Construction,
+                            description = {
+                                Text(text = stringResource(R.string.pre_configure_download_desc))
+                            },
+                            addTonalElevation = false,
+                        )
+                    }
+                }
+
+                item {
+                    SettingsSectionHeader(stringResource(id = R.string.section_notifications))
                 }
                 item {
-                    SettingsSwitch(
-                        onCheckedChange = {
-                            incognitoMode = !incognitoMode
-                            PreferencesUtil.updateValue(INCOGNITO_MODE, incognitoMode)
-                        },
-                        checked = incognitoMode,
-                        title = {
-                            Text(
-                                text = stringResource(R.string.incognito_mode),
-                                fontWeight = FontWeight.Bold
-                            )
-                        },
-                        icon = if (incognitoMode) Icons.Outlined.HistoryToggleOff else Icons.Outlined.History,
-                        description = {
-                            Text(text = stringResource(R.string.incognito_mode_desc))
-                        },
-                    )
+                    SettingsGroup {
+                        SettingsSwitch(
+                            onCheckedChange = {
+                                if (useNotifications && notificationsAllowed) {
+                                    useNotifications = false
+                                    PreferencesUtil.updateValue(NOTIFICATION, false)
+                                    NotificationsUtil.cancelAllNotifications()
+                                } else if (!notificationsAllowed) {
+                                    if (Build.VERSION.SDK_INT >= 33 && !permissionRequested) {
+                                        showNotificationDialog = true
+                                    } else {
+                                        PreferencesUtil.updateValue(NOTIFICATION, true)
+                                        NotificationsUtil.openNotificationSettings()
+                                    }
+                                } else {
+                                    useNotifications = true
+                                    PreferencesUtil.updateValue(NOTIFICATION, true)
+                                }
+                            },
+                            checked = useNotifications && notificationsAllowed,
+                            title = {
+                                Text(
+                                    text = stringResource(R.string.use_notifications),
+                                    fontWeight = FontWeight.Bold
+                                )
+                            },
+                            icon = if (useNotifications && notificationsAllowed) {
+                                Icons.Outlined.NotificationsActive
+                            } else {
+                                Icons.Outlined.NotificationsOff
+                            },
+                            description = {
+                                Text(
+                                    text = stringResource(
+                                        if (permissionRequested && !notificationsAllowed) {
+                                            R.string.notifications_blocked_desc
+                                        } else {
+                                            R.string.use_notifications_desc
+                                        }
+                                    )
+                                )
+                            },
+                            addTonalElevation = false,
+                        )
+                    }
+                }
+
+                item {
+                    SettingsSectionHeader(stringResource(id = R.string.section_privacy))
                 }
                 item {
-                    SettingsSwitch(
-                        onCheckedChange = {
-                            configureBeforeDownload = !configureBeforeDownload
-                            PreferencesUtil.updateValue(CONFIGURE, configureBeforeDownload)
-                        },
-                        checked = configureBeforeDownload,
-                        title = {
-                            Text(
-                                text = stringResource(R.string.pre_configure_download),
-                                fontWeight = FontWeight.Bold
-                            )
-                        },
-                        icon = Icons.Outlined.Construction,
-                        description = {
-                            Text(text = stringResource(R.string.pre_configure_download_desc))
-                        },
-                        clipCorners = false,
-                        modifier = Modifier.clip(
-                            RoundedCornerShape(
-                                bottomStart = 8.dp, bottomEnd = 8.dp
-                            )
-                        ),
-                    )
+                    SettingsGroup {
+                        SettingsSwitch(
+                            onCheckedChange = {
+                                incognitoMode = !incognitoMode
+                                PreferencesUtil.updateValue(INCOGNITO_MODE, incognitoMode)
+                            },
+                            checked = incognitoMode,
+                            title = {
+                                Text(
+                                    text = stringResource(R.string.incognito_mode),
+                                    fontWeight = FontWeight.Bold
+                                )
+                            },
+                            icon = if (incognitoMode) Icons.Outlined.HistoryToggleOff else Icons.Outlined.History,
+                            description = {
+                                Text(text = stringResource(R.string.incognito_mode_desc))
+                            },
+                            addTonalElevation = false,
+                        )
+                    }
                 }
             }
         }
     )
-    
+
     if (showFreqDialog) {
         UpdateFrequencyDialog(
             currentFreq = viewModel.getFrequency(),

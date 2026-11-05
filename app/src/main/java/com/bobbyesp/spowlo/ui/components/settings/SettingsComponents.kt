@@ -1,17 +1,25 @@
 package com.bobbyesp.spowlo.ui.components.settings
 
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.toggleable
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowRight
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Divider
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
@@ -25,10 +33,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 
 @Composable
@@ -59,11 +69,13 @@ fun SettingsItemNew(
         headlineContent = title,
         tonalElevation = if (addTonalElevation) 3.dp else 0.dp,
         colors = ListItemDefaults.colors(
+            containerColor = Color.Transparent,
             leadingIconColor = if (highlightIcon) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
         )
     )
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun SettingsItemNew(
     onClick: () -> Unit,
@@ -75,12 +87,18 @@ fun SettingsItemNew(
     icon: ImageVector? = null,
     addTonalElevation: Boolean = true,
     clipCorners: Boolean = false,
-    highlightIcon: Boolean = false
+    highlightIcon: Boolean = false,
+    onClickLabel: String? = null,
+    onLongClickLabel: String? = null,
+    onLongClick: (() -> Unit)? = null
 ) {
     SettingsItemNew(
         modifier = modifier
-            .clickable(
+            .combinedClickable(
                 onClick = onClick,
+                onClickLabel = onClickLabel,
+                onLongClick = onLongClick,
+                onLongClickLabel = onLongClickLabel,
                 enabled = enabled
             )
             .alpha(if (enabled) 1f else 0.5f),
@@ -158,18 +176,19 @@ fun SettingsNewSingleChoiceItem(
         trailingContent = {
             RadioButton(
                 selected = selected,
-                onClick = onClick
+                onClick = null
             )
         },
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
-            .clearAndSetSemantics { }
-            .clickable(
+            .selectable(
+                selected = selected,
+                role = Role.RadioButton,
                 onClick = onClick,
             )
-            .padding(contentPadding)
-            .then(modifier),
+            .padding(contentPadding),
         tonalElevation = if (wantsTonalElevation) 3.dp else 0.dp,
+        colors = ListItemDefaults.colors(containerColor = Color.Transparent),
     )
 }
 
@@ -249,4 +268,54 @@ fun ElevatedSettingsCard(
     ) {
         content()
     }
+}
+
+@Composable
+fun SettingsSectionHeader(
+    text: String,
+    modifier: Modifier = Modifier,
+) {
+    Text(
+        text = text,
+        modifier = modifier.padding(start = 4.dp, top = 20.dp, bottom = 8.dp),
+        style = MaterialTheme.typography.labelLarge,
+        color = MaterialTheme.colorScheme.primary,
+    )
+}
+
+@Composable
+fun SettingsGroup(
+    modifier: Modifier = Modifier,
+    content: @Composable ColumnScope.() -> Unit,
+) {
+    Card(
+        modifier = modifier.fillMaxWidth(),
+        shape = MaterialTheme.shapes.large,
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceColorAtElevation(3.dp)
+        ),
+    ) {
+        Column(content = content)
+    }
+}
+
+@Composable
+fun SettingsDivider(
+    modifier: Modifier = Modifier,
+    indent: Dp = 56.dp,
+) {
+    HorizontalDivider(
+        modifier = modifier.padding(start = indent),
+        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f),
+    )
+}
+
+@Composable
+fun SettingsChevron() {
+    Icon(
+        imageVector = Icons.AutoMirrored.Outlined.KeyboardArrowRight,
+        contentDescription = null,
+        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier.size(24.dp),
+    )
 }
