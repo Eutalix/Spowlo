@@ -353,6 +353,14 @@ fun InitialEntry(
                     type = type,
                     account = account,
                     playlistPageViewModel = playlistPageViewModel,
+                    onOpenAlbum = { albumId ->
+                        navController.navigate(
+                            Route.PLAYLIST_PAGE + "/album/" + albumId,
+                            navOptions = navOptions {
+                                launchSingleTop = true
+                                restoreState = true
+                            })
+                    },
                 )
             }
         }

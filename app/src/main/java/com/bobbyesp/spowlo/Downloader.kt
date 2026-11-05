@@ -15,10 +15,12 @@ import com.bobbyesp.spowlo.App.Companion.startService
 import com.bobbyesp.spowlo.App.Companion.stopService
 import com.bobbyesp.spowlo.features.spotify_api.data.remote.SpotifyApiRequests
 import com.bobbyesp.spowlo.ui.common.containsEllipsis
+import com.bobbyesp.spowlo.ui.pages.metadata_viewer.playlists.TrackDownload
 import com.bobbyesp.spowlo.utils.DownloaderUtil
 import com.bobbyesp.spowlo.utils.FilesUtil
 import com.bobbyesp.spowlo.utils.NotificationsUtil
 import com.bobbyesp.spowlo.utils.SpotifyApiException
+import com.bobbyesp.spowlo.utils.SpotifyCollection
 import com.bobbyesp.spowlo.utils.SpotifyMetadataFetcher
 import com.bobbyesp.spowlo.utils.ToastUtil
 import com.bobbyesp.spowlo.utils.TrackLinkRequiredException
@@ -511,6 +513,34 @@ object Downloader {
             }.onFailure { manageDownloadError(it, isFetchingInfo = true) }
         }
 
+    fun downloadTracks(tracks: List<TrackDownload>, collectionName: String) =
+        applicationScope.launch(Dispatchers.IO) {
+            if (tracks.isEmpty()) return@launch
+            val requestKey = makeKey(collectionName, tracks.first().url)
+            if (activeParallelDownloads.putIfAbsent(requestKey, true) != null) {
+                ToastUtil.makeToastSuspend(context.getString(R.string.task_running))
+                return@launch
+            }
+            try {
+                runCatching {
+                    DownloaderUtil.executeCollectionDownload(
+                        SpotifyCollection(
+                            url = "https://open.spotify.com/collection/${requestKey.hashCode()}",
+                            name = collectionName,
+                            artist = "",
+                            artworkUrl = tracks.firstNotNullOfOrNull {
+                                it.coverUrl.takeIf(String::isNotBlank)
+                            }.orEmpty(),
+                            songs = tracks.map { it.toSpotifySong() },
+                        ),
+                        fallbackName = collectionName,
+                    )
+                }.onFailure { manageDownloadError(it, isFetchingInfo = true) }
+            } finally {
+                activeParallelDownloads.remove(requestKey)
+            }
+        }
+
     /** Re-downloads a track, forcing spotDL to replace the existing file. */
     suspend fun redownloadTrack(url: String, name: String, existingPath: String = ""): Boolean {
         val requestKey = makeKey(url, url.reversed())
@@ -566,6 +596,25 @@ object Downloader {
         val sb = StringBuilder()
         for (c in this) if (c.isDigit()) sb.append(c)
         return if (sb.isNotEmpty()) sb.toString().toInt() else 0
+    }
+
+    private fun TrackDownload.toSpotifySong(): SpotifySong {
+        val id = url.substringAfterLast('/').substringBefore('?')
+        val names = artists.split(",").map(String::trim).filter(String::isNotEmpty)
+        return SpotifySong(
+            name = title,
+            artists = names,
+            artist = names.firstOrNull().orEmpty(),
+            album_name = albumName,
+            album_artist = names.firstOrNull().orEmpty(),
+            cover_url = coverUrl,
+            duration = durationMs / 1000.0,
+            disc_number = discNumber,
+            track_number = trackNumber,
+            song_id = id,
+            explicit = explicit,
+            url = url,
+        )
     }
 
     // toFullAlbum()/toFullArtist() need the official API client, so look the ids up through our backend.

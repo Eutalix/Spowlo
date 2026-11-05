@@ -31,6 +31,7 @@ object SpotifyWebApi {
 
     const val PLAYLIST_PAGE_SIZE = 100
     const val ALBUM_PAGE_SIZE = 50
+    const val DISCOGRAPHY_PAGE_SIZE = 50
 
     /** Persisted GraphQL query hashes bundled with the current web player build. */
     private val OPERATION_HASHES = mapOf(
@@ -38,6 +39,7 @@ object SpotifyWebApi {
         "getTrack" to "fe16b8083eec2305854db612ca75589bcb71e009dc7a4d014f29bd534a4c01f5",
         "getAlbum" to "0b6ce3511e1b02e4a40fa95440f992acbe85080eb308af9194322d708fc1914f",
         "queryArtistOverview" to "9f8134ef565e78621f1e1793555bd6633c5ac144ae0f89604ed3ae3f80b3c8e6",
+        "queryArtistDiscographyAll" to "5e07d323febb57b4a56a42abbf781490e58764aa45feb6e3dc0591564fc56599",
         "fetchPlaylist" to "21ea11a6ac75a5f3e01fd365d29c18e0a4a8b7dc09f89bbb5d73910190c6acaf",
         "profileAttributes" to "08ffb4730af3746e04a8301396f20875dbbce10c75243803091a9274eacc8ac0",
         "libraryV3" to "390c78e5b951029bad359785e69b07b536a509c581cbcd0aded5e5067f187455",
@@ -231,6 +233,41 @@ object SpotifyWebApi {
         }
 
         return paging(albums, albums.size, 0, albums.size)
+    }
+
+    suspend fun getArtistDiscography(
+        artistId: String,
+        offset: Int,
+        limit: Int = DISCOGRAPHY_PAGE_SIZE,
+    ): PagingObject<SimpleAlbum> {
+        val root = graphql(
+            "queryArtistDiscographyAll",
+            JSONObject()
+                .put("uri", "spotify:artist:$artistId")
+                .put("offset", offset)
+                .put("limit", limit)
+                .put("order", "DATE_DESC"),
+        )
+        val all = root.optJSONObject("data")
+            ?.optJSONObject("artistUnion")
+            ?.optJSONObject("discography")
+            ?.optJSONObject("all")
+            ?: return emptyPage(offset, limit)
+
+        val items = all.optJSONArray("items") ?: return emptyPage(offset, limit)
+        val releases = mutableListOf<SimpleAlbum>()
+        for (groupIndex in 0 until items.length()) {
+            val group = items.optJSONObject(groupIndex) ?: continue
+            val groupItems = group.optJSONObject("releases")?.optJSONArray("items") ?: continue
+            for (releaseIndex in 0 until groupItems.length()) {
+                val node = groupItems.optJSONObject(releaseIndex) ?: continue
+                runCatching { decode<SimpleAlbum>(simpleAlbumJson(node).toString()) }
+                    .getOrNull()
+                    ?.let(releases::add)
+            }
+        }
+
+        return paging(releases, all.optInt("totalCount", releases.size), offset, limit)
     }
 
     suspend fun getPlaylist(playlistId: String, account: Boolean = false): Playlist {
@@ -550,6 +587,14 @@ object SpotifyWebApi {
             .put("is_local", false)
     }
 
+    /** `AlbumResultType` has no EP, and its getter throws on any value outside its list. */
+    private fun albumType(raw: String): String = when (raw.lowercase()) {
+        "single", "ep" -> "single"
+        "compilation" -> "compilation"
+        "appears_on" -> "appears_on"
+        else -> "album"
+    }
+
     private fun simpleAlbumJson(node: JSONObject): JSONObject {
         val uri = node.optString("uri")
         val id = node.optString("id").ifBlank { uri.substringAfterLast(':') }
@@ -563,9 +608,16 @@ object SpotifyWebApi {
             ?: node.optJSONObject("date")?.optInt("year")?.toString()
             ?: "0"
 
+        val totalTracks = when {
+            node.has("totalTracks") -> node.optInt("totalTracks")
+            node.optJSONObject("tracksV2") != null -> node.optJSONObject("tracksV2").optInt("totalCount")
+            node.optJSONObject("tracks") != null -> node.optJSONObject("tracks").optInt("totalCount")
+            else -> 0
+        }
+
         return JSONObject()
-            .put("album_type", node.optString("type", "ALBUM").lowercase())
-            .put("total_tracks", node.optInt("totalTracks", node.optJSONObject("tracksV2")?.optInt("totalCount", 0) ?: 0))
+            .put("album_type", albumType(node.optString("type")))
+            .put("total_tracks", totalTracks)
             .put("available_markets", JSONArray())
             .put("external_urls", JSONObject().put("spotify", "https://open.spotify.com/album/$id"))
             .put("href", "")

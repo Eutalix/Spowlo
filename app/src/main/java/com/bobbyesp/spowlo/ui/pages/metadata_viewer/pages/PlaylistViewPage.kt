@@ -57,8 +57,14 @@ fun PlaylistViewPage(
         if (track.id in downloadedTrackIds) return@mapNotNull null
         TrackDownload(
             url = track.externalUrls.spotify ?: "https://open.spotify.com/track/${track.id}",
-            name = "${track.name} - ${track.artists.joinToString(", ") { it.name }}",
-            durationMs = track.durationMs.toLong()
+            title = track.name,
+            artists = track.artists.joinToString(", ") { it.name },
+            durationMs = track.durationMs.toLong(),
+            albumName = track.album.name,
+            coverUrl = track.album.images?.firstOrNull()?.url.orEmpty(),
+            explicit = track.explicit,
+            discNumber = track.discNumber,
+            trackNumber = track.trackNumber,
         )
     }
     val pendingDurationMs = data.tracks.items.mapNotNull { item ->

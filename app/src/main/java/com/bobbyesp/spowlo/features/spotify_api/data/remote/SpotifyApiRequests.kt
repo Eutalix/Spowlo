@@ -128,4 +128,16 @@ object SpotifyApiRequests {
             Log.e(TAG, "getArtistAlbums($id) failed: ${it.message}", it)
         }.getOrNull()
     }
+
+    suspend fun providesGetArtistDiscography(
+        id: String,
+        offset: Int,
+        limit: Int = SpotifyWebApi.DISCOGRAPHY_PAGE_SIZE,
+    ): PagingObject<SimpleAlbum> {
+        return runCatching {
+            SpotifyWebApi.getArtistDiscography(id, offset, limit)
+        }.onFailure {
+            Log.e(TAG, "getArtistDiscography($id, $offset) failed: ${it.message}", it)
+        }.getOrDefault(PagingObject("", emptyList(), limit, null, offset, null, 0))
+    }
 }
