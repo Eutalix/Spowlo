@@ -1,30 +1,21 @@
 package com.bobbyesp.spowlo.ui.components.songs.metadata_viewer
 
-import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Download
-import androidx.compose.material3.AlertDialogDefaults
+import androidx.compose.material.icons.outlined.Download
+import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -33,13 +24,10 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.Dialog
-import androidx.compose.ui.window.DialogProperties
 import com.bobbyesp.spowlo.R
+import com.bobbyesp.spowlo.ui.components.ActionDialog
 import com.bobbyesp.spowlo.ui.components.ConfirmButton
 import com.bobbyesp.spowlo.ui.components.DismissButton
 import com.bobbyesp.spowlo.ui.components.SpowloDialog
@@ -105,10 +93,17 @@ fun CollectionDownloadActions(
 
     Column(
         modifier = modifier,
-        horizontalAlignment = Alignment.End
+        horizontalAlignment = Alignment.Start
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            FilledTonalButton(onClick = downloadMissing, enabled = !preparing) {
+            Button(
+                onClick = downloadMissing,
+                enabled = !preparing,
+                shape = CircleShape,
+                modifier = Modifier
+                    .weight(1f)
+                    .heightIn(min = 48.dp),
+            ) {
                 if (preparing) {
                     CircularProgressIndicator(
                         modifier = Modifier.size(16.dp),
@@ -118,11 +113,11 @@ fun CollectionDownloadActions(
                     Text(text = stringResource(R.string.preparing))
                 } else {
                     Icon(
-                        imageVector = Icons.Filled.Download,
+                        imageVector = Icons.Outlined.Download,
                         contentDescription = null,
-                        modifier = Modifier.size(18.dp)
+                        modifier = Modifier.size(20.dp)
                     )
-                    Spacer(Modifier.width(8.dp))
+                    Spacer(Modifier.width(10.dp))
                     Text(
                         text = when {
                             missingTracks.isEmpty() -> stringResource(R.string.download_missing)
@@ -134,27 +129,29 @@ fun CollectionDownloadActions(
                                 R.string.download_missing_count,
                                 missingTracks.size,
                             )
-                        }
+                        },
+                        style = MaterialTheme.typography.labelLarge,
                     )
                 }
             }
-            if (onDownloadAll != null) Spacer(Modifier.width(8.dp))
             if (onDownloadAll != null) {
+                Spacer(Modifier.width(8.dp))
                 FilledTonalIconButton(
                     onClick = { requestDownload(totalDurationMs, onDownloadAll) },
+                    shape = CircleShape,
                     modifier = Modifier.size(48.dp),
                 ) {
                     Icon(
-                        imageVector = Icons.Filled.Download,
+                        imageVector = Icons.Outlined.Download,
                         contentDescription = stringResource(R.string.download_all_songs),
-                        modifier = Modifier.padding(14.dp)
+                        modifier = Modifier.size(20.dp)
                     )
                 }
             }
         }
         if (estimateBytes > 0L) {
             Text(
-                modifier = Modifier.padding(top = 6.dp),
+                modifier = Modifier.padding(top = 8.dp),
                 text = if (freeBytes > 0L) {
                     stringResource(
                         R.string.download_estimate,
@@ -175,7 +172,7 @@ fun CollectionDownloadActions(
             onDismissRequest = {
                 pendingAction = null
             },
-            icon = { Icon(Icons.Filled.Download, null) },
+            icon = { Icon(Icons.Outlined.Download, null) },
             title = { Text(stringResource(R.string.not_enough_space_title)) },
             text = {
                 Text(
@@ -216,7 +213,6 @@ fun CollectionDownloadActions(
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun DownloadMissingDialog(
     count: Int,
@@ -224,64 +220,18 @@ private fun DownloadMissingDialog(
     onDismiss: () -> Unit,
     onConfirm: () -> Unit,
 ) {
-    Dialog(
+    ActionDialog(
         onDismissRequest = onDismiss,
-        properties = DialogProperties(usePlatformDefaultWidth = false),
-    ) {
-        Surface(
-            modifier = Modifier
-                .padding(horizontal = 24.dp)
-                .widthIn(max = 400.dp)
-                .fillMaxWidth(),
-            shape = MaterialTheme.shapes.extraLarge,
-            color = AlertDialogDefaults.containerColor,
-            tonalElevation = AlertDialogDefaults.TonalElevation,
-        ) {
-            Column(modifier = Modifier.padding(24.dp)) {
-                Box(
-                    modifier = Modifier
-                        .size(48.dp)
-                        .clip(CircleShape)
-                        .background(MaterialTheme.colorScheme.primaryContainer),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Icon(
-                        imageVector = Icons.Filled.Download,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onPrimaryContainer,
-                        modifier = Modifier.size(24.dp),
-                    )
-                }
-                Spacer(Modifier.height(16.dp))
-                Text(
-                    text = stringResource(R.string.download_missing_confirm_title, count),
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.SemiBold,
-                )
-                if (bytes > 0L) {
-                    Spacer(Modifier.height(4.dp))
-                    Text(
-                        text = stringResource(R.string.download_estimate_only, bytes.toFileSizeText()),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-                Spacer(Modifier.height(24.dp))
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.End,
-                ) {
-                    TextButton(onClick = onDismiss) {
-                        Text(stringResource(R.string.dismiss))
-                    }
-                    Spacer(Modifier.width(8.dp))
-                    FilledTonalButton(onClick = onConfirm) {
-                        Text(stringResource(R.string.download))
-                    }
-                }
-            }
-        }
-    }
+        icon = Icons.Outlined.Download,
+        title = stringResource(R.string.download_missing_confirm_title, count),
+        supportingText = if (bytes > 0L) {
+            stringResource(R.string.download_estimate_only, bytes.toFileSizeText())
+        } else {
+            null
+        },
+        confirmText = stringResource(R.string.download),
+        onConfirm = onConfirm,
+    )
 }
 
 private const val CONFIRM_MIN_TRACKS = 20

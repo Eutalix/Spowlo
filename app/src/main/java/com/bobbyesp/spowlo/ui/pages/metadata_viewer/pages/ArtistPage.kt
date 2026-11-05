@@ -1,27 +1,23 @@
-package com.bobbyesp.spowlo.ui.pages.metadata_viewer.pages
+﻿package com.bobbyesp.spowlo.ui.pages.metadata_viewer.pages
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
-import androidx.compose.foundation.text.selection.SelectionContainer
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
@@ -37,12 +33,8 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.res.vectorResource
@@ -56,14 +48,10 @@ import com.adamratzman.spotify.models.Track
 import com.bobbyesp.spowlo.R
 import com.bobbyesp.spowlo.features.spotify_api.data.remote.SpotifyApiRequests
 import com.bobbyesp.spowlo.features.spotify_api.data.remote.web.SpotifyWebApi
-import com.bobbyesp.spowlo.ui.common.AsyncImageImpl
-import com.bobbyesp.spowlo.ui.components.HorizontalDivider
 import com.bobbyesp.spowlo.ui.components.songs.metadata_viewer.CollectionDownloadActions
 import com.bobbyesp.spowlo.ui.components.songs.metadata_viewer.TrackComponent
-import com.bobbyesp.spowlo.ui.components.text.MarqueeText
 import com.bobbyesp.spowlo.ui.pages.metadata_viewer.playlists.TrackDownload
 import com.bobbyesp.spowlo.ui.pages.searcher.SearchingResult
-import com.bobbyesp.spowlo.ui.theme.harmonizeWithPrimary
 import com.bobbyesp.spowlo.utils.ChromeCustomTabsUtil
 import com.bobbyesp.spowlo.utils.GeneralTextUtils
 import kotlinx.coroutines.Dispatchers
@@ -131,12 +119,13 @@ private fun ArtistSong.toTrackDownload() = TrackDownload(
 fun ArtistPage(
     data: Artist,
     modifier: Modifier,
+    onBack: () -> Unit,
     trackDownloadCallback: (String, String) -> Unit,
     downloadedTrackIds: Set<String> = emptySet(),
     onDownloadTracks: (List<TrackDownload>) -> Unit = {},
     onOpenAlbum: (String) -> Unit = {},
+    onOpenTrack: ((String) -> Unit)? = null,
 ) {
-    val localConfig = LocalConfiguration.current
     val topSongs = remember { mutableStateListOf<ArtistSong>() }
     val moreSongs = remember { mutableStateListOf<ArtistSong>() }
     val releases = remember { mutableStateListOf<SimpleAlbum>() }
@@ -227,189 +216,167 @@ fun ArtistPage(
         .toList()
     val hasMoreSongs = !moreSongsLoaded && releases.isNotEmpty()
 
-    LazyColumn(
-        modifier = modifier.fillMaxSize(),
-        contentPadding = PaddingValues(vertical = 8.dp, horizontal = 12.dp),
-    ) {
-        item {
-            data.images.getOrNull(0)?.url?.let { imageUrl ->
-                Box(
-                    modifier = Modifier
-                        .clip(MaterialTheme.shapes.extraSmall)
-                        .fillMaxWidth()
-                        .padding(bottom = 6.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    val size = (localConfig.screenHeightDp / 3)
-                    AsyncImageImpl(
-                        modifier = Modifier
-                            .size(size.dp)
-                            .aspectRatio(1f, matchHeightConstraintsFirst = true)
-                            .clip(MaterialTheme.shapes.small),
-                        model = imageUrl,
-                        contentDescription = stringResource(id = R.string.track_artwork),
-                        contentScale = ContentScale.Crop,
-                    )
-                }
-            }
-        }
+    val artworkUrl = data.images.getOrNull(0)?.url.orEmpty()
+    val seed = rememberArtworkSeed(artworkUrl)
+    val monthlyListeners = SpotifyApiRequests.getArtistMonthlyListeners(data.id)
 
-        item {
-            Column(
-                verticalArrangement = Arrangement.Center,
-                horizontalAlignment = Alignment.CenterHorizontally,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(start = 16.dp, end = 16.dp, top = 8.dp)
-            ) {
-                SelectionContainer {
-                    MarqueeText(
-                        text = data.name,
-                        fontWeight = FontWeight.Bold,
-                        style = MaterialTheme.typography.headlineMedium
-                    )
-                }
-                Spacer(modifier = Modifier.height(6.dp))
-                SelectionContainer {
-                    Text(
-                        text = "${stringResource(id = R.string.artist_followers)}: ${
-                            GeneralTextUtils.formatCount((data.followers.total ?: 0).toLong())
-                        }",
-                        style = MaterialTheme.typography.bodyMedium.copy(
-                            fontWeight = FontWeight.Bold
-                        ),
-                        modifier = Modifier.alpha(alpha = 0.8f)
-                    )
-                }
-                SpotifyApiRequests.getArtistMonthlyListeners(data.id)?.let { listeners ->
-                    Spacer(modifier = Modifier.height(6.dp))
-                    SelectionContainer {
-                        Text(
-                            text = "${stringResource(id = R.string.artist_monthly_listeners)}: ${
-                                GeneralTextUtils.formatCount(listeners)
+    MetadataScreen(
+        topBarTitle = data.name,
+        onBack = onBack,
+        modifier = modifier,
+        seed = seed,
+        backdrop = { ArtworkBackdrop(artworkUrl) },
+    ) { paddingValues, listState ->
+        LazyColumn(
+            state = listState,
+            modifier = Modifier.fillMaxSize(),
+            contentPadding = PaddingValues(
+                top = paddingValues.calculateTopPadding(),
+                bottom = paddingValues.calculateBottomPadding() + 24.dp,
+            ),
+        ) {
+            item {
+                MetadataHero(
+                    title = data.name,
+                    artwork = {
+                        if (artworkUrl.isNotEmpty()) CollectionArtwork(artworkUrl)
+                    },
+                ) {
+                    MetadataTags(
+                        listOf(
+                            "${GeneralTextUtils.formatCount((data.followers.total ?: 0).toLong())} ${
+                                stringResource(id = R.string.artist_followers).lowercase()
                             }",
-                            style = MaterialTheme.typography.bodyMedium.copy(
-                                fontWeight = FontWeight.Bold
-                            ),
-                            modifier = Modifier.alpha(alpha = 0.8f)
+                            monthlyListeners?.let {
+                                "${GeneralTextUtils.formatCount(it)} ${
+                                    stringResource(id = R.string.artist_monthly_listeners).lowercase()
+                                }"
+                            }.orEmpty(),
+                        )
+                    )
+                    FilledTonalButton(
+                        onClick = { ChromeCustomTabsUtil.openUrl(data.externalUrls.spotify.orEmpty()) },
+                        shape = CircleShape,
+                        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
+                        modifier = Modifier.heightIn(min = 40.dp),
+                    ) {
+                        Icon(
+                            modifier = Modifier.size(18.dp),
+                            imageVector = ImageVector.vectorResource(id = R.drawable.spotify_logo),
+                            contentDescription = null
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = stringResource(id = R.string.open_in_spotify),
+                            style = MaterialTheme.typography.labelLarge,
                         )
                     }
                 }
-                FilledTonalButton(
-                    modifier = Modifier.padding(start = 8.dp),
-                    onClick = { ChromeCustomTabsUtil.openUrl(data.externalUrls.spotify!!) },
-                    colors = ButtonDefaults.filledTonalButtonColors(
-                        containerColor = Color(
-                            red = 30,
-                            green = 215,
-                            blue = 96
-                        ).harmonizeWithPrimary(),
-                    ),
-                )
-                {
-                    Icon(
-                        modifier = Modifier.size(24.dp),
-                        imageVector = ImageVector.vectorResource(id = R.drawable.spotify_logo),
-                        contentDescription = null
+            }
+
+            if (missingTracks.isNotEmpty() || hasMoreSongs) {
+                item {
+                    CollectionDownloadActions(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 12.dp),
+                        totalDurationMs = missingTracks.sumOf { it.durationMs },
+                        missingTracks = missingTracks,
+                        hasMore = hasMoreSongs,
+                        resolveMissing = {
+                            loadAllSongs()
+                            (topSongs + moreSongs)
+                                .filter { it.id !in downloadedTrackIds }
+                                .distinctBy { it.id }
+                                .map { it.toTrackDownload() }
+                        },
+                        onDownloadAll = null,
+                        onDownloadMissing = onDownloadTracks,
                     )
                 }
             }
-        }
 
-        item {
-            ArtistSectionTitle(stringResource(id = R.string.artist_songs))
-        }
-
-        if (missingTracks.isNotEmpty() || hasMoreSongs) {
             item {
-                CollectionDownloadActions(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 4.dp),
-                    totalDurationMs = missingTracks.sumOf { it.durationMs },
-                    missingTracks = missingTracks,
-                    hasMore = hasMoreSongs,
-                    resolveMissing = {
-                        loadAllSongs()
-                        (topSongs + moreSongs)
-                            .filter { it.id !in downloadedTrackIds }
-                            .distinctBy { it.id }
-                            .map { it.toTrackDownload() }
+                MetadataSectionTitle(stringResource(id = R.string.artist_songs))
+            }
+
+            itemsIndexed(songs, key = { _, song -> song.id }) { _, song ->
+                TrackComponent(
+                    contentModifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+                    songName = song.name,
+                    artists = song.artists,
+                    spotifyUrl = song.url,
+                    isExplicit = song.explicit,
+                    isDownloaded = song.id in downloadedTrackIds,
+                    imageUrl = song.coverUrl,
+                    onOpen = {
+                        if (onOpenTrack != null) onOpenTrack(song.id)
+                        else ChromeCustomTabsUtil.openUrl(song.url)
                     },
-                    onDownloadAll = null,
-                    onDownloadMissing = onDownloadTracks,
+                    onDownload = {
+                        trackDownloadCallback(song.url, "${song.name} - ${song.artists}")
+                    }
                 )
             }
-        }
 
-        itemsIndexed(songs, key = { _, song -> song.id }) { _, song ->
-            TrackComponent(
-                contentModifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
-                songName = song.name,
-                artists = song.artists,
-                spotifyUrl = song.url,
-                isExplicit = song.explicit,
-                isDownloaded = song.id in downloadedTrackIds,
-                onClick = {
-                    trackDownloadCallback(song.url, "${song.name} - ${song.artists}")
-                }
-            )
-        }
-
-        if (releases.isNotEmpty() || moreSongs.isNotEmpty()) {
-            item {
-                SongsToggle(
-                    expanded = showAllSongs,
-                    onToggle = { showAllSongs = !showAllSongs },
-                )
-            }
-        }
-
-        if (loadingTopSongs || loadingMoreSongs) {
-            item {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(12.dp),
-                    horizontalArrangement = Arrangement.Center,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
-                    Text(
-                        text = stringResource(R.string.loading),
-                        style = MaterialTheme.typography.bodySmall,
-                        modifier = Modifier.padding(start = 8.dp)
-                    )
-                }
-            }
-        }
-
-        if (albums.isNotEmpty()) {
-            item {
-                ArtistSectionTitle(stringResource(id = R.string.artist_albums))
-            }
-            items(albums, key = { "album-${it.id}" }) { album ->
-                ReleaseRow(album, R.string.album, onOpenAlbum)
-            }
-        }
-
-        if (singles.isNotEmpty()) {
-            item {
-                ArtistSectionTitle(stringResource(id = R.string.artist_singles))
-            }
-            val visibleSingles =
-                if (showAllSingles) singles else singles.take(SINGLES_PREVIEW)
-            items(visibleSingles, key = { "single-${it.id}" }) { single ->
-                ReleaseRow(single, R.string.single, onOpenAlbum)
-            }
-            if (singles.size > SINGLES_PREVIEW) {
+            if (releases.isNotEmpty() || moreSongs.isNotEmpty()) {
                 item {
                     SongsToggle(
-                        expanded = showAllSingles,
-                        onToggle = { showAllSingles = !showAllSingles },
-                        showAllRes = R.string.show_all_singles,
-                        showFewerRes = R.string.show_fewer_singles,
+                        expanded = showAllSongs,
+                        onToggle = { showAllSongs = !showAllSongs },
                     )
+                }
+            }
+
+            if (loadingTopSongs || loadingMoreSongs) {
+                item {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp),
+                        horizontalArrangement = Arrangement.Center,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(18.dp),
+                            strokeWidth = 2.dp
+                        )
+                        Text(
+                            text = stringResource(R.string.loading),
+                            style = MaterialTheme.typography.bodySmall,
+                            modifier = Modifier.padding(start = 8.dp)
+                        )
+                    }
+                }
+            }
+
+            if (albums.isNotEmpty()) {
+                item {
+                    MetadataSectionTitle(stringResource(id = R.string.artist_albums))
+                }
+                items(albums, key = { "album-${it.id}" }) { album ->
+                    ReleaseRow(album, R.string.album, onOpenAlbum)
+                }
+            }
+
+            if (singles.isNotEmpty()) {
+                item {
+                    MetadataSectionTitle(stringResource(id = R.string.artist_singles))
+                }
+                val visibleSingles =
+                    if (showAllSingles) singles else singles.take(SINGLES_PREVIEW)
+                items(visibleSingles, key = { "single-${it.id}" }) { single ->
+                    ReleaseRow(single, R.string.single, onOpenAlbum)
+                }
+                if (singles.size > SINGLES_PREVIEW) {
+                    item {
+                        SongsToggle(
+                            expanded = showAllSingles,
+                            onToggle = { showAllSingles = !showAllSingles },
+                            showAllRes = R.string.show_all_singles,
+                            showFewerRes = R.string.show_fewer_singles,
+                        )
+                    }
                 }
             }
         }
@@ -486,14 +453,3 @@ private fun ReleaseRow(
     )
 }
 
-@Composable
-private fun ArtistSectionTitle(text: String) {
-    Text(
-        text = text,
-        style = MaterialTheme.typography.bodyLarge.copy(
-            fontWeight = FontWeight.Bold
-        ),
-        modifier = Modifier.alpha(alpha = 0.8f)
-    )
-    HorizontalDivider(modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp))
-}

@@ -78,6 +78,7 @@ private const val DYNAMIC_COLOR = "dynamic_color"
 const val CELLULAR_DOWNLOAD = "cellular_download"
 private const val HIGH_CONTRAST = "high_contrast"
 const val FORMAT_SELECTION = "format_selection"
+private const val METADATA_ARTWORK_COLORS = "metadata_artwork_colors"
 
 // Updater Constants
 const val UPDATE_FREQUENCY = "update_frequency"
@@ -132,6 +133,7 @@ val palettesMap = mapOf(
     3 to PaletteStyle.Vibrant,
     4 to PaletteStyle.Spotify,
     5 to PaletteStyle.Monochrome,
+    6 to PaletteStyle.Rainbow,
 )
 
 val lyricProvidersList = listOf("Genius", "Musixmatch", "AZLyrics", "Synced")
@@ -294,7 +296,8 @@ object PreferencesUtil {
         val darkTheme: DarkThemePreference = DarkThemePreference(),
         val isDynamicColorEnabled: Boolean = false,
         val seedColor: Int = DEFAULT_SEED_COLOR,
-        val paletteStyleIndex: Int = 0
+        val paletteStyleIndex: Int = 0,
+        val metadataArtworkColors: Boolean = true
     )
 
     private val mutableAppSettingsStateFlow = MutableStateFlow(
@@ -310,7 +313,8 @@ object PreferencesUtil {
                 DynamicColors.isDynamicColorAvailable()
             ),
             seedColor = kv.decodeInt(THEME_COLOR, DEFAULT_SEED_COLOR),
-            paletteStyleIndex = kv.decodeInt(PALETTE_STYLE, 0)
+            paletteStyleIndex = kv.decodeInt(PALETTE_STYLE, 0),
+            metadataArtworkColors = kv.decodeBool(METADATA_ARTWORK_COLORS, true)
         )
     )
     val AppSettingsStateFlow = mutableAppSettingsStateFlow.asStateFlow()
@@ -349,6 +353,15 @@ object PreferencesUtil {
                 it.copy(isDynamicColorEnabled = enabled)
             }
             kv.encode(DYNAMIC_COLOR, enabled)
+        }
+    }
+
+    fun switchMetadataArtworkColors(enabled: Boolean = !mutableAppSettingsStateFlow.value.metadataArtworkColors) {
+        applicationScope.launch(Dispatchers.IO) {
+            mutableAppSettingsStateFlow.update {
+                it.copy(metadataArtworkColors = enabled)
+            }
+            kv.encode(METADATA_ARTWORK_COLORS, enabled)
         }
     }
 

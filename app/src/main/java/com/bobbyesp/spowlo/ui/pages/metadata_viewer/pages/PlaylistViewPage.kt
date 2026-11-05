@@ -1,11 +1,8 @@
 package com.bobbyesp.spowlo.ui.pages.metadata_viewer.pages
 
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -19,39 +16,36 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextLinkStyles
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.fromHtml
 import androidx.compose.ui.unit.dp
 import com.adamratzman.spotify.models.Playlist
 import com.bobbyesp.spowlo.App
 import com.bobbyesp.spowlo.R
-import com.bobbyesp.spowlo.ui.common.AsyncImageImpl
-import com.bobbyesp.spowlo.ui.components.HorizontalDivider
 import com.bobbyesp.spowlo.ui.components.songs.metadata_viewer.CollectionDownloadActions
 import com.bobbyesp.spowlo.ui.components.songs.metadata_viewer.TrackComponent
-import com.bobbyesp.spowlo.ui.components.text.MarqueeText
-import com.bobbyesp.spowlo.ui.pages.metadata_viewer.binders.dataStringToString
 import com.bobbyesp.spowlo.ui.pages.metadata_viewer.playlists.TrackDownload
+import com.bobbyesp.spowlo.utils.ChromeCustomTabsUtil
+import com.bobbyesp.spowlo.utils.GeneralTextUtils
 
 @Composable
 fun PlaylistViewPage(
     data: Playlist,
     modifier: Modifier,
+    onBack: () -> Unit,
     trackDownloadCallback: (String, String) -> Unit,
     downloadedTrackIds: Set<String> = emptySet(),
     onDownloadTracks: (List<TrackDownload>) -> Unit = {},
     isLoadingTracks: Boolean = false,
+    onOpenTrack: ((String) -> Unit)? = null,
 ) {
-    val localConfig = LocalConfiguration.current
     val trackCount = data.tracks.total
+    val artworkUrl = data.images.firstOrNull()?.url.orEmpty()
+    val seed = rememberArtworkSeed(artworkUrl)
     val missingTracks = data.tracks.items.mapNotNull { item ->
         val track = item.track?.asTrack ?: return@mapNotNull null
         if (track.id in downloadedTrackIds) return@mapNotNull null
@@ -70,159 +64,141 @@ fun PlaylistViewPage(
     val pendingDurationMs = data.tracks.items.mapNotNull { item ->
         item.track?.asTrack?.takeIf { it.id !in downloadedTrackIds }
     }.sumOf { it.durationMs.toLong() }
+    val downloadAll: (() -> Unit)? = data.externalUrls.spotify?.let { url ->
+        { trackDownloadCallback(url, data.name) }
+    }
 
-    LazyColumn(
-        modifier = modifier.fillMaxSize(),
-        contentPadding = PaddingValues(vertical = 8.dp, horizontal = 12.dp),
-    ) {
-        item {
-            Box(
-                modifier = Modifier
-                    .clip(MaterialTheme.shapes.extraSmall)
-                    .fillMaxWidth()
-                    .padding(bottom = 6.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                //calculate the image size based on the screen size and the aspect ratio as 1:1 (square) based on the height
-                val size = (localConfig.screenHeightDp / 3)
-                AsyncImageImpl(
-                    modifier = Modifier
-                        .size(size.dp)
-                        .aspectRatio(
-                            1f, matchHeightConstraintsFirst = true
-                        )
-                        .clip(MaterialTheme.shapes.small),
-                    model = data.images.getOrNull(0)?.url ?: "",
-                    contentDescription = stringResource(id = R.string.track_artwork),
-                    contentScale = ContentScale.Crop,
-                )
-            }
-        }
-        item {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 12.dp)
-                    .padding(top = 6.dp),
-                verticalArrangement = Arrangement.spacedBy(6.dp)
-            ) {
-                SelectionContainer {
-                    MarqueeText(
-                        text = data.name,
-                        fontWeight = FontWeight.Bold,
-                        style = MaterialTheme.typography.headlineMedium
-                    )
-                }
-                SelectionContainer {
-                    Text(
-                        text = data.owner.displayName ?: data.owner.id,
-                        style = MaterialTheme.typography.bodyMedium.copy(
-                            fontWeight = FontWeight.Bold
-                        ),
-                        modifier = Modifier.alpha(alpha = 0.8f)
-                    )
-                }
-                SelectionContainer {
-                    Text(
-                        text = dataStringToString(
-                            data = data.type,
-                            additional = data.followers.total.toString() + " " + App.context.getString(
-                                R.string.followers
-                            )
-                                .lowercase()
-                        ),
-                        style = MaterialTheme.typography.bodySmall,
-                        modifier = Modifier.alpha(alpha = 0.8f)
-                    )
-                }
-                if (trackCount > 0) {
-                    Text(
-                        text = pluralStringResource(
-                            R.plurals.song_count, trackCount, trackCount
-                        ),
-                        style = MaterialTheme.typography.bodySmall,
-                        modifier = Modifier.alpha(alpha = 0.8f)
-                    )
-                }
-                SelectionContainer {
-                    val annotatedString = AnnotatedString.fromHtml(
-                        data.description ?: "",
-                        linkStyles = TextLinkStyles(
-                            style = SpanStyle(
-                                color = MaterialTheme.colorScheme.primary,
-                            )
-                        )
-                    )
-                    Text(
-                        text = annotatedString,
-                        style = MaterialTheme.typography.bodySmall,
-                        modifier = Modifier.alpha(alpha = 0.8f)
-                    )
-                }
-            }
-        }
-        if (data.externalUrls.spotify != null || missingTracks.isNotEmpty()) {
+    MetadataScreen(
+        topBarTitle = data.name,
+        onBack = onBack,
+        modifier = modifier,
+        seed = seed,
+        backdrop = { ArtworkBackdrop(artworkUrl) },
+    ) { paddingValues, listState ->
+        LazyColumn(
+            state = listState,
+            modifier = Modifier.fillMaxSize(),
+            contentPadding = PaddingValues(
+                top = paddingValues.calculateTopPadding(),
+                bottom = paddingValues.calculateBottomPadding() + 24.dp,
+            ),
+            verticalArrangement = Arrangement.Top,
+        ) {
             item {
-                val downloadAll: (() -> Unit)? = data.externalUrls.spotify?.let { url ->
-                    { trackDownloadCallback(url, data.name) }
+                MetadataHero(
+                    title = data.name,
+                    artwork = {
+                        if (artworkUrl.isNotEmpty()) CollectionArtwork(artworkUrl)
+                    },
+                ) {
+                    MetadataLine(
+                        text = data.owner.displayName ?: data.owner.id,
+                        emphasized = true,
+                    )
+                    MetadataTags(
+                        listOf(
+                            stringResource(R.string.playlist),
+                            if ((data.followers.total ?: 0) > 0) {
+                                "${GeneralTextUtils.formatCount((data.followers.total ?: 0).toLong())} ${
+                                    App.context.getString(R.string.followers).lowercase()
+                                }"
+                            } else {
+                                ""
+                            },
+                            if (trackCount > 0) {
+                                pluralStringResource(R.plurals.song_count, trackCount, trackCount)
+                            } else {
+                                ""
+                            },
+                        )
+                    )
+                    data.description?.takeIf { it.isNotBlank() }?.let { description ->
+                        SelectionContainer {
+                            Text(
+                                text = AnnotatedString.fromHtml(
+                                    description,
+                                    linkStyles = TextLinkStyles(
+                                        style = SpanStyle(
+                                            color = MaterialTheme.colorScheme.primary,
+                                        )
+                                    )
+                                ),
+                                style = MaterialTheme.typography.bodySmall,
+                                maxLines = 4,
+                                modifier = Modifier.alpha(alpha = 0.7f),
+                            )
+                        }
+                    }
                 }
-                CollectionDownloadActions(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(12.dp),
-                    totalDurationMs = pendingDurationMs,
-                    missingTracks = missingTracks,
-                    onDownloadAll = downloadAll,
-                    onDownloadMissing = onDownloadTracks,
-                )
-                HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp))
             }
-        }
-        if (data.tracks.size > 0) {
+            if (data.externalUrls.spotify != null || missingTracks.isNotEmpty()) {
+                item {
+                    CollectionDownloadActions(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 12.dp),
+                        totalDurationMs = pendingDurationMs,
+                        missingTracks = missingTracks,
+                        onDownloadAll = downloadAll,
+                        onDownloadMissing = onDownloadTracks,
+                    )
+                }
+            }
+            item {
+                MetadataSectionTitle(stringResource(R.string.tracks))
+            }
             items(data.tracks.items.size) { index ->
                 val track = data.tracks.items[index]
                 val actualTrack = track.track?.asTrack
                 val taskName = StringBuilder().append(actualTrack?.name).append(" - ")
                     .append(actualTrack?.artists?.joinToString(", ") { it.name }).toString()
                 TrackComponent(
-                    contentModifier = Modifier,
+                    contentModifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
                     songName = actualTrack?.name ?: App.context.getString(R.string.unknown),
                     artists = actualTrack?.artists?.joinToString(", ") { it.name } ?: "",
                     spotifyUrl = actualTrack?.externalUrls?.spotify ?: "",
                     isExplicit = actualTrack?.explicit ?: false,
-                    isPlaylist = true,
                     isDownloaded = actualTrack?.id?.let { it in downloadedTrackIds } == true,
                     imageUrl = actualTrack?.album?.images?.getOrNull(0)?.url ?: "",
-                    onClick = {
+                    onOpen = {
+                        if (actualTrack != null) {
+                            if (onOpenTrack != null) {
+                                onOpenTrack(actualTrack.id)
+                            } else {
+                                ChromeCustomTabsUtil.openUrl(actualTrack.externalUrls.spotify.orEmpty())
+                            }
+                        }
+                    },
+                    onDownload = {
                         if (actualTrack != null) {
                             trackDownloadCallback(
-                                actualTrack.externalUrls.spotify!!,
-                                taskName
+                                actualTrack.externalUrls.spotify ?: "",
+                                taskName,
                             )
                         }
-                    }
+                    },
                 )
             }
-        }
-
-        item {
             if (isLoadingTracks) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(12.dp),
-                    horizontalArrangement = Arrangement.Center,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
-                    Text(
-                        text = stringResource(R.string.loading),
-                        style = MaterialTheme.typography.bodySmall,
-                        modifier = Modifier.padding(start = 8.dp)
-                    )
+                item {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp),
+                        horizontalArrangement = Arrangement.Center,
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(18.dp),
+                            strokeWidth = 2.dp,
+                        )
+                        Text(
+                            text = stringResource(R.string.loading),
+                            style = MaterialTheme.typography.bodySmall,
+                            modifier = Modifier.padding(start = 8.dp),
+                        )
+                    }
                 }
-            } else {
-                androidx.compose.material3.HorizontalDivider()
             }
         }
     }
