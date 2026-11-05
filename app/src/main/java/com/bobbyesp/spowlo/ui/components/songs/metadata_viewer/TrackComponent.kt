@@ -2,6 +2,7 @@ package com.bobbyesp.spowlo.ui.components.songs.metadata_viewer
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -14,24 +15,29 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.ContentCopy
-import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.MoreVert
-import androidx.compose.material3.Divider
+import androidx.compose.material.icons.outlined.Download
+import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
@@ -41,11 +47,15 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.PopupProperties
 import com.bobbyesp.spowlo.R
 import com.bobbyesp.spowlo.ui.common.AsyncImageImpl
+import com.bobbyesp.spowlo.ui.components.ActionDialog
 import com.bobbyesp.spowlo.ui.components.songs.ExplicitIcon
 import com.bobbyesp.spowlo.ui.components.songs.LyricsIcon
 import com.bobbyesp.spowlo.ui.components.text.MarqueeText
 import com.bobbyesp.spowlo.ui.pages.settings.about.LocalAsset
 import com.bobbyesp.spowlo.utils.ChromeCustomTabsUtil
+import com.bobbyesp.spowlo.utils.RedownloadUtil
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -58,164 +68,198 @@ fun TrackComponent(
     spotifyUrl: String,
     hasLyrics: Boolean = false,
     isExplicit: Boolean = false,
-    isPlaylist: Boolean = false,
     isDownloaded: Boolean = false,
     imageUrl: String = "",
-    onClick: () -> Unit = { ChromeCustomTabsUtil.openUrl(spotifyUrl) }
+    onOpen: () -> Unit = { ChromeCustomTabsUtil.openUrl(spotifyUrl) },
+    onDownload: (() -> Unit)? = null,
 ) {
     val clipboardManager = LocalClipboardManager.current
-    val showDropdown = remember { mutableStateOf(false) }
-    Column(
-        modifier
-            .fillMaxWidth()
-            .clickable { onClick() }) {
+    var showDropdown by remember { mutableStateOf(false) }
+    var showRedownloadDialog by remember { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
+
+    Row(
+        modifier = modifier
+            .then(contentModifier)
+            .fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
         Row(
-            modifier = contentModifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically, //This makes all go to the center
+            modifier = Modifier
+                .weight(1f)
+                .clip(MaterialTheme.shapes.medium)
+                .clickable(onClick = onOpen)
+                .padding(vertical = 6.dp),
+            verticalAlignment = Alignment.CenterVertically,
         ) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .weight(1f),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.Center
-            ) {
-                if (isPlaylist && imageUrl.isNotEmpty()) {
-                    AsyncImageImpl(
-                        modifier = Modifier
-                            .size(40.dp)
-                            .aspectRatio(
-                                1f, matchHeightConstraintsFirst = true
-                            )
-                            .clip(MaterialTheme.shapes.extraSmall),
-                        model = imageUrl,
-                        contentDescription = stringResource(id = R.string.track_artwork),
-                        contentScale = ContentScale.Crop,
-                    )
-                }
-                Column(
+            if (imageUrl.isNotEmpty()) {
+                AsyncImageImpl(
                     modifier = Modifier
-                        .padding(6.dp)
-                        .padding(start = if (isPlaylist) 6.dp else 0.dp)
-                        .weight(1f),
-                    verticalArrangement = Arrangement.Center,
-                    horizontalAlignment = Alignment.Start
-                ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.Center
-                    ) {
-                        MarqueeText(
-                            text = songName,
-                            color = MaterialTheme.colorScheme.onSurface,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                            fontSize = 15.sp,
-                            fontWeight = FontWeight.Bold,
-                            basicGradientColor = MaterialTheme.colorScheme.surface.copy(
-                                alpha = 0.8f
-                            ),
+                        .size(48.dp)
+                        .aspectRatio(
+                            1f, matchHeightConstraintsFirst = true
                         )
-                        if (isDownloaded) {
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Icon(
-                                imageVector = Icons.Filled.CheckCircle,
-                                contentDescription = stringResource(id = R.string.downloaded),
-                                tint = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.size(12.dp)
-                            )
-                        }
-                    }
-                    Spacer(Modifier.height(6.dp))
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.Center
-                    ) {
-                        MarqueeText(
-                            text = artists,
-                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f),
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                            fontSize = 10.sp,
-                            basicGradientColor = MaterialTheme.colorScheme.surface.copy(
-                                alpha = 0.8f
-                            ),
-                        )
-                        Spacer(modifier = Modifier.width(6.dp))
-                        LyricsIcon(visible = hasLyrics)
-                        Spacer(modifier = Modifier.width(6.dp))
-                        ExplicitIcon(visible = isExplicit)
-                    }
-                }
+                        .clip(MaterialTheme.shapes.small),
+                    model = imageUrl,
+                    contentDescription = stringResource(id = R.string.track_artwork),
+                    contentScale = ContentScale.Crop,
+                )
             }
-            Column {
-                FilledTonalIconButton(
-                    onClick = {
-                        showDropdown.value = !showDropdown.value
-                    },
-                    modifier = Modifier.size(32.dp),
+            Column(
+                modifier = Modifier
+                    .padding(6.dp)
+                    .padding(start = if (imageUrl.isNotEmpty()) 10.dp else 0.dp)
+                    .weight(1f),
+                verticalArrangement = Arrangement.Center,
+                horizontalAlignment = Alignment.Start
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.Center
                 ) {
-                    Icon(
-                        imageVector = Icons.Filled.MoreVert,
-                        contentDescription = "More options button",
-                        modifier = Modifier
-                            .weight(0.1f)
-                            .padding(6.dp)
+                    MarqueeText(
+                        text = songName,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        fontSize = 15.sp,
+                        fontWeight = FontWeight.Bold,
+                        basicGradientColor = MaterialTheme.colorScheme.surface.copy(
+                            alpha = 0.8f
+                        ),
                     )
+                    if (isDownloaded) {
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Icon(
+                            imageVector = Icons.Filled.CheckCircle,
+                            contentDescription = stringResource(id = R.string.downloaded),
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(12.dp)
+                        )
+                    }
                 }
-
-                DropdownMenu(
-                    expanded = showDropdown.value,
-                    onDismissRequest = { showDropdown.value = false },
-                    properties = PopupProperties(
-                        dismissOnClickOutside = true,
-                        dismissOnBackPress = true,
-                        focusable = true,
-                    ),
+                Spacer(Modifier.height(6.dp))
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.Center
                 ) {
-                    DropdownMenuItem(
-                        onClick = onClick,
-                        text = {
-                            Text(text = stringResource(id = R.string.download))
-                        },
-                        leadingIcon = {
-                            Icon(
-                                imageVector = Icons.Filled.Download,
-                                contentDescription = "Download icon",
-                            )
-                        }
+                    MarqueeText(
+                        text = artists,
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        fontSize = 10.sp,
+                        basicGradientColor = MaterialTheme.colorScheme.surface.copy(
+                            alpha = 0.8f
+                        ),
                     )
-                    Divider()
-                    DropdownMenuItem(
-                        text = {
-                            Text(text = stringResource(id = R.string.open_in_spotify))
-                        }, onClick = {
-                            ChromeCustomTabsUtil.openUrl(spotifyUrl)
-                        },
-                        leadingIcon = {
-                            Icon(
-                                imageVector = LocalAsset(id = R.drawable.spotify_logo),
-                                contentDescription = "Spotify logo",
-                            )
-                        }
-                    )
-
-                    DropdownMenuItem(
-                        onClick = {
-                            clipboardManager.setText(AnnotatedString(spotifyUrl))
-                        },
-                        text = {
-                            Text(text = stringResource(id = R.string.copy_link))
-                        },
-                        leadingIcon = {
-                            Icon(
-                                imageVector = Icons.Filled.ContentCopy,
-                                contentDescription = "Copy link icon",
-                            )
-                        }
-                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    LyricsIcon(visible = hasLyrics)
+                    Spacer(modifier = Modifier.width(6.dp))
+                    ExplicitIcon(visible = isExplicit)
                 }
             }
         }
+
+        if (onDownload != null) {
+            Box(
+                modifier = Modifier.size(40.dp),
+                contentAlignment = Alignment.Center,
+            ) {
+                if (isDownloaded) {
+                    IconButton(
+                        onClick = { showRedownloadDialog = true },
+                        modifier = Modifier.size(40.dp),
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.CheckCircle,
+                            contentDescription = stringResource(id = R.string.redownload),
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(22.dp),
+                        )
+                    }
+                } else {
+                    FilledTonalIconButton(
+                        onClick = onDownload,
+                        modifier = Modifier.size(40.dp),
+                    ) {
+                        Icon(
+                            imageVector = Icons.Outlined.Download,
+                            contentDescription = stringResource(id = R.string.download),
+                            modifier = Modifier.size(20.dp),
+                        )
+                    }
+                }
+            }
+            Spacer(modifier = Modifier.width(4.dp))
+        }
+
+        Box {
+            IconButton(
+                onClick = { showDropdown = true },
+                modifier = Modifier.size(40.dp),
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.MoreVert,
+                    contentDescription = stringResource(id = R.string.more_options),
+                    modifier = Modifier.size(20.dp),
+                )
+            }
+
+            DropdownMenu(
+                expanded = showDropdown,
+                onDismissRequest = { showDropdown = false },
+                properties = PopupProperties(
+                    dismissOnClickOutside = true,
+                    dismissOnBackPress = true,
+                    focusable = true,
+                ),
+            ) {
+                DropdownMenuItem(
+                    text = {
+                        Text(text = stringResource(id = R.string.open_in_spotify))
+                    }, onClick = {
+                        showDropdown = false
+                        ChromeCustomTabsUtil.openUrl(spotifyUrl)
+                    },
+                    leadingIcon = {
+                        Icon(
+                            imageVector = LocalAsset(id = R.drawable.spotify_logo),
+                            contentDescription = null,
+                        )
+                    }
+                )
+
+                DropdownMenuItem(
+                    onClick = {
+                        showDropdown = false
+                        clipboardManager.setText(AnnotatedString(spotifyUrl))
+                    },
+                    text = {
+                        Text(text = stringResource(id = R.string.copy_link))
+                    },
+                    leadingIcon = {
+                        Icon(
+                            imageVector = Icons.Filled.ContentCopy,
+                            contentDescription = null,
+                        )
+                    }
+                )
+            }
+        }
+    }
+
+    if (showRedownloadDialog) {
+        ActionDialog(
+            onDismissRequest = { showRedownloadDialog = false },
+            icon = Icons.Outlined.Refresh,
+            title = pluralStringResource(R.plurals.redownload_confirm_title, 1, 1),
+            supportingText = pluralStringResource(R.plurals.redownload_confirm_message, 1),
+            confirmText = stringResource(id = R.string.redownload),
+            onConfirm = {
+                showRedownloadDialog = false
+                scope.launch(Dispatchers.IO) { RedownloadUtil.redownload(spotifyUrl, "$songName - $artists") }
+            },
+        )
     }
 }

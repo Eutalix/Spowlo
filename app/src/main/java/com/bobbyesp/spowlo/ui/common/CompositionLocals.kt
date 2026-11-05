@@ -22,6 +22,7 @@ val LocalWindowWidthState = staticCompositionLocalOf { WindowWidthSizeClass.Comp
 val LocalWindowHeightState = staticCompositionLocalOf { WindowHeightSizeClass.Compact }
 val LocalDynamicColorSwitch = compositionLocalOf { false }
 val LocalPaletteStyleIndex = compositionLocalOf { 0 }
+val LocalMetadataArtworkColors = compositionLocalOf { true }
 
 @Composable
 fun SettingsProvider(
@@ -40,6 +41,7 @@ fun SettingsProvider(
         LocalWindowWidthState provides windowWidthSizeClass,
         LocalWindowHeightState provides localWindowHeightSizeClass,
         LocalDynamicColorSwitch provides appSettingsState.isDynamicColorEnabled,
+        LocalMetadataArtworkColors provides appSettingsState.metadataArtworkColors,
         content = content
     )
 }

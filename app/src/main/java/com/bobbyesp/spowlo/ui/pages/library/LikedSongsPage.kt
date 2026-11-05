@@ -1,10 +1,8 @@
 package com.bobbyesp.spowlo.ui.pages.library
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -12,43 +10,42 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.bobbyesp.spowlo.R
-import com.bobbyesp.spowlo.ui.components.BackButton
-import com.bobbyesp.spowlo.ui.components.HorizontalDivider
 import com.bobbyesp.spowlo.ui.components.songs.metadata_viewer.CollectionDownloadActions
 import com.bobbyesp.spowlo.ui.components.songs.metadata_viewer.TrackComponent
-import com.bobbyesp.spowlo.ui.components.text.MarqueeText
+import com.bobbyesp.spowlo.ui.pages.metadata_viewer.pages.ColorBackdrop
+import com.bobbyesp.spowlo.ui.pages.metadata_viewer.pages.MetadataHero
+import com.bobbyesp.spowlo.ui.pages.metadata_viewer.pages.MetadataScreen
+import com.bobbyesp.spowlo.ui.pages.metadata_viewer.pages.MetadataSectionTitle
+import com.bobbyesp.spowlo.ui.pages.metadata_viewer.pages.MetadataTags
 import com.bobbyesp.spowlo.ui.pages.metadata_viewer.playlists.TrackDownload
+import com.bobbyesp.spowlo.utils.ChromeCustomTabsUtil
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun LikedSongsPage(
     onBackPressed: () -> Unit,
+    onOpenTrack: ((String) -> Unit)? = null,
     viewModel: LikedSongsViewModel = viewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -69,17 +66,13 @@ fun LikedSongsPage(
     }
     val hasMore = !state.endReached
 
-    Scaffold(modifier = Modifier.fillMaxSize(), topBar = {
-        TopAppBar(
-            title = { Text(stringResource(R.string.metadata_viewer), maxLines = 1) },
-            navigationIcon = { BackButton(onBackPressed) }
-        )
-    }) { paddingValues ->
-        Box(
-            modifier = Modifier
-                .padding(paddingValues)
-                .fillMaxSize()
-        ) {
+    MetadataScreen(
+        topBarTitle = stringResource(R.string.liked_songs),
+        onBack = onBackPressed,
+        seed = LikedSongsColor,
+        backdrop = { ColorBackdrop(LikedSongsColor) },
+    ) { paddingValues, listState ->
+        Box(modifier = Modifier.fillMaxSize()) {
             when {
                 state.isLoading -> CircularProgressIndicator(
                     modifier = Modifier.align(Alignment.Center)
@@ -91,11 +84,30 @@ fun LikedSongsPage(
                 )
 
                 else -> LazyColumn(
+                    state = listState,
                     modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(bottom = 24.dp)
+                    contentPadding = PaddingValues(
+                        top = paddingValues.calculateTopPadding(),
+                        bottom = paddingValues.calculateBottomPadding() + 24.dp,
+                    ),
                 ) {
                     item(key = "header") {
-                        LikedSongsHeader(state.total)
+                        MetadataHero(
+                            title = stringResource(R.string.liked_songs),
+                            artwork = { LikedSongsArtwork() },
+                        ) {
+                            if (state.total > 0) {
+                                MetadataTags(
+                                    listOf(
+                                        pluralStringResource(
+                                            R.plurals.song_count,
+                                            state.total,
+                                            state.total
+                                        )
+                                    )
+                                )
+                            }
+                        }
                     }
 
                     if (missingTracks.isNotEmpty() || hasMore) {
@@ -103,7 +115,7 @@ fun LikedSongsPage(
                             CollectionDownloadActions(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .padding(horizontal = 12.dp, vertical = 8.dp),
+                                    .padding(horizontal = 16.dp, vertical = 12.dp),
                                 totalDurationMs = missingTracks.sumOf { it.durationMs },
                                 missingTracks = missingTracks,
                                 hasMore = hasMore,
@@ -111,8 +123,11 @@ fun LikedSongsPage(
                                 onDownloadAll = null,
                                 onDownloadMissing = viewModel::downloadMissing,
                             )
-                            HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
                         }
+                    }
+
+                    item(key = "songs_title") {
+                        MetadataSectionTitle(stringResource(R.string.tracks))
                     }
 
                     itemsIndexed(state.tracks, key = { _, track -> track.id }) { index, track ->
@@ -120,15 +135,18 @@ fun LikedSongsPage(
                             LaunchedEffect(index) { viewModel.loadMore() }
                         }
                         TrackComponent(
-                            contentModifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
+                            contentModifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
                             songName = track.name,
                             artists = track.artists,
                             spotifyUrl = track.url,
                             isExplicit = track.explicit,
-                            isPlaylist = true,
                             isDownloaded = track.id in downloadedTrackIds,
                             imageUrl = track.imageUrl,
-                            onClick = {
+                            onOpen = {
+                                if (onOpenTrack != null) onOpenTrack(track.id)
+                                else ChromeCustomTabsUtil.openUrl(track.url)
+                            },
+                            onDownload = {
                                 viewModel.downloadTrack(
                                     track.url,
                                     "${track.name} - ${track.artists}"
@@ -159,53 +177,31 @@ fun LikedSongsPage(
 }
 
 @Composable
-private fun LikedSongsHeader(total: Int) {
-    val localConfig = LocalConfiguration.current
-    Column(
+private fun LikedSongsArtwork() {
+    val size = (LocalConfiguration.current.screenHeightDp / 3).dp
+    val shape = RoundedCornerShape(24.dp)
+    Box(
         modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 8.dp)
-    ) {
-        Box(
-            modifier = Modifier.fillMaxWidth(),
-            contentAlignment = Alignment.Center
-        ) {
-            Box(
-                modifier = Modifier
-                    .padding(bottom = 6.dp)
-                    .size((localConfig.screenHeightDp / 3).dp)
-                    .aspectRatio(1f, matchHeightConstraintsFirst = true)
-                    .clip(MaterialTheme.shapes.small)
-                    .background(Color(0xFF450AF5)),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    imageVector = Icons.Filled.Favorite,
-                    contentDescription = null,
-                    tint = Color.White,
-                    modifier = Modifier.size(64.dp)
-                )
-            }
-        }
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 12.dp)
-                .padding(top = 6.dp),
-            verticalArrangement = Arrangement.spacedBy(6.dp)
-        ) {
-            MarqueeText(
-                text = stringResource(R.string.liked_songs),
-                fontWeight = FontWeight.Bold,
-                style = MaterialTheme.typography.headlineMedium
+            .size(size)
+            .aspectRatio(1f, matchHeightConstraintsFirst = true)
+            .shadow(
+                elevation = 16.dp,
+                shape = shape,
+                clip = false,
+                ambientColor = Color.Black.copy(alpha = 0.45f),
+                spotColor = Color.Black.copy(alpha = 0.45f),
             )
-            if (total > 0) {
-                Text(
-                    text = pluralStringResource(R.plurals.song_count, total, total),
-                    style = MaterialTheme.typography.bodySmall,
-                    modifier = Modifier.alpha(alpha = 0.8f)
-                )
-            }
-        }
+            .clip(shape)
+            .background(LikedSongsColor),
+        contentAlignment = Alignment.Center
+    ) {
+        Icon(
+            imageVector = Icons.Filled.Favorite,
+            contentDescription = null,
+            tint = Color.White,
+            modifier = Modifier.size(64.dp)
+        )
     }
 }
+
+private val LikedSongsColor = Color(0xFF450AF5)

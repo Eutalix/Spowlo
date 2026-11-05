@@ -241,6 +241,7 @@ dependencies {
     implementation(libs.paging.runtime)
 
     implementation(libs.coil.kt.compose)
+    implementation(libs.androidx.palette)
 
     implementation(libs.jaudiotagger)
 

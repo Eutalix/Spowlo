@@ -47,7 +47,6 @@ import com.bobbyesp.spowlo.ui.pages.downloader.DownloaderPage
 import com.bobbyesp.spowlo.ui.pages.downloader.DownloaderViewModel
 import com.bobbyesp.spowlo.ui.pages.library.LikedSongsPage
 import com.bobbyesp.spowlo.ui.pages.library.UserLibraryPage
-import com.bobbyesp.spowlo.ui.pages.metadata_viewer.playlists.PlaylistPageViewModel
 import com.bobbyesp.spowlo.ui.pages.metadata_viewer.playlists.SpotifyItemPage
 import com.bobbyesp.spowlo.ui.pages.playlist.PlaylistMetadataPage
 import com.bobbyesp.spowlo.ui.pages.searcher.SearcherPage
@@ -83,6 +82,10 @@ import java.util.concurrent.TimeUnit
 
 private const val TAG = "SpowloDebug"
 
+private const val METADATA_ROUTE_PATTERN = Route.PLAYLIST_PAGE + "/{type}/{id}?account={account}"
+
+private fun metadataRoute(type: String, id: String) = Route.PLAYLIST_PAGE + "/" + type + "/" + id
+
 @OptIn(
     ExperimentalAnimationApi::class,
     ExperimentalMaterialNavigationApi::class,
@@ -92,7 +95,6 @@ private const val TAG = "SpowloDebug"
 @Composable
 fun InitialEntry(
     downloaderViewModel: DownloaderViewModel,
-    playlistPageViewModel: PlaylistPageViewModel,
     isUrlShared: Boolean,
     openDownloadsRequest: Int = 0
 ) {
@@ -115,6 +117,17 @@ fun InitialEntry(
 
     val cookiesViewModel: CookiesSettingsViewModel = viewModel()
     val onBackPressed: () -> Unit = { navController.popBackStack() }
+
+    // Keeps every metadata page on the back stack, except when re-opening the page already shown.
+    val openMetadataPage: (String, String) -> Unit = { type, id ->
+        val current = navController.currentBackStackEntry
+        val isCurrentPage = current?.destination?.route == METADATA_ROUTE_PATTERN &&
+            current.arguments?.getString("type") == type &&
+            current.arguments?.getString("id") == id
+        navController.navigate(metadataRoute(type, id)) {
+            launchSingleTop = isCurrentPage
+        }
+    }
 
     LaunchedEffect(openDownloadsRequest) {
         if (openDownloadsRequest > 0) {
@@ -228,7 +241,10 @@ fun InitialEntry(
                 )
             }
             animatedComposable(Route.LIKED_SONGS) {
-                LikedSongsPage(onBackPressed)
+                LikedSongsPage(
+                    onBackPressed = onBackPressed,
+                    onOpenTrack = { trackId -> openMetadataPage("track", trackId) },
+                )
             }
             animatedComposable(Route.GENERAL_DOWNLOAD_PREFERENCES) {
                 GeneralSettingsPage(
@@ -332,15 +348,9 @@ fun InitialEntry(
                 defaultValue = false
             }
 
-            //We build the route with the type of the destination and the id of it
-            val routeWithIdPattern: String =
-                StringBuilder().append(Route.PLAYLIST_PAGE).append("/{type}")
-                    .append("/{id}")
-                    .append("?account={account}").toString()
-
             //We create the composable with the route and the arguments
             animatedComposableVariant(
-                routeWithIdPattern, arguments = listOf(typeArg, idArg, accountArg)
+                METADATA_ROUTE_PATTERN, arguments = listOf(typeArg, idArg, accountArg)
             ) { backStackEntry ->
                 val id = backStackEntry.arguments?.getString("id") ?: "SOMETHING WENT WRONG"
                 val type =
@@ -352,15 +362,9 @@ fun InitialEntry(
                     id = id,
                     type = type,
                     account = account,
-                    playlistPageViewModel = playlistPageViewModel,
-                    onOpenAlbum = { albumId ->
-                        navController.navigate(
-                            Route.PLAYLIST_PAGE + "/album/" + albumId,
-                            navOptions = navOptions {
-                                launchSingleTop = true
-                                restoreState = true
-                            })
-                    },
+                    onOpenAlbum = { albumId -> openMetadataPage("album", albumId) },
+                    onOpenArtist = { artistId -> openMetadataPage("artist", artistId) },
+                    onOpenTrack = { trackId -> openMetadataPage("track", trackId) },
                 )
             }
         }
@@ -502,30 +506,9 @@ fun InitialEntry(
             onRequestMetadata = {
                 downloaderViewModel.requestMetadata()
             },
-            navigateToPlaylist = { id ->
-                navController.navigate(
-                    Route.PLAYLIST_PAGE + "/" + "playlist" + "/" + id,
-                    navOptions = navOptions {
-                        launchSingleTop = true
-                        restoreState = true
-                    })
-            },
-            navigateToAlbum = { id ->
-                navController.navigate(
-                    Route.PLAYLIST_PAGE + "/" + "album" + "/" + id,
-                    navOptions = navOptions {
-                        launchSingleTop = true
-                        restoreState = true
-                    })
-            },
-            navigateToArtist = { id ->
-                navController.navigate(
-                    Route.PLAYLIST_PAGE + "/" + "artist" + "/" + id,
-                    navOptions = navOptions {
-                        launchSingleTop = true
-                        restoreState = true
-                    })
-            },
+            navigateToPlaylist = { id -> openMetadataPage("playlist", id) },
+            navigateToAlbum = { id -> openMetadataPage("album", id) },
+            navigateToArtist = { id -> openMetadataPage("artist", id) },
         )
     }
 
