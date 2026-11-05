@@ -22,6 +22,7 @@ data class UserTrack(
     val id: String,
     val name: String,
     val artists: String,
+    val albumName: String,
     val imageUrl: String,
     val durationMs: Long,
     val explicit: Boolean,
@@ -124,14 +125,14 @@ object SpotifyUserApi {
             ?: return null
         val data = wrapper.optJSONObject("data") ?: return null
         val artists = data.optJSONObject("artists")?.optJSONArray("items")
+        val album = data.optJSONObject("albumOfTrack")
 
         return UserTrack(
             id = id,
             name = data.optString("name"),
             artists = artistNames(artists),
-            imageUrl = firstSource(
-                data.optJSONObject("albumOfTrack")?.optJSONObject("coverArt")
-            ),
+            albumName = album?.optString("name").orEmpty(),
+            imageUrl = firstSource(album?.optJSONObject("coverArt")),
             durationMs = data.optJSONObject("duration")?.optLong("totalMilliseconds", 0L) ?: 0L,
             explicit = data.optJSONObject("contentRating")?.optString("label") == "EXPLICIT",
         )

@@ -38,6 +38,7 @@ fun SpotifyItemPage(
     id: String,
     type: String,
     account: Boolean = false,
+    onOpenAlbum: (String) -> Unit = {},
 ) {
     val scrollBehavior = TopAppBarDefaults.enterAlwaysScrollBehavior()
 
@@ -115,6 +116,7 @@ fun SpotifyItemPage(
                                         trackDownloadCallback = trackDownloadCallback,
                                         downloadedTrackIds = downloadedTrackIds,
                                         onDownloadTracks = downloadTracksCallback,
+                                        onOpenAlbum = onOpenAlbum,
                                     )
                                 }
                             }

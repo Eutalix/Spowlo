@@ -3,7 +3,10 @@ package com.bobbyesp.spowlo.ui.pages.metadata_viewer.playlists
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.bobbyesp.spowlo.App.Companion.applicationScope
+import com.adamratzman.spotify.models.Album
+import com.adamratzman.spotify.models.Artist
+import com.adamratzman.spotify.models.Playlist
+import com.adamratzman.spotify.models.Track
 import com.bobbyesp.spowlo.Downloader
 import com.bobbyesp.spowlo.features.spotify_api.data.remote.SpotifyApiRequests
 import com.bobbyesp.spowlo.features.spotify_api.data.remote.web.SpotifyWebApi
@@ -18,11 +21,22 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import javax.inject.Inject
 
-data class TrackDownload(val url: String, val name: String, val durationMs: Long = 0L)
+data class TrackDownload(
+    val url: String,
+    val title: String,
+    val artists: String,
+    val durationMs: Long = 0L,
+    val albumName: String = "",
+    val coverUrl: String = "",
+    val explicit: Boolean = false,
+    val discNumber: Int = 1,
+    val trackNumber: Int = 0,
+) {
+    val displayName: String get() = if (artists.isBlank()) title else "$title - $artists"
+}
 
 class PlaylistPageViewModel @Inject constructor() : ViewModel() {
 
@@ -144,14 +158,19 @@ class PlaylistPageViewModel @Inject constructor() : ViewModel() {
         Downloader.executeParallelDownloadWithUrl(url, name)
     }
 
-    /** Queues missing tracks one after another so a long playlist does not start every process at once. */
     fun downloadTracks(tracks: List<TrackDownload>) {
         if (tracks.isEmpty()) return
-        applicationScope.launch(Dispatchers.IO) {
-            tracks.forEach { track ->
-                Downloader.executeParallelDownloadWithUrl(track.url, track.name).join()
+        val name = when (val state = mutableViewStateFlow.value.state) {
+            is PlaylistDataState.Loaded -> when (val data = state.data) {
+                is Playlist -> data.name
+                is Album -> data.name
+                is Artist -> data.name
+                is Track -> data.name
+                else -> ""
             }
+            else -> ""
         }
+        Downloader.downloadTracks(tracks, name.ifBlank { tracks.first().title })
     }
 
     private companion object {
