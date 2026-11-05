@@ -1,12 +1,14 @@
 package com.bobbyesp.spowlo.ui.pages.settings.cookies
 
 import android.webkit.CookieManager
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
@@ -23,7 +25,6 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.LargeTopAppBar
 import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -59,11 +60,15 @@ import com.bobbyesp.spowlo.ui.components.BackButton
 import com.bobbyesp.spowlo.ui.components.ConfirmButton
 import com.bobbyesp.spowlo.ui.components.DismissButton
 import com.bobbyesp.spowlo.ui.components.HelpDialog
-import com.bobbyesp.spowlo.ui.components.HorizontalDivider
+import com.bobbyesp.spowlo.ui.components.LargeTopAppBar
 import com.bobbyesp.spowlo.ui.components.PasteFromClipBoardButton
-import com.bobbyesp.spowlo.ui.components.PreferenceItemVariant
-import com.bobbyesp.spowlo.ui.components.PreferenceSwitchWithContainer
+import com.bobbyesp.spowlo.ui.components.PreferenceInfo
 import com.bobbyesp.spowlo.ui.components.TextButtonWithIcon
+import com.bobbyesp.spowlo.ui.components.settings.SettingsDivider
+import com.bobbyesp.spowlo.ui.components.settings.SettingsGroup
+import com.bobbyesp.spowlo.ui.components.settings.SettingsItemNew
+import com.bobbyesp.spowlo.ui.components.settings.SettingsSectionHeader
+import com.bobbyesp.spowlo.ui.components.settings.SettingsSwitch
 import com.bobbyesp.spowlo.utils.COOKIES
 import com.bobbyesp.spowlo.utils.DownloaderUtil
 import com.bobbyesp.spowlo.utils.FilesUtil
@@ -128,61 +133,128 @@ fun CookieProfilePage(
         },
     )
     { paddingValues ->
-        LazyColumn(modifier = Modifier.padding(paddingValues)) {
+        LazyColumn(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(paddingValues),
+            contentPadding = PaddingValues(
+                start = 16.dp,
+                end = 16.dp,
+                top = 8.dp,
+                bottom = 32.dp,
+            )
+        ) {
             item {
-                PreferenceSwitchWithContainer(
-                    title = stringResource(R.string.use_cookies),
-                    icon = if (!isCookieEnabled) Icons.Outlined.Cookie else Icons.Filled.Cookie,
-                    isChecked = isCookieEnabled,
-                    onClick = {
-                        if (cookies.isEmpty() || (!cookieManager.hasCookies()) && !isCookieEnabled)
-                            showHelpDialog = true
-                        else {
-                            isCookieEnabled = !isCookieEnabled
-                            PreferencesUtil.updateValue(COOKIES, isCookieEnabled)
-                        }
-                    })
+                SettingsSectionHeader(stringResource(R.string.cookies))
             }
-            itemsIndexed(cookies) { _, item ->
-                PreferenceItemVariant(
-                    modifier = Modifier.padding(vertical = 4.dp),
-                    title = item.url,
-                    onClick = { cookiesViewModel.showEditCookieDialog(item) },
-                    onClickLabel = stringResource(
-                        id = R.string.edit
-                    ), onLongClick = {
-                        hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
-                        cookiesViewModel.showDeleteCookieDialog(item)
-                    }, onLongClickLabel = stringResource(R.string.remove)
-                )
+            item {
+                SettingsGroup {
+                    SettingsSwitch(
+                        onCheckedChange = {
+                            if (cookies.isEmpty() || (!cookieManager.hasCookies()) && !isCookieEnabled)
+                                showHelpDialog = true
+                            else {
+                                isCookieEnabled = !isCookieEnabled
+                                PreferencesUtil.updateValue(COOKIES, isCookieEnabled)
+                            }
+                        },
+                        checked = isCookieEnabled,
+                        title = {
+                            Text(
+                                text = stringResource(R.string.use_cookies),
+                                fontWeight = FontWeight.Bold
+                            )
+                        },
+                        icon = if (!isCookieEnabled) Icons.Outlined.Cookie else Icons.Filled.Cookie,
+                        addTonalElevation = false,
+                    )
+                }
             }
 
             item {
-                HorizontalDivider()
-                PreferenceItemVariant(
-                    title = stringResource(id = R.string.generate_new_cookies),
-                    icon = Icons.Outlined.Add
-                ) { cookiesViewModel.showEditCookieDialog() }
+                SettingsSectionHeader(stringResource(R.string.section_profiles))
             }
             item {
-                PreferenceItemVariant(
-                    title = stringResource(id = R.string.export_to_clipboard),
-                    icon = Icons.Outlined.ContentPasteGo
-                ) {
-                    scope.launch(Dispatchers.IO) {
-                        DownloaderUtil.getCookiesContentFromDatabase().getOrNull()?.let {
-                            clipboardManager.setText(AnnotatedString(it))
+                Column(modifier = Modifier.fillMaxWidth()) {
+                    if (cookies.isNotEmpty()) {
+                        SettingsGroup {
+                            cookies.forEachIndexed { index, item ->
+                                SettingsItemNew(
+                                    title = {
+                                        Text(
+                                            text = item.url,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                    },
+                                    icon = Icons.Outlined.Cookie,
+                                    addTonalElevation = false,
+                                    onClick = { cookiesViewModel.showEditCookieDialog(item) },
+                                    onClickLabel = stringResource(R.string.edit),
+                                    onLongClick = {
+                                        hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
+                                        cookiesViewModel.showDeleteCookieDialog(item)
+                                    },
+                                    onLongClickLabel = stringResource(R.string.remove),
+                                )
+                                if (index != cookies.lastIndex) SettingsDivider()
+                            }
                         }
+                        Spacer(modifier = Modifier.height(8.dp))
+                    }
+                    SettingsGroup {
+                        SettingsItemNew(
+                            title = {
+                                Text(
+                                    text = stringResource(id = R.string.generate_new_cookies),
+                                    fontWeight = FontWeight.Bold
+                                )
+                            },
+                            icon = Icons.Outlined.Add,
+                            addTonalElevation = false,
+                            onClick = { cookiesViewModel.showEditCookieDialog() },
+                        )
+                        SettingsDivider()
+                        SettingsItemNew(
+                            title = {
+                                Text(
+                                    text = stringResource(id = R.string.export_to_clipboard),
+                                    fontWeight = FontWeight.Bold
+                                )
+                            },
+                            icon = Icons.Outlined.ContentPasteGo,
+                            enabled = cookies.isNotEmpty(),
+                            addTonalElevation = false,
+                            onClick = {
+                                scope.launch(Dispatchers.IO) {
+                                    DownloaderUtil.getCookiesContentFromDatabase().getOrNull()?.let {
+                                        clipboardManager.setText(AnnotatedString(it))
+                                    }
+                                }
+                            },
+                        )
+                        SettingsDivider()
+                        SettingsItemNew(
+                            title = {
+                                Text(
+                                    text = stringResource(id = R.string.clear_all_cookies),
+                                    fontWeight = FontWeight.Bold
+                                )
+                            },
+                            icon = Icons.Outlined.DeleteForever,
+                            addTonalElevation = false,
+                            onClick = {
+                                hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
+                                showClearCookieDialog = true
+                            },
+                        )
                     }
                 }
             }
-            item {
-                PreferenceItemVariant(
-                    title = stringResource(id = R.string.clear_all_cookies),
-                    icon = Icons.Outlined.DeleteForever
-                ) {
-                    hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
-                    showClearCookieDialog = true
+            if (cookies.isNotEmpty()) {
+                item {
+                    PreferenceInfo(
+                        text = stringResource(id = R.string.cookies_profiles_hint)
+                    )
                 }
             }
         }

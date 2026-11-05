@@ -19,6 +19,7 @@ import com.bobbyesp.spowlo.ui.pages.metadata_viewer.playlists.TrackDownload
 import com.bobbyesp.spowlo.utils.DownloaderUtil
 import com.bobbyesp.spowlo.utils.FilesUtil
 import com.bobbyesp.spowlo.utils.NotificationsUtil
+import com.bobbyesp.spowlo.utils.PreferencesUtil
 import com.bobbyesp.spowlo.utils.SpotifyApiException
 import com.bobbyesp.spowlo.utils.SpotifyCollection
 import com.bobbyesp.spowlo.utils.SpotifyMetadataFetcher
@@ -280,6 +281,12 @@ object Downloader {
         return true
     }
 
+    private fun isNetworkAllowed(): Boolean {
+        if (PreferencesUtil.isDownloadNetworkAllowed()) return true
+        ToastUtil.makeToastSuspend(context.getString(R.string.mobile_data_downloads_disabled))
+        return false
+    }
+
     @CheckResult
     private suspend fun downloadSong(
         songInfo: SpotifySong,
@@ -338,7 +345,7 @@ object Downloader {
         downloadPreferences: DownloaderUtil.DownloadPreferences = DownloaderUtil.DownloadPreferences(),
         skipInfoFetch: Boolean = false
     ) {
-        if (!isDownloaderAvailable()) return
+        if (!isNetworkAllowed() || !isDownloaderAvailable()) return
         updateState(State.FetchingInfo)
         currentJob?.cancel()
         currentJob = applicationScope.launch(Dispatchers.IO) {
@@ -477,6 +484,7 @@ object Downloader {
     }
 
     fun executeParallelDownloadWithUrl(url: String, name: String) = applicationScope.launch(Dispatchers.IO) {
+        if (!isNetworkAllowed()) return@launch
         val requestKey = makeKey(url, url.reversed())
         if (activeParallelDownloads.putIfAbsent(requestKey, true) != null) {
             ToastUtil.makeToastSuspend(context.getString(R.string.task_running))
@@ -506,6 +514,7 @@ object Downloader {
 
     fun downloadCollection(url: String, fallbackName: String = "") =
         applicationScope.launch(Dispatchers.IO) {
+            if (!isNetworkAllowed()) return@launch
             runCatching {
                 val collection = SpotifyMetadataFetcher.fetchCollectionFromUrl(url)
                     ?: throw SpotifyApiException("Could not load the Spotify album or playlist.")
@@ -515,6 +524,7 @@ object Downloader {
 
     fun downloadTracks(tracks: List<TrackDownload>, collectionName: String) =
         applicationScope.launch(Dispatchers.IO) {
+            if (!isNetworkAllowed()) return@launch
             if (tracks.isEmpty()) return@launch
             val requestKey = makeKey(collectionName, tracks.first().url)
             if (activeParallelDownloads.putIfAbsent(requestKey, true) != null) {
@@ -541,8 +551,8 @@ object Downloader {
             }
         }
 
-    /** Re-downloads a track, forcing spotDL to replace the existing file. */
     suspend fun redownloadTrack(url: String, name: String, existingPath: String = ""): Boolean {
+        if (!isNetworkAllowed()) return false
         val requestKey = makeKey(url, url.reversed())
         if (activeParallelDownloads.putIfAbsent(requestKey, true) != null) return false
         return try {

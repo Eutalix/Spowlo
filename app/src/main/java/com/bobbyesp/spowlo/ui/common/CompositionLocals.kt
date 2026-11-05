@@ -21,8 +21,9 @@ val LocalSeedColor = compositionLocalOf { DEFAULT_SEED_COLOR }
 val LocalWindowWidthState = staticCompositionLocalOf { WindowWidthSizeClass.Compact }
 val LocalWindowHeightState = staticCompositionLocalOf { WindowHeightSizeClass.Compact }
 val LocalDynamicColorSwitch = compositionLocalOf { false }
+val LocalBottomBarEnabled = compositionLocalOf { false }
 val LocalPaletteStyleIndex = compositionLocalOf { 0 }
-val LocalMetadataArtworkColors = compositionLocalOf { true }
+val LocalMetadataArtworkColors = compositionLocalOf { false }
 
 @Composable
 fun SettingsProvider(
@@ -41,6 +42,7 @@ fun SettingsProvider(
         LocalWindowWidthState provides windowWidthSizeClass,
         LocalWindowHeightState provides localWindowHeightSizeClass,
         LocalDynamicColorSwitch provides appSettingsState.isDynamicColorEnabled,
+        LocalBottomBarEnabled provides false,
         LocalMetadataArtworkColors provides appSettingsState.metadataArtworkColors,
         content = content
     )

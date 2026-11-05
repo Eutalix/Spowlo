@@ -64,9 +64,6 @@ object DownloaderUtil {
     val songsState = mutableSongsState.asStateFlow()
 
     data class DownloadPreferences(
-        val downloadPlaylist: Boolean = PreferencesUtil.getValue(PLAYLIST),
-        val customPath: Boolean = PreferencesUtil.getValue(CUSTOM_PATH),
-        val maxFileSize: String = MAX_FILE_SIZE.getString(),
         val cookies: Boolean = PreferencesUtil.getValue(COOKIES),
         val cookiesContent: String = PreferencesUtil.getCookies(),
         val audioFormat: Int = PreferencesUtil.getAudioFormat(),
@@ -97,14 +94,26 @@ object DownloaderUtil {
         val overwrite: String? = null,
     )
 
-    private fun StringBuilder.buildPathExtensions(downloadPreferences: DownloadPreferences) {
-        when {
-            downloadPreferences.outputFormat.isNotEmpty() -> {
-                this.append("/").append(downloadPreferences.outputFormat)
-            }
-            else -> return
+    private fun StringBuilder.buildPathExtensions(
+        downloadPreferences: DownloadPreferences,
+        collectionName: String? = null,
+    ) {
+        if (downloadPreferences.splitByPlaylist && !collectionName.isNullOrBlank()) {
+            this.append("/").append(collectionName.toPathSegment())
+        }
+        if (downloadPreferences.splitByMainArtist) {
+            this.append("/").append("{artist}")
+        }
+        if (downloadPreferences.outputFormat.isNotEmpty()) {
+            this.append("/").append(downloadPreferences.outputFormat)
         }
     }
+
+    private fun String.toPathSegment(): String =
+        replace(Regex("[\\\\/:*?\"<>|]"), "-")
+            .trim()
+            .trimEnd('.')
+            .ifBlank { "Unknown" }
 
     object CookieScheme {
         const val NAME = "name"
@@ -266,6 +275,7 @@ object DownloaderUtil {
         downloadPreferences: DownloadPreferences,
         outputTemplate: String? = null,
         formatOverride: String? = null,
+        collectionName: String? = null,
     ): SpotDLRequest {
         val request = SpotDLRequest()
         val pathBuilder = StringBuilder()
@@ -276,7 +286,7 @@ object DownloaderUtil {
 
                 pathBuilder.append(audioDownloadDir)
                 if (outputTemplate.isNullOrBlank()) {
-                    pathBuilder.buildPathExtensions(downloadPreferences)
+                    pathBuilder.buildPathExtensions(downloadPreferences, collectionName)
                 } else {
                     pathBuilder.append("/").append(outputTemplate)
                 }
@@ -608,7 +618,11 @@ object DownloaderUtil {
 
         val downloadPreferences = DownloadPreferences()
         val metadataFile = writeMetadataFile(taskId, collection.songs)
-        val request = createDownloadRequest(metadataFile.absolutePath, downloadPreferences).apply {
+        val request = createDownloadRequest(
+            url = metadataFile.absolutePath,
+            downloadPreferences = downloadPreferences,
+            collectionName = collection.name.ifBlank { fallbackName },
+        ).apply {
             addOption("--threads", downloadPreferences.threads.toString())
         }
         val startedAt = System.currentTimeMillis()
