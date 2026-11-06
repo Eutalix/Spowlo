@@ -28,7 +28,6 @@ import androidx.navigation.navArgument
 import androidx.navigation.navOptions
 import androidx.navigation.navigation
 import com.bobbyesp.library.data.remote.SpotDLDependencyUpdater
-import com.bobbyesp.spowlo.App
 import com.bobbyesp.spowlo.Downloader
 import com.bobbyesp.spowlo.R
 import com.bobbyesp.spowlo.features.spotify_api.data.remote.SpotifyApiRequests
