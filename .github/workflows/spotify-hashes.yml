@@ -1,0 +1,38 @@
+name: Spotify hashes
+
+on:
+  schedule:
+    - cron: '17 */6 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: spotify-hashes
+  cancel-in-progress: false
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Refresh
+        run: python scripts/refresh-spotify-hashes.py --strict
+
+      - name: Commit
+        run: |
+          if git diff --quiet -- docs/spotify-hashes.json; then
+            echo "Manifest unchanged."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs/spotify-hashes.json
+          git commit -m "chore: refresh spotify graphql hashes"
+          git push
