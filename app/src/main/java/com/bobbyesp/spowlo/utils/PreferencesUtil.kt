@@ -201,8 +201,11 @@ object PreferencesUtil {
 
     fun getAudioProvider(): List<String> {
         val audioProviderString = AUDIO_PROVIDERS.getString()
-        val providersList = audioProviderString?.split(",") ?: emptyList()
-        return providersList
+        return audioProviderString
+            ?.split(",")
+            ?.map { it.trim() }
+            ?.filter { it.isNotEmpty() }
+            ?: emptyList()
     }
 
     fun getAudioQuality(): Int = AUDIO_QUALITY.getInt()
