@@ -8,7 +8,13 @@ import com.bobbyesp.spowlo.App
 import com.bobbyesp.spowlo.App.Companion.context
 import com.bobbyesp.spowlo.database.DownloadedSongInfo
 import com.bobbyesp.spowlo.utils.PreferencesUtil.getString
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
 import java.io.File
 
@@ -22,6 +28,9 @@ object HistoryImporter {
     private const val SPOWLO_EXTRACTOR = "Spowlo"
 
     private val AUDIO_EXTENSIONS = setOf("mp3", "m4a", "aac", "opus", "ogg", "flac", "wav")
+
+    // Tag parsing and metadata reads are I/O heavy; a few in flight at once is much faster than one.
+    private val readSemaphore = Semaphore(4)
 
     data class ImportResult(val imported: Int, val scanned: Int)
 
@@ -55,22 +64,25 @@ object HistoryImporter {
         }
         if (candidates.isEmpty()) return@withContext ImportResult(imported = 0, scanned = 0)
 
-        runCatching {
-            val knownPaths = DatabaseUtil.getMediaPaths().toMutableSet()
-            var imported = 0
+        try {
+            val existing = DatabaseUtil.getAllMediaOnce().associateBy { it.songPath }
+            val fresh = candidates.filterNot { it.path in existing }
             candidates.forEach { candidate ->
-                if (candidate.path in knownPaths) {
-                    upgradeImported(candidate)
-                    return@forEach
-                }
-                if (DatabaseUtil.insertImportedInfo(candidate.toDownloadedSongInfo())) {
-                    knownPaths += candidate.path
-                    imported++
-                }
+                existing[candidate.path]?.let { upgradeImported(candidate, it) }
             }
-            ImportResult(imported = imported, scanned = candidates.size)
-        }.getOrElse {
-            Log.e(TAG, "Failed to import existing files", it)
+            val infos = coroutineScope {
+                fresh.map { candidate ->
+                    async { readSemaphore.withPermit { candidate.toDownloadedSongInfo() } }
+                }.awaitAll()
+            }
+            ImportResult(
+                imported = DatabaseUtil.insertImportedInfoList(infos),
+                scanned = candidates.size,
+            )
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to import existing files", e)
             ImportResult(imported = 0, scanned = candidates.size)
         }
     }
@@ -132,23 +144,27 @@ object HistoryImporter {
 
     private fun Candidate.toDownloadedSongInfo(): DownloadedSongInfo {
         val (fileNameArtist, fileNameTitle) = parseFileName(fileName)
-        val metadata = readMetadata(path)
         val tags = EmbeddedTagReader.read(path)
+        // jaudiotagger also gives the length; only formats it can't open need the retriever.
+        val metadata = if (tags.durationSeconds > 0 && (tags.title.isNotBlank() || tags.artist.isNotBlank())) {
+            EMPTY_METADATA
+        } else {
+            readMetadata(path)
+        }
         return DownloadedSongInfo(
             songName = tags.title.ifBlank { metadata.title }.ifBlank { fileNameTitle }.ifBlank { fileName },
             songAuthor = tags.artist.ifBlank { metadata.artist }.ifBlank { fileNameArtist },
             songUrl = tags.spotifyUrl,
             thumbnailUrl = tags.artworkUri,
             songPath = path,
-            songDuration = metadata.durationSeconds,
+            songDuration = tags.durationSeconds.takeIf { it > 0.0 } ?: metadata.durationSeconds,
             extractor = if (tags.taggedBySpowlo) SPOWLO_EXTRACTOR else IMPORTED_EXTRACTOR,
             downloadedAt = lastModified.takeIf { it > 0L } ?: System.currentTimeMillis(),
         )
     }
 
     /** Fills in entries imported before Spowlo read its own tags, without touching real downloads. */
-    private suspend fun upgradeImported(candidate: Candidate) {
-        val existing = DatabaseUtil.getInfoByPath(candidate.path) ?: return
+    private suspend fun upgradeImported(candidate: Candidate, existing: DownloadedSongInfo) {
         if (existing.extractor != IMPORTED_EXTRACTOR) return
         if (existing.songUrl.isNotBlank() && existing.thumbnailUrl.isNotBlank()) return
 

@@ -10,7 +10,9 @@ import com.bobbyesp.spowlo.database.CommandTemplate
 import com.bobbyesp.spowlo.database.CookieProfile
 import com.bobbyesp.spowlo.database.DownloadedSongInfo
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 
@@ -29,7 +31,9 @@ object DatabaseUtil {
         }
     }
 
+    // Lyrics sidecars were once recorded as songs; keep them out of every consumer.
     fun getMediaInfo() = dao.getAllMedia()
+        .map { songs -> songs.filterNot { it.songPath.isLyricsSidecar() } }
 
     fun clearHistory() {
         applicationScope.launch(Dispatchers.IO) {
@@ -37,10 +41,20 @@ object DatabaseUtil {
         }
     }
 
+    /** Waits for the wipe to finish, for callers that write straight back in. */
+    suspend fun clearHistoryNow() = withContext(Dispatchers.IO) {
+        dao.deleteAllMediaFromDb()
+    }
+
     suspend fun getMediaPaths(): List<String> = dao.getAllPaths()
+
+    suspend fun getAllMediaOnce(): List<DownloadedSongInfo> = dao.getAllMediaList()
 
     suspend fun insertImportedInfo(info: DownloadedSongInfo): Boolean =
         dao.insertInfoDistinctByPath(info)
+
+    suspend fun insertImportedInfoList(infoList: List<DownloadedSongInfo>): Int =
+        dao.insertInfoListDistinctByPath(infoList)
 
     suspend fun getInfoByPath(path: String): DownloadedSongInfo? = dao.getInfoByPath(path)
 

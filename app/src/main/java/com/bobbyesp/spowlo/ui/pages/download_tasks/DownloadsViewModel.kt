@@ -57,6 +57,7 @@ data class LibraryState(
     val missingOnly: Boolean = false,
     /** IDs whose file is gone from storage, across the whole library. */
     val missingIds: Set<Int> = emptySet(),
+    val totalBytes: Long = 0L,
 ) {
     val totalCount: Int get() = allSongs.size
     val isFiltered: Boolean
@@ -273,6 +274,7 @@ class DownloadsViewModel : ViewModel() {
                 .sortedBy { it.name },
             missingOnly = filters.missingOnly,
             missingIds = missingIds,
+            totalBytes = songs.sumOf { sizes[it.id] ?: 0L },
         )
     }
 

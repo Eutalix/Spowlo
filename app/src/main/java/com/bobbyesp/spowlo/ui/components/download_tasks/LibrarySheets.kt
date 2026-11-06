@@ -88,41 +88,6 @@ fun artistLabel(name: String): String =
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun SortSheet(
-    current: LibrarySort,
-    onSelect: (LibrarySort) -> Unit,
-    onDismiss: () -> Unit,
-) {
-    BottomSheet(onDismiss = onDismiss, dragHandle = { SheetDragHandle() }) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(bottom = 16.dp)
-        ) {
-            SheetHeader(text = stringResource(R.string.sort_by))
-            LibrarySort.entries.forEach { sort ->
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .selectable(
-                            selected = sort == current,
-                            role = Role.RadioButton,
-                            onClick = { onSelect(sort) }
-                        )
-                        .padding(horizontal = 24.dp, vertical = 12.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    RadioButton(selected = sort == current, onClick = null)
-                    Spacer(Modifier.width(16.dp))
-                    Text(text = sortLabel(sort), style = MaterialTheme.typography.bodyLarge)
-                }
-            }
-        }
-    }
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
 fun ArtistSheet(
     artists: List<ArtistEntry>,
     selected: String?,
