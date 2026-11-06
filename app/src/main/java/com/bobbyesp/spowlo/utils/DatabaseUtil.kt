@@ -35,23 +35,11 @@ object DatabaseUtil {
     fun getMediaInfo() = dao.getAllMedia()
         .map { songs -> songs.filterNot { it.songPath.isLyricsSidecar() } }
 
-    fun clearHistory() {
-        applicationScope.launch(Dispatchers.IO) {
-            dao.deleteAllMediaFromDb()
-        }
-    }
-
-    /** Waits for the wipe to finish, for callers that write straight back in. */
     suspend fun clearHistoryNow() = withContext(Dispatchers.IO) {
         dao.deleteAllMediaFromDb()
     }
 
-    suspend fun getMediaPaths(): List<String> = dao.getAllPaths()
-
     suspend fun getAllMediaOnce(): List<DownloadedSongInfo> = dao.getAllMediaList()
-
-    suspend fun insertImportedInfo(info: DownloadedSongInfo): Boolean =
-        dao.insertInfoDistinctByPath(info)
 
     suspend fun insertImportedInfoList(infoList: List<DownloadedSongInfo>): Int =
         dao.insertInfoListDistinctByPath(infoList)
