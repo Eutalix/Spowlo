@@ -2,6 +2,7 @@ package com.bobbyesp.spowlo
 
 import android.app.PendingIntent
 import android.graphics.Bitmap
+import android.os.SystemClock
 import android.util.Log
 import androidx.annotation.CheckResult
 import androidx.compose.runtime.mutableStateMapOf
@@ -37,13 +38,16 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 import java.io.IOException
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
 import kotlin.math.roundToInt
 
 object Downloader {
+
+    private const val MAX_CONSOLE_CHARS = 100_000
+    private const val CONSOLE_FLUSH_INTERVAL_MS = 200L
+    private val PERCENT_REGEX = Regex("(\\d+)%")
 
     sealed class State {
         data class DownloadingPlaylist(val currentItem: Int = 0, val itemCount: Int = 0) : State()
@@ -171,6 +175,10 @@ object Downloader {
     private val activeParallelDownloads = ConcurrentHashMap<String, Boolean>()
     val mutableTaskList = mutableStateMapOf<String, DownloadTask>()
 
+    private val consoleBuilders = ConcurrentHashMap<String, StringBuilder>()
+    private val consoleSeenLines = ConcurrentHashMap<String, MutableSet<String>>()
+    private val consoleLastFlush = ConcurrentHashMap<String, Long>()
+
     init {
         applicationScope.launch {
             downloaderState.combine(processCount) { state, cnt ->
@@ -211,29 +219,45 @@ object Downloader {
     fun updateTaskOutput(url: String, line: String, progress: Float, isPlaylist: Boolean = false) {
         val key = makeKey(url, url.reversed())
         val oldValue = mutableTaskList[key] ?: return
-        val newValue = oldValue.run {
-            if (currentLine == line || line.containsEllipsis() || consoleOutput.contains(line)) return
-            when (isPlaylist) {
-                true -> copy(
-                    consoleOutput = consoleOutput + line + "\n",
-                    currentLine = line,
-                    state = DownloadTask.State.Running(
-                        if (line.contains("Total")) getProgress(line) else (state as DownloadTask.State.Running).progress
-                    )
-                )
-                false -> copy(
-                    consoleOutput = consoleOutput + line + "\n",
-                    currentLine = line,
-                    state = DownloadTask.State.Running(progress)
-                )
-            }
+        if (oldValue.currentLine == line || line.containsEllipsis() || !appendConsoleLine(key, line)) return
+
+        val now = SystemClock.elapsedRealtime()
+        if (now - (consoleLastFlush[key] ?: 0L) < CONSOLE_FLUSH_INTERVAL_MS) return
+        consoleLastFlush[key] = now
+
+        val runningProgress = when {
+            !isPlaylist -> progress
+            line.contains("Total") -> getProgress(line)
+            else -> (oldValue.state as? DownloadTask.State.Running)?.progress ?: 0f
         }
-        mutableTaskList[key] = newValue
+        mutableTaskList[key] = oldValue.copy(
+            consoleOutput = consoleText(key),
+            currentLine = line,
+            state = DownloadTask.State.Running(runningProgress),
+        )
+    }
+
+    private fun appendConsoleLine(key: String, line: String): Boolean {
+        val seen = consoleSeenLines.getOrPut(key) { HashSet() }
+        if (!seen.add(line)) return false
+        val builder = consoleBuilders.getOrPut(key) { StringBuilder() }
+        builder.append(line).append('\n')
+        if (builder.length > MAX_CONSOLE_CHARS) {
+            builder.delete(0, builder.length - MAX_CONSOLE_CHARS)
+        }
+        return true
+    }
+
+    private fun consoleText(key: String): String = consoleBuilders[key]?.toString().orEmpty()
+
+    private fun forgetConsole(key: String) {
+        consoleBuilders.remove(key)
+        consoleSeenLines.remove(key)
+        consoleLastFlush.remove(key)
     }
 
     private fun getProgress(line: String): Float {
-        val regex = Regex("(\\d+)%")
-        val matchResult = regex.find(line)
+        val matchResult = PERCENT_REGEX.find(line)
         return (matchResult?.groupValues?.get(1)?.toFloatOrNull() ?: 0f) / 100f
     }
 
@@ -252,10 +276,12 @@ object Downloader {
             text = context.getString(R.string.status_completed),
             largeIcon = largeIcon,
         )
-        val newValue = oldValue.copy(state = DownloadTask.State.Completed).run {
-            response?.let { copy(consoleOutput = response) } ?: this
-        }
+        val newValue = oldValue.copy(
+            state = DownloadTask.State.Completed,
+            consoleOutput = response ?: consoleText(key).ifEmpty { oldValue.consoleOutput },
+        )
         mutableTaskList[key] = newValue
+        forgetConsole(key)
         FilesUtil.scanDownloadDirectoryToMediaLibrary(App.audioDownloadDir)
         return true
     }
@@ -278,8 +304,9 @@ object Downloader {
             mutableTaskList[key] = oldValue.copy(
                 state = DownloadTask.State.Error(details ?: message),
                 currentLine = message,
-                consoleOutput = oldValue.consoleOutput + "\n" + (details ?: message)
+                consoleOutput = consoleText(key).ifEmpty { oldValue.consoleOutput } + "\n" + (details ?: message)
             )
+            forgetConsole(key)
         }
 
     fun onProcessEnded() = mutableProcessCount.update { it - 1 }
@@ -362,46 +389,6 @@ object Downloader {
     
     private fun cleanSpotifyUrl(url: String): String {
         return UrlValidator.normalize(url)
-    }
-
-    fun getInfoAndDownload(
-        url: String,
-        downloadPreferences: DownloaderUtil.DownloadPreferences = DownloaderUtil.DownloadPreferences(),
-        skipInfoFetch: Boolean = false
-    ) {
-        if (!isNetworkAllowed() || !isDownloaderAvailable()) return
-        updateState(State.FetchingInfo)
-        currentJob?.cancel()
-        currentJob = applicationScope.launch(Dispatchers.IO) {
-            try {
-                val cleanedUrl = cleanSpotifyUrl(url)
-
-                when (UrlValidator.classify(cleanedUrl)) {
-                    UrlValidator.Type.SpotifyTrack -> {
-                        val spotifyTrack = SpotifyMetadataFetcher.fetchTrackFromUrl(cleanedUrl)
-                            ?: throw SpotifyApiException("Failed to fetch metadata from Spotify API.")
-
-                        val songInfo = spotifyTrack.toSpotifySongWithDetails()
-
-                        if (!skipInfoFetch) DownloaderUtil.updateSongsState(listOf(songInfo))
-                        mutableTaskState.update { songInfo.toTask(preferencesHash = downloadPreferences.hashCode()) }
-
-                        downloadSong(songInfo, preferences = downloadPreferences)
-                    }
-
-                    UrlValidator.Type.SpotifyPlaylist,
-                    UrlValidator.Type.SpotifyAlbum -> {
-                        updateState(State.Idle)
-                        downloadCollection(cleanedUrl)
-                    }
-
-                    else -> throw UnsupportedLinkException()
-                }
-            } catch (e: Exception) {
-                if (e is CancellationException) throw e
-                manageDownloadError(e, isFetchingInfo = true, isTaskAborted = true)
-            }
-        }
     }
 
     fun getRequestedMetadata(
