@@ -19,6 +19,7 @@ import android.widget.Toast
 import androidx.core.content.getSystemService
 import com.bobbyesp.ffmpeg.FFmpeg
 import com.bobbyesp.library.SpotDL
+import com.bobbyesp.library.data.remote.SpotDLDependencyUpdater
 import com.bobbyesp.spowlo.features.spotify_api.data.remote.web.SpotifyWebTransport
 import com.bobbyesp.spowlo.features.spotify_api.data.remote.web.SpotifyUserSession
 import com.bobbyesp.spowlo.utils.AUDIO_DIRECTORY
@@ -174,11 +175,16 @@ class App : Application() {
             } else {
                 Build.VERSION.RELEASE
             }
-            return StringBuilder().append("App version: $versionName ($versionCode)\n")
-                .append("Device information: Android $release (API ${Build.VERSION.SDK_INT})\n")
-                .append("Supported ABIs: ${Build.SUPPORTED_ABIS.contentToString()}\n")
-                .append("spotDL version: ${SpotDl.version(context.applicationContext)}\n")
-                .toString()
+            val versions = SpotDLDependencyUpdater.getInstalledVersions(context.applicationContext)
+            return buildString {
+                append("App version: $versionName ($versionCode)\n")
+                append("Device: ${Build.MANUFACTURER} ${Build.MODEL}\n")
+                append("Android: $release (API ${Build.VERSION.SDK_INT})\n")
+                append("Supported ABIs: ${Build.SUPPORTED_ABIS.joinToString(", ")}\n")
+                versions.forEach { (name, version) ->
+                    append("$name: ${version.takeIf { it != "0.0.0" } ?: "not installed"}\n")
+                }
+            }
         }
 
         @Suppress("DEPRECATION")

@@ -16,6 +16,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.rememberTopAppBarState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -27,6 +28,7 @@ import androidx.compose.ui.res.vectorResource
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.bobbyesp.library.data.remote.SpotDLDependencyUpdater
 import com.bobbyesp.spowlo.App
 import com.bobbyesp.spowlo.App.Companion.packageInfo
 import com.bobbyesp.spowlo.R
@@ -59,8 +61,11 @@ fun AboutPage(onBackPressed: () -> Unit) {
     val context = LocalContext.current
     val clipboardManager = LocalClipboardManager.current
 
-    val info = App.getVersionReport()
+    val info = remember { App.getVersionReport() }
     val versionName = packageInfo.versionName
+    val spotDlVersion = remember {
+        SpotDLDependencyUpdater.getLocalSpotDLVersion(App.context).takeIf { it != "0.0.0" }
+    }
 
     Scaffold(
         modifier = Modifier
@@ -203,7 +208,10 @@ fun AboutPage(onBackPressed: () -> Unit) {
             item {
                 PreferenceItem(
                     title = stringResource(R.string.version),
-                    description = versionName,
+                    description = listOfNotNull(
+                        versionName,
+                        spotDlVersion?.let { "spotDL $it" },
+                    ).joinToString(" · "),
                     icon = Icons.Outlined.Info,
                 ) {
                     clipboardManager.setText(AnnotatedString(info))
