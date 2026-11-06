@@ -8,6 +8,8 @@ import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
+import android.graphics.Bitmap
+import android.graphics.drawable.BitmapDrawable
 import android.os.Build
 import android.os.SystemClock
 import android.provider.Settings
@@ -15,7 +17,11 @@ import android.util.Log
 import androidx.annotation.RequiresApi
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationCompat.FOREGROUND_SERVICE_IMMEDIATE
+import androidx.core.content.ContextCompat
 import androidx.core.graphics.drawable.IconCompat
+import androidx.core.graphics.drawable.toBitmap
+import coil.imageLoader
+import coil.request.ImageRequest
 import com.bobbyesp.spowlo.App.Companion.context
 import com.bobbyesp.spowlo.MainActivity
 import com.bobbyesp.spowlo.NotificationActionReceiver
@@ -44,7 +50,38 @@ object NotificationsUtil {
     private const val NOTIFICATION_GROUP_ID = "spowlo.download.notification"
     private const val DEFAULT_NOTIFICATION_ID = 100
     private const val REQUEST_CODE_OPEN_DOWNLOADS = 2000
+    private const val ARTWORK_SIZE_PX = 256
+    private const val ARTWORK_CACHE_LIMIT = 32
     const val SERVICE_NOTIFICATION_ID = 123
+
+    private val artworkCache = ConcurrentHashMap<String, Bitmap>()
+
+    /** Cover art for a notification, or the launcher icon if there is none. */
+    suspend fun loadArtwork(url: String): Bitmap {
+        if (url.isNotBlank()) {
+            artworkCache[url]?.let { return it }
+            val bitmap = runCatching {
+                val request = ImageRequest.Builder(context)
+                    .data(url)
+                    .size(ARTWORK_SIZE_PX)
+                    .allowHardware(false)
+                    .build()
+                (context.imageLoader.execute(request).drawable as? BitmapDrawable)?.bitmap
+            }.getOrNull()
+            if (bitmap != null) {
+                if (artworkCache.size >= ARTWORK_CACHE_LIMIT) artworkCache.clear()
+                artworkCache[url] = bitmap
+                return bitmap
+            }
+        }
+        return fallbackArtwork
+    }
+
+    private val fallbackArtwork: Bitmap by lazy {
+        ContextCompat.getDrawable(context, R.mipmap.ic_launcher)
+            ?.toBitmap(ARTWORK_SIZE_PX, ARTWORK_SIZE_PX)
+            ?: Bitmap.createBitmap(ARTWORK_SIZE_PX, ARTWORK_SIZE_PX, Bitmap.Config.ARGB_8888)
+    }
 
     @RequiresApi(Build.VERSION_CODES.O)
     fun createNotificationChannel() {
@@ -82,10 +119,11 @@ object NotificationsUtil {
         notificationId: Int = DEFAULT_NOTIFICATION_ID,
         progress: Int? = PROGRESS_INITIAL,
         taskId: String? = null,
-        text: String? = null
+        text: String? = null,
+        largeIcon: Bitmap? = null,
     ) {
         if (!notificationsEnabled()) return
-        val progressValue = progressToPost(notificationId, progress) ?: return
+        val progressValue = progressToPost(notificationId, progress, text) ?: return
 
         val pendingIntent = taskId?.let {
             Intent(context.applicationContext, NotificationActionReceiver::class.java)
@@ -108,6 +146,7 @@ object NotificationsUtil {
             .setOngoing(true)
             .setOnlyAlertOnce(true)
             .setContentIntent(openDownloadsIntent())
+            .applyLargeIcon(largeIcon)
             .applyProgress(progressValue, text)
             .run {
                 pendingIntent?.let {
@@ -126,6 +165,7 @@ object NotificationsUtil {
         title: String? = null,
         text: String? = null,
         intent: PendingIntent? = null,
+        largeIcon: Bitmap? = null,
     ) {
         if (!notificationsEnabled()) return
 
@@ -138,6 +178,7 @@ object NotificationsUtil {
             .setContentIntent(intent ?: openDownloadsIntent())
             .setOngoing(false)
             .setAutoCancel(true)
+            .applyLargeIcon(largeIcon)
 
         text?.let {
             builder.setStyle(NotificationCompat.BigTextStyle().bigText(it))
@@ -165,6 +206,7 @@ object NotificationsUtil {
         title: String = context.getString(R.string.download_error_msg),
         notificationId: Int,
         error: String,
+        largeIcon: Bitmap? = null,
     ) {
         if (!notificationsEnabled()) return
 
@@ -189,6 +231,7 @@ object NotificationsUtil {
             .setContentIntent(openDownloadsIntent())
             .setOngoing(false)
             .setAutoCancel(true)
+            .applyLargeIcon(largeIcon)
             .addAction(
                 R.drawable.outline_content_copy_24,
                 context.getString(R.string.copy_error_report),
@@ -204,9 +247,10 @@ object NotificationsUtil {
         progress: Int? = null,
         text: String? = null,
         title: String,
+        largeIcon: Bitmap? = null,
     ) {
         if (!notificationsEnabled()) return
-        val progressValue = progressToPost(notificationId, progress) ?: return
+        val progressValue = progressToPost(notificationId, progress, text) ?: return
 
         val intent = Intent(context.applicationContext, NotificationActionReceiver::class.java)
             .putExtra(TASK_ID_KEY, taskId)
@@ -227,6 +271,7 @@ object NotificationsUtil {
             .setOngoing(true)
             .setOnlyAlertOnce(true)
             .setContentIntent(openDownloadsIntent())
+            .applyLargeIcon(largeIcon)
             .applyProgress(progressValue, text)
             .addAction(
                 R.drawable.outline_cancel_24,
@@ -258,6 +303,11 @@ object NotificationsUtil {
             .onFailure { Log.w(TAG, "Could not open notification settings", it) }
     }
 
+    private fun NotificationCompat.Builder.applyLargeIcon(icon: Bitmap?): NotificationCompat.Builder {
+        if (icon != null) setLargeIcon(icon)
+        return this
+    }
+
     private fun NotificationCompat.Builder.applyProgress(
         progress: Int,
         text: String? = null
@@ -282,19 +332,20 @@ object NotificationsUtil {
         return this
     }
 
-    private fun progressToPost(notificationId: Int, progress: Int?): Int? {
+    private fun progressToPost(notificationId: Int, progress: Int?, text: String?): Int? {
         val now = SystemClock.elapsedRealtime()
         val previous = progressStates[notificationId]
         val value = progress?.coerceIn(0, PROGRESS_MAX) ?: previous?.value ?: 0
-        if (previous != null &&
-            previous.value == value &&
-            now - previous.postedAt < PROGRESS_UPDATE_INTERVAL_MS
-        ) return null
-        progressStates[notificationId] = ProgressState(value, now)
+        if (previous != null) {
+            // Re-posting the same content collapses the expanded progress notification.
+            if (previous.value == value && previous.text == text) return null
+            if (now - previous.postedAt < PROGRESS_UPDATE_INTERVAL_MS) return null
+        }
+        progressStates[notificationId] = ProgressState(value, text, now)
         return value
     }
 
-    private data class ProgressState(val value: Int, val postedAt: Long)
+    private data class ProgressState(val value: Int, val text: String?, val postedAt: Long)
 
     private fun openDownloadsIntent(): PendingIntent {
         val intent = Intent(context, MainActivity::class.java).apply {

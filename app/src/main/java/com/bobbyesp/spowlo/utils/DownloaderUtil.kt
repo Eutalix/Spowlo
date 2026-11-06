@@ -2,6 +2,7 @@ package com.bobbyesp.spowlo.utils
 
 import android.content.Context
 import android.database.sqlite.SQLiteDatabase
+import android.graphics.Bitmap
 import android.media.MediaScannerConnection
 import android.util.Log
 import android.webkit.CookieManager
@@ -223,8 +224,8 @@ object DownloaderUtil {
         return true
     }
 
-    private fun SpotDLRequest.addAudioFormat(): SpotDLRequest = this.apply {
-        when (PreferencesUtil.getAudioFormat()) {
+    private fun SpotDLRequest.addAudioFormat(format: Int): SpotDLRequest = this.apply {
+        when (format) {
             0 -> addOption("--format", "mp3")
             1 -> addOption("--format", "flac")
             2 -> addOption("--format", "ogg")
@@ -235,8 +236,8 @@ object DownloaderUtil {
         }
     }
 
-    private fun SpotDLRequest.addAudioQuality(): SpotDLRequest = this.apply {
-        when (PreferencesUtil.getAudioQuality()) {
+    private fun SpotDLRequest.addAudioQuality(quality: Int): SpotDLRequest = this.apply {
+        when (quality) {
             0 -> addOption("--bitrate", "auto")
             1 -> addOption("--bitrate", "8k")
             2 -> addOption("--bitrate", "16k")
@@ -329,9 +330,9 @@ object DownloaderUtil {
                 if (preserveOriginalAudio) {
                     addOption("--bitrate", "disable")
                 } else {
-                    addAudioQuality()
+                    addAudioQuality(audioQuality)
                 }
-                if (formatOverride != null) addOption("--format", formatOverride) else addAudioFormat()
+                if (formatOverride != null) addOption("--format", formatOverride) else addAudioFormat(audioFormat)
 
                 addAudioProvider(downloadPreferences)
             }
@@ -483,6 +484,7 @@ object DownloaderUtil {
         overwrite: String? = null,
         showToasts: Boolean = true,
         overwritePath: String? = null,
+        preferences: DownloadPreferences? = null,
     ): Boolean {
         val url = songInfo.url
         val taskId = Downloader.makeKey(url, url.reversed())
@@ -492,7 +494,7 @@ object DownloaderUtil {
         if (metadataOnly && target == null) return false
         if (showToasts) ToastUtil.makeToastSuspend(context.getString(R.string.download_started_msg))
 
-        val downloadPreferences = DownloadPreferences().let {
+        val downloadPreferences = (preferences ?: DownloadPreferences()).let {
             if (overwrite != null) it.copy(overwrite = overwrite) else it
         }
         val metadataFile = writeMetadataFile(taskId, listOf(songInfo))
@@ -508,6 +510,12 @@ object DownloaderUtil {
         ).apply {
             addOption("--threads", downloadPreferences.threads.toString())
         }
+        // Callers pass the URL or a collection name; the notification should show the track itself.
+        val displayTitle = listOf(songInfo.name, songInfo.artist)
+            .filter(String::isNotBlank)
+            .joinToString(" - ")
+            .ifBlank { name }
+        val artwork = if (metadataOnly) null else NotificationsUtil.loadArtwork(songInfo.cover_url)
         val callback: ((Float, Long, String) -> Unit)? = if (metadataOnly) {
             null
         } else {
@@ -517,7 +525,8 @@ object DownloaderUtil {
                     taskId = taskId,
                     progress = if (text.contains('%')) (progress * 100).roundToInt() else null,
                     text = context.getString(R.string.downloading),
-                    title = name,
+                    title = displayTitle,
+                    largeIcon = artwork,
                 )
                 Downloader.updateTaskOutput(
                     url = url, line = text, progress = progress, isPlaylist = false
@@ -532,13 +541,14 @@ object DownloaderUtil {
                 name = songInfo.name.ifBlank { name },
                 artist = songInfo.artist,
                 artworkUrl = songInfo.cover_url,
+                largeIcon = artwork,
             )
         }
 
         var downloadSucceeded = false
         runCatching {
             val response = retryTransient(
-                onRetry = { if (!metadataOnly) showRetry(taskId, name, url, isPlaylist = false) },
+                onRetry = { if (!metadataOnly) showRetry(taskId, displayTitle, url, isPlaylist = false, largeIcon = artwork) },
                 shouldRetry = { metadataOnly || Downloader.isTaskRunning(url) },
             ) {
                 runCatching {
@@ -559,7 +569,7 @@ object DownloaderUtil {
                     downloadPath = buildPathForDatabase(pathBuilder.toString(), songInfo, target?.format),
                     consoleOutput = finalResponse,
                 )
-                downloadSucceeded = Downloader.onTaskEnded(url, finalResponse, name)
+                downloadSucceeded = Downloader.onTaskEnded(url, finalResponse, displayTitle, artwork)
             }
         }.onFailure {
             if (it is CanceledException) return@onFailure
@@ -570,6 +580,7 @@ object DownloaderUtil {
                     message = context.getString(R.string.download_error_msg),
                     details = it.taskDetails(),
                     url = url,
+                    largeIcon = artwork,
                 )
             }
         }
@@ -626,6 +637,7 @@ object DownloaderUtil {
             addOption("--threads", downloadPreferences.threads.toString())
         }
         val startedAt = System.currentTimeMillis()
+        val artwork = NotificationsUtil.loadArtwork(collection.artworkUrl)
 
         Downloader.onProcessStarted()
         Downloader.onTaskStarted(
@@ -633,12 +645,13 @@ object DownloaderUtil {
             name = taskName,
             artist = collection.artist,
             artworkUrl = collection.artworkUrl,
+            largeIcon = artwork,
         )
 
         var downloadSucceeded = false
         runCatching {
             val response = retryTransient(
-                onRetry = { showRetry(taskId, taskName, url, isPlaylist = true) },
+                onRetry = { showRetry(taskId, taskName, url, isPlaylist = true, largeIcon = artwork) },
                 shouldRetry = { Downloader.isTaskRunning(url) },
             ) {
                 runCatching {
@@ -652,6 +665,7 @@ object DownloaderUtil {
                                 progress = overallProgress(text, progress),
                                 text = context.getString(R.string.downloading),
                                 title = taskName,
+                                largeIcon = artwork,
                             )
                             Downloader.updateTaskOutput(
                                 url = url, line = text, progress = progress, isPlaylist = true
@@ -663,7 +677,7 @@ object DownloaderUtil {
             if (!downloadPreferences.incognitoMode) {
                 insertCollectionIntoDownloadHistory(collection.songs, finalResponse, startedAt)
             }
-            downloadSucceeded = Downloader.onTaskEnded(url, finalResponse, taskName)
+            downloadSucceeded = Downloader.onTaskEnded(url, finalResponse, taskName, artwork)
         }.onFailure {
             if (it is CanceledException) return@onFailure
             Log.e(TAG, "Collection download failed", it)
@@ -684,6 +698,7 @@ object DownloaderUtil {
                 message = message,
                 details = it.taskDetails(),
                 url = url,
+                largeIcon = artwork,
             )
         }
         Downloader.onProcessEnded()
@@ -747,13 +762,20 @@ object DownloaderUtil {
         return block()
     }
 
-    private fun showRetry(taskId: String, title: String, url: String, isPlaylist: Boolean) {
+    private fun showRetry(
+        taskId: String,
+        title: String,
+        url: String,
+        isPlaylist: Boolean,
+        largeIcon: Bitmap? = null,
+    ) {
         val text = context.getString(R.string.retrying_download)
         NotificationsUtil.makeNotificationForParallelDownloads(
             notificationId = taskId.hashCode(),
             taskId = taskId,
             text = text,
             title = title,
+            largeIcon = largeIcon,
         )
         Downloader.updateTaskOutput(url = url, line = text, progress = 0f, isPlaylist = isPlaylist)
     }

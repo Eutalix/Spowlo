@@ -4,15 +4,11 @@ import android.Manifest
 import android.os.Build
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.NotificationsActive
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
-import androidx.compose.material3.Icon
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
 import com.bobbyesp.spowlo.R
+import com.bobbyesp.spowlo.ui.components.ActionDialog
 import com.bobbyesp.spowlo.utils.NOTIFICATION
 import com.bobbyesp.spowlo.utils.NOTIFICATION_PERMISSION_REQUESTED
 import com.bobbyesp.spowlo.utils.PreferencesUtil
@@ -44,27 +40,13 @@ fun NotificationPermissionDialog(
     onDismissRequest: () -> Unit = {},
     onPermissionGranted: () -> Unit = {}
 ) {
-    AlertDialog(
+    ActionDialog(
         onDismissRequest = onDismissRequest,
-        icon = {
-            Icon(
-                imageVector = Icons.Outlined.NotificationsActive,
-                contentDescription = null
-            )
-        },
-        text = {
-            Text(text = stringResource(id = R.string.enable_notifications_desc))
-        },
-        title = { Text(text = stringResource(id = R.string.enable_notifications)) },
-        confirmButton = {
-            Button(onClick = onPermissionGranted) {
-                Text(text = stringResource(id = R.string.enable_notifications_action))
-            }
-        },
-        dismissButton = {
-            OutlinedButton(onClick = onDismissRequest) {
-                Text(text = stringResource(id = R.string.not_now))
-            }
-        }
+        icon = Icons.Outlined.NotificationsActive,
+        title = stringResource(id = R.string.enable_notifications),
+        supportingText = stringResource(id = R.string.enable_notifications_desc),
+        confirmText = stringResource(id = R.string.enable_notifications_action),
+        onConfirm = onPermissionGranted,
+        dismissText = stringResource(id = R.string.not_now),
     )
 }
