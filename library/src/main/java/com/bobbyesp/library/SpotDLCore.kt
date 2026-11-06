@@ -386,6 +386,7 @@ abstract class SpotDLCore {
             INT_FIELDS = ("disc_number", "disc_count", "duration", "track_number", "tracks_count", "year")
             LIST_FIELDS = ("artists", "genres")
             STR_FIELDS = ("album_id", "copyright_text", "cover_url", "isrc", "name", "artist", "album_name", "album_artist", "date", "song_id", "publisher", "url")
+            NAME_BYTES = 255
 
 
             def register_spotdl_package():
@@ -447,6 +448,38 @@ abstract class SpotDLCore {
                     logger.addHandler(logging.StreamHandler(sys.stderr))
                 except Exception as error:
                     print(f"Error reporting patch skipped: {error}", file=sys.stderr)
+
+
+            def patch_filename_limit():
+                '''Cap path components at the 255-byte name limit enforced by ext4/f2fs.'''
+                try:
+                    from spotdl.utils import formatter
+                except Exception as error:
+                    print(f"Filename limit patch skipped: {error}", file=sys.stderr)
+                    return
+
+                def shorten(name):
+                    if len(name.encode("utf-8")) <= NAME_BYTES:
+                        return name
+                    stem, dot, extension = name.rpartition(".")
+                    if not dot or len(extension.encode("utf-8")) > 16:
+                        stem, suffix = name, ""
+                    else:
+                        suffix = "." + extension
+                    budget = NAME_BYTES - len(suffix.encode("utf-8"))
+                    stem = stem.encode("utf-8")[:budget].decode("utf-8", "ignore").rstrip(" .")
+                    return (stem or "_") + suffix
+
+                original = formatter.create_path_object
+
+                def create_path_object(path_string):
+                    path = original(path_string)
+                    parts = [shorten(part) for part in path.parts]
+                    if parts == list(path.parts):
+                        return path
+                    return type(path)(*parts)
+
+                formatter.create_path_object = create_path_object
 
 
             def patch_ytmusic():
@@ -565,6 +598,8 @@ abstract class SpotDLCore {
                 from spotdl.types.song import Song
                 from spotdl.utils.arguments import parse_arguments
                 from spotdl.utils.config import create_settings
+
+                patch_filename_limit()
 
                 arguments = parse_arguments()
                 _, downloader_settings, _ = create_settings(arguments)
