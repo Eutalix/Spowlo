@@ -40,3 +40,14 @@ val preferenceTitle = TextStyle(
     fontSize = 20.sp, lineHeight = 24.sp,
     lineBreak = LineBreak.Paragraph,
 )
+
+/** Editorial serif used only for metadata page titles. */
+@OptIn(ExperimentalTextApi::class)
+val metadataHeroTitle = TextStyle(
+    fontFamily = FontFamily.Serif,
+    fontWeight = FontWeight.Light,
+    fontSize = 32.sp,
+    lineHeight = 36.sp,
+    letterSpacing = (-0.4).sp,
+    lineBreak = LineBreak.Paragraph,
+)

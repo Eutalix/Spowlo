@@ -7,7 +7,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -19,13 +18,15 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Tab
+import androidx.compose.material3.TabRow
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -34,10 +35,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.res.vectorResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.adamratzman.spotify.models.AlbumResultType
@@ -48,10 +48,10 @@ import com.adamratzman.spotify.models.Track
 import com.bobbyesp.spowlo.R
 import com.bobbyesp.spowlo.features.spotify_api.data.remote.SpotifyApiRequests
 import com.bobbyesp.spowlo.features.spotify_api.data.remote.web.SpotifyWebApi
+import com.bobbyesp.spowlo.ui.components.MetadataResultRow
 import com.bobbyesp.spowlo.ui.components.songs.metadata_viewer.CollectionDownloadActions
 import com.bobbyesp.spowlo.ui.components.songs.metadata_viewer.TrackComponent
 import com.bobbyesp.spowlo.ui.pages.metadata_viewer.playlists.TrackDownload
-import com.bobbyesp.spowlo.ui.pages.searcher.SearchingResult
 import com.bobbyesp.spowlo.utils.ChromeCustomTabsUtil
 import com.bobbyesp.spowlo.utils.GeneralTextUtils
 import kotlinx.coroutines.Dispatchers
@@ -68,6 +68,7 @@ private data class ArtistSong(
     val url: String,
     val durationMs: Long,
     val explicit: Boolean,
+    val albumId: String = "",
     val albumName: String = "",
     val coverUrl: String = "",
     val discNumber: Int = 1,
@@ -75,6 +76,7 @@ private data class ArtistSong(
 )
 
 private const val MAX_DISCOGRAPHY = 1000
+private const val ALBUMS_PREVIEW = 6
 private const val SINGLES_PREVIEW = 5
 
 private fun SimpleTrack.toArtistSong(release: SimpleAlbum) = ArtistSong(
@@ -84,6 +86,7 @@ private fun SimpleTrack.toArtistSong(release: SimpleAlbum) = ArtistSong(
     url = externalUrls.spotify ?: "https://open.spotify.com/track/$id",
     durationMs = durationMs.toLong(),
     explicit = explicit,
+    albumId = release.id,
     albumName = release.name,
     coverUrl = release.images.firstOrNull()?.url.orEmpty(),
     discNumber = discNumber,
@@ -97,6 +100,7 @@ private fun Track.toArtistSong() = ArtistSong(
     url = externalUrls.spotify ?: "https://open.spotify.com/track/$id",
     durationMs = durationMs.toLong(),
     explicit = explicit,
+    albumId = album.id,
     albumName = album.name,
     coverUrl = album.images?.firstOrNull()?.url.orEmpty(),
     discNumber = discNumber,
@@ -115,6 +119,8 @@ private fun ArtistSong.toTrackDownload() = TrackDownload(
     trackNumber = trackNumber,
 )
 
+private fun ArtistSong.albumTitle() = albumName.ifBlank { artists }
+
 @Composable
 fun ArtistPage(
     data: Artist,
@@ -131,7 +137,9 @@ fun ArtistPage(
     val releases = remember { mutableStateListOf<SimpleAlbum>() }
     val albums = remember { mutableStateListOf<SimpleAlbum>() }
     val singles = remember { mutableStateListOf<SimpleAlbum>() }
+    var selectedTab by rememberSaveable(data.id) { mutableIntStateOf(0) }
     var showAllSongs by rememberSaveable { mutableStateOf(false) }
+    var showAllAlbums by rememberSaveable { mutableStateOf(false) }
     var showAllSingles by rememberSaveable { mutableStateOf(false) }
     var loadingTopSongs by remember { mutableStateOf(true) }
     var loadingMoreSongs by remember { mutableStateOf(false) }
@@ -146,6 +154,7 @@ fun ArtistPage(
         albums.clear()
         singles.clear()
         showAllSongs = false
+        showAllAlbums = false
         showAllSingles = false
         loadingTopSongs = true
         loadingMoreSongs = false
@@ -173,6 +182,12 @@ fun ArtistPage(
 
             offset += SpotifyWebApi.DISCOGRAPHY_PAGE_SIZE
             if (offset >= page.total) break
+        }
+        val releaseNames = releases.associate { it.id to it.name }
+        topSongs.forEachIndexed { index, song ->
+            if (song.albumName.isBlank()) {
+                releaseNames[song.albumId]?.let { topSongs[index] = song.copy(albumName = it) }
+            }
         }
         discographyLoaded = true
     }
@@ -226,6 +241,7 @@ fun ArtistPage(
         modifier = modifier,
         seed = seed,
         backdrop = { ArtworkBackdrop(artworkUrl) },
+        actions = { MetadataOverflowMenu(data.externalUrls.spotify.orEmpty()) },
     ) { paddingValues, listState ->
         LazyColumn(
             state = listState,
@@ -239,143 +255,148 @@ fun ArtistPage(
                 MetadataHero(
                     title = data.name,
                     artwork = {
-                        if (artworkUrl.isNotEmpty()) CollectionArtwork(artworkUrl)
+                        if (artworkUrl.isNotEmpty()) {
+                            CollectionArtwork(artworkUrl, listState, CircleShape)
+                        }
                     },
                 ) {
-                    MetadataTags(
-                        listOf(
-                            "${GeneralTextUtils.formatCount((data.followers.total ?: 0).toLong())} ${
-                                stringResource(id = R.string.artist_followers).lowercase()
-                            }",
-                            monthlyListeners?.let {
-                                "${GeneralTextUtils.formatCount(it)} ${
-                                    stringResource(id = R.string.artist_monthly_listeners).lowercase()
-                                }"
-                            }.orEmpty(),
-                        )
-                    )
-                    FilledTonalButton(
-                        onClick = { ChromeCustomTabsUtil.openUrl(data.externalUrls.spotify.orEmpty()) },
-                        shape = CircleShape,
-                        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
-                        modifier = Modifier.heightIn(min = 40.dp),
-                    ) {
-                        Icon(
-                            modifier = Modifier.size(18.dp),
-                            imageVector = ImageVector.vectorResource(id = R.drawable.spotify_logo),
-                            contentDescription = null
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(
-                            text = stringResource(id = R.string.open_in_spotify),
-                            style = MaterialTheme.typography.labelLarge,
-                        )
-                    }
-                }
-            }
-
-            if (missingTracks.isNotEmpty() || hasMoreSongs) {
-                item {
-                    CollectionDownloadActions(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 16.dp, vertical = 12.dp),
-                        totalDurationMs = missingTracks.sumOf { it.durationMs },
-                        missingTracks = missingTracks,
-                        hasMore = hasMoreSongs,
-                        resolveMissing = {
-                            loadAllSongs()
-                            (topSongs + moreSongs)
-                                .filter { it.id !in downloadedTrackIds }
-                                .distinctBy { it.id }
-                                .map { it.toTrackDownload() }
-                        },
-                        onDownloadAll = null,
-                        onDownloadMissing = onDownloadTracks,
+                    MetadataMetaLine(
+                        "${GeneralTextUtils.formatCompactCount((data.followers.total ?: 0).toLong())} ${
+                            stringResource(id = R.string.artist_followers).lowercase()
+                        }",
+                        monthlyListeners?.let {
+                            "${GeneralTextUtils.formatCount(it)} ${
+                                stringResource(id = R.string.artist_monthly_listeners).lowercase()
+                            }"
+                        }.orEmpty(),
                     )
                 }
             }
 
             item {
-                MetadataSectionTitle(stringResource(id = R.string.artist_songs))
-            }
-
-            itemsIndexed(songs, key = { _, song -> song.id }) { _, song ->
-                TrackComponent(
-                    contentModifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
-                    songName = song.name,
-                    artists = song.artists,
-                    spotifyUrl = song.url,
-                    isExplicit = song.explicit,
-                    isDownloaded = song.id in downloadedTrackIds,
-                    imageUrl = song.coverUrl,
-                    onOpen = {
-                        if (onOpenTrack != null) onOpenTrack(song.id)
-                        else ChromeCustomTabsUtil.openUrl(song.url)
-                    },
-                    onDownload = {
-                        trackDownloadCallback(song.url, "${song.name} - ${song.artists}")
-                    }
-                )
-            }
-
-            if (releases.isNotEmpty() || moreSongs.isNotEmpty()) {
-                item {
-                    SongsToggle(
-                        expanded = showAllSongs,
-                        onToggle = { showAllSongs = !showAllSongs },
+                TabRow(
+                    selectedTabIndex = selectedTab,
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+                    containerColor = Color.Transparent,
+                    divider = {},
+                ) {
+                    Tab(
+                        selected = selectedTab == 0,
+                        onClick = { selectedTab = 0 },
+                        text = { Text(stringResource(R.string.artist_releases)) },
+                    )
+                    Tab(
+                        selected = selectedTab == 1,
+                        onClick = { selectedTab = 1 },
+                        text = { Text(stringResource(R.string.tracks)) },
                     )
                 }
             }
 
-            if (loadingTopSongs || loadingMoreSongs) {
-                item {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(16.dp),
-                        horizontalArrangement = Arrangement.Center,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        CircularProgressIndicator(
-                            modifier = Modifier.size(18.dp),
-                            strokeWidth = 2.dp
-                        )
-                        Text(
-                            text = stringResource(R.string.loading),
-                            style = MaterialTheme.typography.bodySmall,
-                            modifier = Modifier.padding(start = 8.dp)
+            if (selectedTab == 0) {
+                if (albums.isNotEmpty()) {
+                    item {
+                        MetadataSectionTitle(stringResource(id = R.string.artist_albums))
+                    }
+                    val visibleAlbums =
+                        if (showAllAlbums) albums else albums.take(ALBUMS_PREVIEW)
+                    items(visibleAlbums, key = { "album-${it.id}" }) { album ->
+                        ReleaseRow(album, onOpenAlbum)
+                    }
+                    if (albums.size > ALBUMS_PREVIEW) {
+                        item {
+                            SongsToggle(
+                                expanded = showAllAlbums,
+                                onToggle = { showAllAlbums = !showAllAlbums },
+                                showAllRes = R.string.show_all_albums,
+                                showFewerRes = R.string.show_fewer_albums,
+                            )
+                        }
+                    }
+                }
+
+                if (singles.isNotEmpty()) {
+                    item {
+                        MetadataSectionTitle(stringResource(id = R.string.artist_singles))
+                    }
+                    val visibleSingles =
+                        if (showAllSingles) singles else singles.take(SINGLES_PREVIEW)
+                    items(visibleSingles, key = { "single-${it.id}" }) { single ->
+                        ReleaseRow(single, onOpenAlbum)
+                    }
+                    if (singles.size > SINGLES_PREVIEW) {
+                        item {
+                            SongsToggle(
+                                expanded = showAllSingles,
+                                onToggle = { showAllSingles = !showAllSingles },
+                                showAllRes = R.string.show_all_singles,
+                                showFewerRes = R.string.show_fewer_singles,
+                            )
+                        }
+                    }
+                }
+
+                if (!discographyLoaded) {
+                    item {
+                        LoadingRow()
+                    }
+                }
+            } else {
+                if (missingTracks.isNotEmpty() || hasMoreSongs) {
+                    item {
+                        CollectionDownloadActions(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 16.dp, vertical = 12.dp),
+                            totalDurationMs = missingTracks.sumOf { it.durationMs },
+                            missingTracks = missingTracks,
+                            hasMore = hasMoreSongs,
+                            resolveMissing = {
+                                loadAllSongs()
+                                (topSongs + moreSongs)
+                                    .filter { it.id !in downloadedTrackIds }
+                                    .distinctBy { it.id }
+                                    .map { it.toTrackDownload() }
+                            },
+                            onDownloadAll = null,
+                            onDownloadMissing = onDownloadTracks,
                         )
                     }
                 }
-            }
 
-            if (albums.isNotEmpty()) {
-                item {
-                    MetadataSectionTitle(stringResource(id = R.string.artist_albums))
+                itemsIndexed(songs, key = { _, song -> song.id }) { _, song ->
+                    TrackComponent(
+                        contentModifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+                        songName = song.name,
+                        artists = song.artists,
+                        subtitle = song.albumTitle(),
+                        subtitleTrailing = GeneralTextUtils.formatTrackDuration(song.durationMs),
+                        spotifyUrl = song.url,
+                        isExplicit = song.explicit,
+                        isDownloaded = song.id in downloadedTrackIds,
+                        imageUrl = song.coverUrl,
+                        onOpen = {
+                            if (onOpenTrack != null) onOpenTrack(song.id)
+                            else ChromeCustomTabsUtil.openUrl(song.url)
+                        },
+                        onDownload = {
+                            trackDownloadCallback(song.url, "${song.name} - ${song.artists}")
+                        }
+                    )
                 }
-                items(albums, key = { "album-${it.id}" }) { album ->
-                    ReleaseRow(album, R.string.album, onOpenAlbum)
-                }
-            }
 
-            if (singles.isNotEmpty()) {
-                item {
-                    MetadataSectionTitle(stringResource(id = R.string.artist_singles))
-                }
-                val visibleSingles =
-                    if (showAllSingles) singles else singles.take(SINGLES_PREVIEW)
-                items(visibleSingles, key = { "single-${it.id}" }) { single ->
-                    ReleaseRow(single, R.string.single, onOpenAlbum)
-                }
-                if (singles.size > SINGLES_PREVIEW) {
+                if (releases.isNotEmpty() || moreSongs.isNotEmpty()) {
                     item {
                         SongsToggle(
-                            expanded = showAllSingles,
-                            onToggle = { showAllSingles = !showAllSingles },
-                            showAllRes = R.string.show_all_singles,
-                            showFewerRes = R.string.show_fewer_singles,
+                            expanded = showAllSongs,
+                            onToggle = { showAllSongs = !showAllSongs },
                         )
+                    }
+                }
+
+                if (loadingTopSongs || loadingMoreSongs) {
+                    item {
+                        LoadingRow()
                     }
                 }
             }
@@ -398,6 +419,27 @@ private suspend fun albumTracks(albumId: String): List<SimpleTrack> {
         if (offset >= page.total) break
     }
     return tracks
+}
+
+@Composable
+private fun LoadingRow() {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(16.dp),
+        horizontalArrangement = Arrangement.Center,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        CircularProgressIndicator(
+            modifier = Modifier.size(18.dp),
+            strokeWidth = 2.dp,
+        )
+        Text(
+            text = stringResource(R.string.loading),
+            style = MaterialTheme.typography.bodySmall,
+            modifier = Modifier.padding(start = 8.dp),
+        )
+    }
 }
 
 @Composable
@@ -434,22 +476,23 @@ private fun SongsToggle(
 @Composable
 private fun ReleaseRow(
     release: SimpleAlbum,
-    typeRes: Int,
     onOpenAlbum: (String) -> Unit,
 ) {
     val trackCount = release.totalTracks ?: 0
-    val subtitle = if (trackCount > 0) {
-        pluralStringResource(R.plurals.song_count, trackCount, trackCount)
-    } else {
-        release.releaseDate?.year?.takeIf { it > 0 }?.toString().orEmpty()
-    }
-    SearchingResult(
-        modifier = Modifier.fillMaxWidth(),
+    val subtitle = listOfNotNull(
+        release.releaseDate?.year?.takeIf { it > 0 }?.toString(),
+        if (trackCount > 0) {
+            pluralStringResource(R.plurals.song_count, trackCount, trackCount)
+        } else {
+            null
+        },
+    ).joinToString(" · ")
+    MetadataResultRow(
+        modifier = Modifier.padding(horizontal = 16.dp),
         artworkUrl = release.images.firstOrNull()?.url.orEmpty(),
         name = release.name,
-        artists = subtitle,
-        type = stringResource(typeRes),
+        subtitle = subtitle,
+        showDivider = true,
         onClick = { onOpenAlbum(release.id) },
     )
 }
-

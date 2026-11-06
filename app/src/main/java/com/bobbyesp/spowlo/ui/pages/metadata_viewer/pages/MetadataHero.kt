@@ -1,5 +1,6 @@
 ﻿package com.bobbyesp.spowlo.ui.pages.metadata_viewer.pages
 
+import android.os.Build
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -10,6 +11,7 @@ import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
@@ -25,8 +27,13 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material.icons.automirrored.outlined.OpenInNew
+import androidx.compose.material.icons.outlined.ContentCopy
+import androidx.compose.material.icons.outlined.MoreVert
+import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
@@ -50,16 +57,22 @@ import androidx.compose.ui.draw.scale
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.lerp
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.core.graphics.drawable.toBitmap
 import androidx.palette.graphics.Palette
 import coil.imageLoader
@@ -70,8 +83,11 @@ import com.bobbyesp.spowlo.R
 import com.bobbyesp.spowlo.ui.common.AsyncImageImpl
 import com.bobbyesp.spowlo.ui.common.LocalDarkTheme
 import com.bobbyesp.spowlo.ui.common.LocalMetadataArtworkColors
+import com.bobbyesp.spowlo.ui.components.AnchoredMenu
+import com.bobbyesp.spowlo.ui.components.AnchoredMenuItem
 import com.bobbyesp.spowlo.ui.components.BackButton
-import com.bobbyesp.spowlo.ui.components.text.MarqueeText
+import com.bobbyesp.spowlo.ui.theme.metadataHeroTitle
+import com.bobbyesp.spowlo.utils.ChromeCustomTabsUtil
 import com.kyant.monet.LocalTonalPalettes
 import com.kyant.monet.PaletteStyle
 import com.kyant.monet.TonalPalettes.Companion.toTonalPalettes
@@ -80,8 +96,14 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 private const val BACKDROP_FADE_PX = 640f
-private const val ARTWORK_CORNER_DP = 24
-private const val ARTWORK_MAX_DP = 272
+private const val ARTWORK_CORNER_DP = 20
+private const val ARTWORK_MAX_DP = 212
+private const val ARTWORK_WIDTH_FRACTION = 0.52f
+
+val ArtworkShape = RoundedCornerShape(ARTWORK_CORNER_DP.dp)
+
+/** Green is reserved for "saved" state, never for generic accents. */
+val SavedGreen = Color(0xFF3F9D5A)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -91,18 +113,10 @@ fun MetadataScreen(
     backdrop: @Composable BoxScope.() -> Unit,
     modifier: Modifier = Modifier,
     seed: Color? = null,
+    actions: @Composable RowScope.() -> Unit = {},
     content: @Composable (PaddingValues, LazyListState) -> Unit,
 ) {
-    if (LocalMetadataArtworkColors.current) {
-        ArtworkThemedScreen(modifier = modifier, seed = seed) {
-            MetadataChrome(
-                topBarTitle = topBarTitle,
-                onBack = onBack,
-                backdrop = backdrop,
-                content = content,
-            )
-        }
-    } else {
+    ArtworkPaletteTheme(seed = seed) {
         Surface(
             modifier = modifier.fillMaxSize(),
             color = MaterialTheme.colorScheme.surface,
@@ -112,18 +126,23 @@ fun MetadataScreen(
                 topBarTitle = topBarTitle,
                 onBack = onBack,
                 backdrop = backdrop,
+                actions = actions,
                 content = content,
             )
         }
     }
 }
 
+/**
+ * Applies the artwork-derived palette when artwork colours are enabled.
+ * Also used by sheets and dialogs emitted outside [MetadataScreen] so they match the page.
+ */
 @Composable
-private fun ArtworkThemedScreen(
-    modifier: Modifier,
-    seed: Color?,
-    content: @Composable () -> Unit,
-) {
+fun ArtworkPaletteTheme(seed: Color?, content: @Composable () -> Unit) {
+    if (!LocalMetadataArtworkColors.current) {
+        content()
+        return
+    }
     val isLight = !LocalDarkTheme.current.isDarkTheme()
     val fallbackSeed = LocalTonalPalettes.current.keyColor
     val palettes = remember(seed, fallbackSeed) {
@@ -131,15 +150,7 @@ private fun ArtworkThemedScreen(
     }
 
     CompositionLocalProvider(LocalTonalPalettes provides palettes) {
-        val scheme = dynamicColorScheme(isLight)
-        MaterialTheme(colorScheme = scheme) {
-            Surface(
-                modifier = modifier.fillMaxSize(),
-                color = scheme.surface,
-                contentColor = scheme.onSurface,
-                content = content,
-            )
-        }
+        MaterialTheme(colorScheme = dynamicColorScheme(isLight), content = content)
     }
 }
 
@@ -149,6 +160,7 @@ private fun MetadataChrome(
     topBarTitle: String,
     onBack: () -> Unit,
     backdrop: @Composable BoxScope.() -> Unit,
+    actions: @Composable RowScope.() -> Unit,
     content: @Composable (PaddingValues, LazyListState) -> Unit,
 ) {
     val listState = rememberLazyListState()
@@ -182,6 +194,7 @@ private fun MetadataChrome(
                         )
                     },
                     navigationIcon = { BackButton { onBack() } },
+                    actions = actions,
                     colors = TopAppBarDefaults.topAppBarColors(containerColor = barColor),
                 )
             },
@@ -241,15 +254,30 @@ fun ArtworkBackdrop(url: String) {
     val surface = MaterialTheme.colorScheme.surface
     Box(modifier = Modifier.fillMaxSize()) {
         if (url.isNotEmpty()) {
-            AsyncImageImpl(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .scale(1.3f)
-                    .blur(72.dp),
-                model = url,
-                contentDescription = null,
-                contentScale = ContentScale.Crop,
-            )
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                AsyncImageImpl(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .scale(1.3f)
+                        .blur(72.dp),
+                    model = url,
+                    contentDescription = null,
+                    contentScale = ContentScale.Crop,
+                )
+            } else {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(
+                            Brush.radialGradient(
+                                colors = listOf(
+                                    MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.45f),
+                                    surface,
+                                )
+                            )
+                        ),
+                )
+            }
         }
         Box(
             modifier = Modifier
@@ -294,7 +322,7 @@ fun MetadataHero(
     Column(
         modifier = modifier
             .fillMaxWidth()
-            .padding(top = 8.dp, bottom = 4.dp),
+            .padding(top = 4.dp, bottom = 2.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Box(
@@ -305,15 +333,16 @@ fun MetadataHero(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(start = 16.dp, end = 16.dp, top = 22.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
+                .padding(start = 16.dp, end = 16.dp, top = 14.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp),
             horizontalAlignment = Alignment.Start,
         ) {
             SelectionContainer {
-                MarqueeText(
+                Text(
                     text = title,
-                    fontWeight = FontWeight.Bold,
-                    style = MaterialTheme.typography.headlineMedium,
+                    style = metadataHeroTitle,
+                    maxLines = 3,
+                    overflow = TextOverflow.Ellipsis,
                 )
             }
             details()
@@ -322,71 +351,64 @@ fun MetadataHero(
 }
 
 @Composable
-fun CollectionArtwork(url: String) {
-    val size = (LocalConfiguration.current.screenHeightDp / 3).coerceAtMost(ARTWORK_MAX_DP).dp
-    val shape = RoundedCornerShape(ARTWORK_CORNER_DP.dp)
-    AsyncImageImpl(
+fun rememberArtworkSize(): Dp {
+    val width = LocalConfiguration.current.screenWidthDp
+    return (width * ARTWORK_WIDTH_FRACTION).coerceIn(168f, ARTWORK_MAX_DP.toFloat()).dp
+}
+
+@Composable
+fun CollectionArtwork(
+    url: String,
+    scrollState: LazyListState? = null,
+    shape: Shape = ArtworkShape,
+) {
+    val size = rememberArtworkSize()
+    val sizePx = with(LocalDensity.current) { size.toPx() }
+    Box(
         modifier = Modifier
             .size(size)
             .aspectRatio(1f, matchHeightConstraintsFirst = true)
             .shadow(
-                elevation = 20.dp,
+                elevation = 18.dp,
                 shape = shape,
                 clip = false,
                 ambientColor = Color.Black.copy(alpha = 0.5f),
                 spotColor = Color.Black.copy(alpha = 0.5f),
             )
             .clip(shape),
-        model = url,
-        contentDescription = stringResource(id = R.string.track_artwork),
-        contentScale = ContentScale.Crop,
-    )
+    ) {
+        AsyncImageImpl(
+            modifier = Modifier
+                .matchParentSize()
+                .graphicsLayer {
+                    val offset = if (scrollState != null && scrollState.firstVisibleItemIndex == 0) {
+                        scrollState.firstVisibleItemScrollOffset
+                    } else {
+                        0
+                    }
+                    val progress = (offset / (sizePx * 0.8f)).coerceIn(0f, 1f)
+                    translationY = -sizePx * 0.05f * progress
+                    scaleX = 1f + 0.12f * progress
+                    scaleY = 1f + 0.12f * progress
+                },
+            model = url,
+            contentDescription = stringResource(id = R.string.track_artwork),
+            contentScale = ContentScale.Crop,
+        )
+    }
 }
 
 @Composable
-fun MetadataTags(
-    tags: List<String>,
-    trailing: @Composable () -> Unit = {},
-) {
-    val visible = tags.filter { it.isNotBlank() }
+fun MetadataMetaLine(vararg parts: String, modifier: Modifier = Modifier) {
+    val visible = parts.filter { it.isNotBlank() }
     if (visible.isEmpty()) return
-    FlowRow(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        visible.forEach { MetadataTag(it) }
-        trailing()
-    }
-}
-
-@Composable
-fun MetadataTag(text: String, icon: ImageVector? = null) {
-    Surface(
-        shape = CircleShape,
-        color = MaterialTheme.colorScheme.surfaceContainerHighest,
-        contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
-    ) {
-        Row(
-            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            if (icon != null) {
-                Icon(
-                    imageVector = icon,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(14.dp),
-                )
-                Spacer(modifier = Modifier.width(6.dp))
-            }
-            Text(
-                text = text,
-                style = MaterialTheme.typography.labelMedium,
-                maxLines = 1,
-            )
-        }
-    }
+    Text(
+        text = visible.joinToString("  ·  "),
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        letterSpacing = 0.2.sp,
+        modifier = modifier,
+    )
 }
 
 @Composable
@@ -405,50 +427,115 @@ fun MetadataArtistLine(
             Text(
                 text = artist.name + if (index == artists.lastIndex) "" else ",",
                 style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
+                color = MaterialTheme.colorScheme.onSurface,
                 modifier = Modifier
                     .clip(RoundedCornerShape(6.dp))
                     .clickable { onArtistClick(artist.id) }
-                    .padding(horizontal = 2.dp, vertical = 2.dp)
-                    .alpha(alpha = 0.8f),
+                    .padding(horizontal = 2.dp, vertical = 2.dp),
             )
         }
     }
 }
 
 @Composable
-fun MetadataLine(text: String, emphasized: Boolean = false) {
-    SelectionContainer {
+fun MetadataOwnerLine(name: String, imageUrl: String = "", modifier: Modifier = Modifier) {
+    Row(modifier = modifier, verticalAlignment = Alignment.CenterVertically) {
+        if (imageUrl.isNotEmpty()) {
+            AsyncImageImpl(
+                modifier = Modifier
+                    .size(22.dp)
+                    .clip(CircleShape),
+                model = imageUrl,
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+            )
+        } else {
+            Box(
+                modifier = Modifier
+                    .size(22.dp)
+                    .clip(CircleShape)
+                    .background(MaterialTheme.colorScheme.surfaceVariant),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    imageVector = Icons.Outlined.Person,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(14.dp),
+                )
+            }
+        }
+        Spacer(Modifier.width(8.dp))
         Text(
-            text = text,
-            style = if (emphasized) {
-                MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold)
-            } else {
-                MaterialTheme.typography.bodySmall
-            },
-            modifier = Modifier.alpha(alpha = 0.8f),
+            text = name,
+            style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Medium),
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
         )
     }
 }
 
 @Composable
+fun MetadataOverflowMenu(spotifyUrl: String) {
+    val clipboard = LocalClipboardManager.current
+    var expanded by remember { mutableStateOf(false) }
+    Box {
+        IconButton(onClick = { expanded = true }) {
+            Icon(
+                imageVector = Icons.Outlined.MoreVert,
+                contentDescription = stringResource(R.string.more_options),
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        AnchoredMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+            AnchoredMenuItem(
+                text = stringResource(R.string.open_in_spotify),
+                leadingIcon = { Icon(Icons.AutoMirrored.Outlined.OpenInNew, contentDescription = null) },
+                enabled = spotifyUrl.isNotBlank(),
+                onClick = {
+                    expanded = false
+                    ChromeCustomTabsUtil.openUrl(spotifyUrl)
+                },
+            )
+            AnchoredMenuItem(
+                text = stringResource(R.string.copy_link),
+                leadingIcon = { Icon(Icons.Outlined.ContentCopy, contentDescription = null) },
+                enabled = spotifyUrl.isNotBlank(),
+                onClick = {
+                    expanded = false
+                    clipboard.setText(AnnotatedString(spotifyUrl))
+                },
+            )
+        }
+    }
+}
+
+@Composable
 fun MetadataSectionTitle(text: String, modifier: Modifier = Modifier) {
-    Row(
+    Text(
+        text = text.uppercase(),
+        style = MaterialTheme.typography.labelSmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        letterSpacing = 1.6.sp,
         modifier = modifier
             .fillMaxWidth()
-            .padding(start = 16.dp, end = 16.dp, top = 24.dp, bottom = 8.dp),
-        verticalAlignment = Alignment.CenterVertically,
+            .padding(start = 16.dp, end = 16.dp, top = 28.dp, bottom = 8.dp),
+    )
+}
+
+@Composable
+fun MetadataDetailCard(
+    modifier: Modifier = Modifier,
+    content: @Composable ColumnScope.() -> Unit,
+) {
+    Surface(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp),
+        shape = RoundedCornerShape(16.dp),
+        color = MaterialTheme.colorScheme.surfaceContainerLow,
     ) {
-        Box(
-            modifier = Modifier
-                .size(width = 3.dp, height = 16.dp)
-                .clip(CircleShape)
-                .background(MaterialTheme.colorScheme.primary)
-        )
-        Spacer(modifier = Modifier.width(10.dp))
-        Text(
-            text = text,
-            style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
-        )
+        Column(content = content)
     }
 }
 
@@ -463,13 +550,13 @@ fun MetadataDetailRow(label: String, value: String, onClick: (() -> Unit)? = nul
     ) {
         Text(
             text = label,
-            style = MaterialTheme.typography.bodyMedium,
+            style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.weight(1f),
         )
         Text(
             text = value,
-            style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
+            style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Medium),
             maxLines = 2,
             overflow = TextOverflow.Ellipsis,
             textAlign = TextAlign.End,
@@ -488,40 +575,4 @@ fun MetadataDetailRow(label: String, value: String, onClick: (() -> Unit)? = nul
     }
 }
 
-@Composable
-fun MetadataStat(
-    icon: ImageVector,
-    value: String,
-    label: String,
-    modifier: Modifier = Modifier,
-) {
-    Surface(
-        modifier = modifier,
-        shape = RoundedCornerShape(20.dp),
-        color = MaterialTheme.colorScheme.surfaceContainerHigh,
-    ) {
-        Column(
-            modifier = Modifier.padding(14.dp),
-            verticalArrangement = Arrangement.spacedBy(4.dp),
-        ) {
-            Icon(
-                imageVector = icon,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.size(20.dp),
-            )
-            Text(
-                text = value,
-                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-            Text(
-                text = label,
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 1,
-            )
-        }
-    }
-}
+

@@ -8,10 +8,12 @@ import com.adamratzman.spotify.models.Artist
 import com.adamratzman.spotify.models.Playlist
 import com.adamratzman.spotify.models.Track
 import com.bobbyesp.spowlo.Downloader
+import com.bobbyesp.spowlo.database.DownloadedSongInfo
 import com.bobbyesp.spowlo.features.spotify_api.data.remote.SpotifyApiRequests
 import com.bobbyesp.spowlo.features.spotify_api.data.remote.web.SpotifyWebApi
 import com.bobbyesp.spowlo.features.spotify_api.model.SpotifyDataType
 import com.bobbyesp.spowlo.utils.DatabaseUtil
+import com.bobbyesp.spowlo.utils.DownloaderUtil
 import com.bobbyesp.spowlo.utils.SpotifyUrls
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -43,8 +45,16 @@ class PlaylistPageViewModel @Inject constructor() : ViewModel() {
     private val mutableViewStateFlow = MutableStateFlow(ViewState())
     val viewStateFlow = mutableViewStateFlow.asStateFlow()
 
-    val downloadedTrackIds: StateFlow<Set<String>> = DatabaseUtil.getMediaInfo()
-        .map { songs -> songs.mapNotNull { SpotifyUrls.trackId(it.songUrl) }.toSet() }
+    /** Download history entries indexed by their Spotify track ID. */
+    val downloadedSongs: StateFlow<Map<String, DownloadedSongInfo>> = DatabaseUtil.getMediaInfo()
+        .map { songs ->
+            songs.mapNotNull { song -> SpotifyUrls.trackId(song.songUrl)?.let { it to song } }
+                .toMap()
+        }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyMap())
+
+    val downloadedTrackIds: StateFlow<Set<String>> = downloadedSongs
+        .map { songs -> songs.keys }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptySet())
 
     data class ViewState(
@@ -154,8 +164,12 @@ class PlaylistPageViewModel @Inject constructor() : ViewModel() {
         }
     }
 
-    fun downloadTrack(url: String, name: String) {
-        Downloader.executeParallelDownloadWithUrl(url, name)
+    fun downloadTrack(
+        url: String,
+        name: String,
+        preferences: DownloaderUtil.DownloadPreferences? = null,
+    ) {
+        Downloader.executeParallelDownloadWithUrl(url, name, preferences)
     }
 
     fun downloadTracks(tracks: List<TrackDownload>) {

@@ -30,6 +30,7 @@ import com.bobbyesp.spowlo.ui.pages.metadata_viewer.pages.ArtistPage
 import com.bobbyesp.spowlo.ui.pages.metadata_viewer.pages.MetadataScreen
 import com.bobbyesp.spowlo.ui.pages.metadata_viewer.pages.PlaylistViewPage
 import com.bobbyesp.spowlo.ui.pages.metadata_viewer.pages.TrackPage
+import com.bobbyesp.spowlo.utils.DownloaderUtil
 
 @Composable
 fun SpotifyItemPage(
@@ -44,6 +45,7 @@ fun SpotifyItemPage(
 ) {
     val viewState by playlistPageViewModel.viewStateFlow.collectAsStateWithLifecycle()
     val downloadedTrackIds by playlistPageViewModel.downloadedTrackIds.collectAsStateWithLifecycle()
+    val downloadedSongs by playlistPageViewModel.downloadedSongs.collectAsStateWithLifecycle()
 
     LaunchedEffect(id, account) {
         playlistPageViewModel.loadData(id, typeOfSpotifyDataType(type), account)
@@ -83,8 +85,12 @@ fun SpotifyItemPage(
 
                 val pageModifier = Modifier.fillMaxSize()
 
-                val trackDownloadCallback: (url: String, name: String) -> Unit = { url, name ->
-                    playlistPageViewModel.downloadTrack(url, name)
+                val trackDownloadCallback: (
+                    url: String,
+                    name: String,
+                    preferences: DownloaderUtil.DownloadPreferences?,
+                ) -> Unit = { url, name, preferences ->
+                    playlistPageViewModel.downloadTrack(url, name, preferences)
                 }
 
                 val downloadTracksCallback: (List<TrackDownload>) -> Unit = { tracks ->
@@ -100,7 +106,9 @@ fun SpotifyItemPage(
                                     data = it,
                                     modifier = pageModifier,
                                     onBack = onBackPressed,
-                                    trackDownloadCallback = trackDownloadCallback,
+                                    trackDownloadCallback = { url, name ->
+                                        trackDownloadCallback(url, name, null)
+                                    },
                                     downloadedTrackIds = downloadedTrackIds,
                                     onDownloadTracks = downloadTracksCallback,
                                     isLoadingTracks = viewState.isLoadingTracks,
@@ -117,7 +125,9 @@ fun SpotifyItemPage(
                                     data = it,
                                     modifier = pageModifier,
                                     onBack = onBackPressed,
-                                    trackDownloadCallback = trackDownloadCallback,
+                                    trackDownloadCallback = { url, name ->
+                                        trackDownloadCallback(url, name, null)
+                                    },
                                     downloadedTrackIds = downloadedTrackIds,
                                     onDownloadTracks = downloadTracksCallback,
                                     onOpenAlbum = onOpenAlbum,
@@ -133,7 +143,9 @@ fun SpotifyItemPage(
                                     data = it,
                                     modifier = pageModifier,
                                     onBack = onBackPressed,
-                                    trackDownloadCallback = trackDownloadCallback,
+                                    trackDownloadCallback = { url, name ->
+                                        trackDownloadCallback(url, name, null)
+                                    },
                                     downloadedTrackIds = downloadedTrackIds,
                                     onDownloadTracks = downloadTracksCallback,
                                     isLoadingTracks = viewState.isLoadingTracks,
@@ -152,7 +164,7 @@ fun SpotifyItemPage(
                                     trackDownloadCallback = trackDownloadCallback,
                                     onOpenAlbum = onOpenAlbum,
                                     onOpenArtist = onOpenArtist,
-                                    isDownloaded = it.id in downloadedTrackIds,
+                                    downloadedSong = downloadedSongs[it.id],
                                 )
                             }
                         }

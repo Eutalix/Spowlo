@@ -7,12 +7,11 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Download
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -33,6 +32,7 @@ import com.bobbyesp.spowlo.ui.components.DismissButton
 import com.bobbyesp.spowlo.ui.components.SpowloDialog
 import com.bobbyesp.spowlo.ui.pages.metadata_viewer.playlists.TrackDownload
 import com.bobbyesp.spowlo.utils.DownloadSizeEstimator
+import com.bobbyesp.spowlo.utils.ToastUtil
 import com.bobbyesp.spowlo.utils.toFileSizeText
 import kotlinx.coroutines.launch
 
@@ -44,10 +44,13 @@ fun CollectionDownloadActions(
     resolveMissing: (suspend () -> List<TrackDownload>)? = null,
     onDownloadAll: (() -> Unit)?,
     onDownloadMissing: (List<TrackDownload>) -> Unit,
+    downloadFullCollection: Boolean = false,
+    idleLabel: String? = null,
     modifier: Modifier = Modifier,
 ) {
     val estimateBytes = DownloadSizeEstimator.estimateBytes(totalDurationMs)
     val freeBytes = remember(totalDurationMs) { DownloadSizeEstimator.freeBytes() }
+    val showMissing = missingTracks.isNotEmpty() || (hasMore && resolveMissing != null)
 
     var pendingBytes by remember { mutableStateOf(0L) }
     var pendingFreeBytes by remember { mutableStateOf(0L) }
@@ -55,6 +58,8 @@ fun CollectionDownloadActions(
     var pendingConfirm by remember { mutableStateOf<List<TrackDownload>?>(null) }
     var preparing by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
+
+    if (!showMissing) return
 
     val requestDownload: (Long, () -> Unit) -> Unit = { durationMs, action ->
         val bytes = DownloadSizeEstimator.estimateBytes(durationMs)
@@ -74,16 +79,18 @@ fun CollectionDownloadActions(
             scope.launch {
                 val resolved = runCatching { resolveMissing() }.getOrDefault(emptyList())
                 preparing = false
-                if (resolved.isNotEmpty()) {
-                    if (needsConfirmation(missingTracks.size, resolved.size)) {
-                        pendingConfirm = resolved
-                    } else {
-                        requestDownload(resolved.sumOf { it.durationMs }) {
-                            onDownloadMissing(resolved)
-                        }
+                if (resolved.isEmpty()) {
+                    ToastUtil.makeToast(R.string.all_downloaded)
+                } else if (needsConfirmation(missingTracks.size, resolved.size)) {
+                    pendingConfirm = resolved
+                } else {
+                    requestDownload(resolved.sumOf { it.durationMs }) {
+                        onDownloadMissing(resolved)
                     }
                 }
             }
+        } else if (downloadFullCollection && onDownloadAll != null) {
+            requestDownload(totalDurationMs, onDownloadAll)
         } else if (missingTracks.isNotEmpty()) {
             requestDownload(missingTracks.sumOf { it.durationMs }) {
                 onDownloadMissing(missingTracks)
@@ -99,10 +106,10 @@ fun CollectionDownloadActions(
             Button(
                 onClick = downloadMissing,
                 enabled = !preparing,
-                shape = CircleShape,
+                shape = RoundedCornerShape(14.dp),
                 modifier = Modifier
                     .weight(1f)
-                    .heightIn(min = 48.dp),
+                    .heightIn(min = 52.dp),
             ) {
                 if (preparing) {
                     CircularProgressIndicator(
@@ -120,11 +127,9 @@ fun CollectionDownloadActions(
                     Spacer(Modifier.width(10.dp))
                     Text(
                         text = when {
-                            missingTracks.isEmpty() -> stringResource(R.string.download_missing)
-                            hasMore -> stringResource(
-                                R.string.download_missing_count_more,
-                                missingTracks.size,
-                            )
+                            hasMore -> stringResource(R.string.download_all_songs)
+                            downloadFullCollection && idleLabel != null -> idleLabel
+                            missingTracks.isEmpty() -> stringResource(R.string.check_for_missing)
                             else -> stringResource(
                                 R.string.download_missing_count,
                                 missingTracks.size,
@@ -134,22 +139,8 @@ fun CollectionDownloadActions(
                     )
                 }
             }
-            if (onDownloadAll != null) {
-                Spacer(Modifier.width(8.dp))
-                FilledTonalIconButton(
-                    onClick = { requestDownload(totalDurationMs, onDownloadAll) },
-                    shape = CircleShape,
-                    modifier = Modifier.size(48.dp),
-                ) {
-                    Icon(
-                        imageVector = Icons.Outlined.Download,
-                        contentDescription = stringResource(R.string.download_all_songs),
-                        modifier = Modifier.size(20.dp)
-                    )
-                }
-            }
         }
-        if (estimateBytes > 0L) {
+        if (!hasMore && missingTracks.isNotEmpty() && estimateBytes > 0L) {
             Text(
                 modifier = Modifier.padding(top = 8.dp),
                 text = if (freeBytes > 0L) {
@@ -159,7 +150,10 @@ fun CollectionDownloadActions(
                         freeBytes.toFileSizeText()
                     )
                 } else {
-                    stringResource(R.string.download_estimate_only, estimateBytes.toFileSizeText())
+                    stringResource(
+                        R.string.download_estimate_only,
+                        estimateBytes.toFileSizeText()
+                    )
                 },
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
