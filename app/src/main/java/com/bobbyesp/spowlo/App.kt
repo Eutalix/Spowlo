@@ -60,6 +60,7 @@ class App : Application() {
         connectivityManager = getSystemService()!!
 
         applicationScope.launch((Dispatchers.IO)) {
+            deleteStaleUpdateApk()
             try {
                 SpotDL.getInstance().init(this@App)
                 FFmpeg.init(this@App)
@@ -176,6 +177,25 @@ class App : Application() {
                 .append("Supported ABIs: ${Build.SUPPORTED_ABIS.contentToString()}\n")
                 .append("spotDL version: ${SpotDl.version(context.applicationContext)}\n")
                 .toString()
+        }
+
+        @Suppress("DEPRECATION")
+        private fun deleteStaleUpdateApk() {
+            val apkDir = context.getExternalFilesDir("apk") ?: return
+            val apk = File(apkDir, "latest.apk")
+            if (!apk.exists()) return
+
+            val cached = context.packageManager.getPackageArchiveInfo(apk.absolutePath, 0) ?: return
+            val cachedVersionCode =
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) cached.longVersionCode
+                else cached.versionCode.toLong()
+            val installedVersionCode =
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) packageInfo.longVersionCode
+                else packageInfo.versionCode.toLong()
+
+            if (cachedVersionCode <= installedVersionCode && apk.delete()) {
+                apkDir.delete()
+            }
         }
 
         fun createLogFile(context: Context, errorReport: String): String {

@@ -41,13 +41,9 @@ class DownloaderViewModel : ViewModel() {
 
     private fun checkDependencies() {
         viewModelScope.launch {
-            // Check if spotdl package is installed
-            val version = SpotDLDependencyUpdater.getLocalSpotDLVersion(App.context)
-            if (version != "0.0.0") {
-                _isDependenciesReady.emit(true)
-            } else {
-                _isDependenciesReady.emit(false)
-            }
+            // spotDL imports yt-dlp, ytmusicapi and syncedlyrics at module level,
+            // so a missing package means downloads cannot start.
+            _isDependenciesReady.emit(SpotDLDependencyUpdater.areDependenciesInstalled(App.context))
         }
     }
     
