@@ -724,12 +724,19 @@ object DownloaderUtil {
         val log = consoleOutput.takeLast(MAX_COLLECTION_LOG_LENGTH)
         var inserted = 0
 
+        val fileKeys = files.associateWith { it.nameWithoutExtension.matchKey() }
+
         songs.forEach { song ->
-            val candidates = files.filter {
-                it.absolutePath !in usedPaths && it.matchesTitle(song.name)
+            val titleKey = song.name.matchKey()
+            if (titleKey.isEmpty()) return@forEach
+            val artistKeys = (song.artists + song.artist).map { it.matchKey() }.filter { it.isNotEmpty() }
+            val candidates = files.filter { file ->
+                file.absolutePath !in usedPaths && fileKeys.getValue(file).contains(titleKey)
             }
-            val match = candidates.firstOrNull { it.matchesArtist(song) } ?: candidates.firstOrNull()
-                ?: return@forEach
+            val match = candidates.firstOrNull { file ->
+                val fileKey = fileKeys.getValue(file)
+                artistKeys.any { fileKey.contains(it) }
+            } ?: candidates.firstOrNull() ?: return@forEach
             usedPaths += match.absolutePath
             insertInfoIntoDownloadHistory(song, listOf(match.absolutePath), log)
             inserted++
@@ -778,19 +785,6 @@ object DownloaderUtil {
             largeIcon = largeIcon,
         )
         Downloader.updateTaskOutput(url = url, line = text, progress = 0f, isPlaylist = isPlaylist)
-    }
-
-    private fun File.matchesTitle(title: String): Boolean {
-        val titleKey = title.matchKey()
-        return titleKey.isNotEmpty() && nameWithoutExtension.matchKey().contains(titleKey)
-    }
-
-    private fun File.matchesArtist(song: SpotifySong): Boolean {
-        val fileKey = nameWithoutExtension.matchKey()
-        return (song.artists + song.artist).any { artist ->
-            val artistKey = artist.matchKey()
-            artistKey.isNotEmpty() && fileKey.contains(artistKey)
-        }
     }
 
     private fun String.matchKey(): String = lowercase().filter { it.isLetterOrDigit() }

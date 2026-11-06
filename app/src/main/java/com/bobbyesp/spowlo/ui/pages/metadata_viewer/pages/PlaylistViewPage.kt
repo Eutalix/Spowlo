@@ -53,28 +53,36 @@ fun PlaylistViewPage(
     val trackCount = data.tracks.total
     val artworkUrl = data.images.firstOrNull()?.url.orEmpty()
     val seed = rememberArtworkSeed(artworkUrl)
-    val missingTracks = data.tracks.items.mapNotNull { item ->
-        val track = item.track?.asTrack ?: return@mapNotNull null
-        if (track.id in downloadedTrackIds) return@mapNotNull null
-        TrackDownload(
-            url = track.externalUrls.spotify ?: "https://open.spotify.com/track/${track.id}",
-            title = track.name,
-            artists = track.artists.joinToString(", ") { it.name },
-            durationMs = track.durationMs.toLong(),
-            albumName = track.album.name,
-            coverUrl = track.album.images?.firstOrNull()?.url.orEmpty(),
-            explicit = track.explicit,
-            discNumber = track.discNumber,
-            trackNumber = track.trackNumber,
-        )
+    val missingTracks = remember(data, downloadedTrackIds) {
+        data.tracks.items.mapNotNull { item ->
+            val track = item.track?.asTrack ?: return@mapNotNull null
+            if (track.id in downloadedTrackIds) return@mapNotNull null
+            TrackDownload(
+                url = track.externalUrls.spotify ?: "https://open.spotify.com/track/${track.id}",
+                title = track.name,
+                artists = track.artists.joinToString(", ") { it.name },
+                durationMs = track.durationMs.toLong(),
+                albumName = track.album.name,
+                coverUrl = track.album.images?.firstOrNull()?.url.orEmpty(),
+                explicit = track.explicit,
+                discNumber = track.discNumber,
+                trackNumber = track.trackNumber,
+            )
+        }
     }
-    val pendingDurationMs = data.tracks.items.mapNotNull { item ->
-        item.track?.asTrack?.takeIf { it.id !in downloadedTrackIds }
-    }.sumOf { it.durationMs.toLong() }
-    val totalDurationMs = data.tracks.items.mapNotNull { it.track?.asTrack }
-        .sumOf { it.durationMs.toLong() }
-    val downloadedCount = data.tracks.items.count { item ->
-        item.track?.asTrack?.id in downloadedTrackIds
+    val pendingDurationMs = remember(data, downloadedTrackIds) {
+        data.tracks.items.mapNotNull { item ->
+            item.track?.asTrack?.takeIf { it.id !in downloadedTrackIds }
+        }.sumOf { it.durationMs.toLong() }
+    }
+    val totalDurationMs = remember(data) {
+        data.tracks.items.mapNotNull { it.track?.asTrack }
+            .sumOf { it.durationMs.toLong() }
+    }
+    val downloadedCount = remember(data, downloadedTrackIds) {
+        data.tracks.items.count { item ->
+            item.track?.asTrack?.id in downloadedTrackIds
+        }
     }
     val downloadAll: (() -> Unit)? = data.externalUrls.spotify?.let { url ->
         { trackDownloadCallback(url, data.name) }
@@ -126,15 +134,18 @@ fun PlaylistViewPage(
                         GeneralTextUtils.formatCollectionDuration(totalDurationMs),
                     )
                     data.description?.takeIf { it.isNotBlank() }?.let { description ->
+                        val linkColor = MaterialTheme.colorScheme.primary
                         Text(
-                            text = AnnotatedString.fromHtml(
-                                description,
-                                linkStyles = TextLinkStyles(
-                                    style = SpanStyle(
-                                        color = MaterialTheme.colorScheme.primary,
+                            text = remember(description, linkColor) {
+                                AnnotatedString.fromHtml(
+                                    description,
+                                    linkStyles = TextLinkStyles(
+                                        style = SpanStyle(
+                                            color = linkColor,
+                                        )
                                     )
                                 )
-                            ),
+                            },
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             maxLines = if (descriptionExpanded) Int.MAX_VALUE else 2,

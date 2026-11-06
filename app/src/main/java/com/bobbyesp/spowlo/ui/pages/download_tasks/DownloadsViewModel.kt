@@ -14,6 +14,7 @@ import com.bobbyesp.spowlo.utils.HistoryMetadataMatcher.withTrackMetadata
 import com.bobbyesp.spowlo.utils.PreferencesUtil
 import com.bobbyesp.spowlo.utils.ToastUtil
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.plus
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -113,7 +114,7 @@ class DownloadsViewModel : ViewModel() {
         mediaInfoFlow, filtersFlow, sortFlow, fileSizes
     ) { songs, filters, sort, sizes ->
         buildLibraryState(songs, filters, sort, sizes)
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), LibraryState())
+    }.stateIn(viewModelScope + Dispatchers.Default, SharingStarted.WhileSubscribed(5_000), LibraryState())
 
     /** Every artist in the library with its song count, unknown artists last. */
     val artists: StateFlow<List<ArtistEntry>> = mediaInfoFlow

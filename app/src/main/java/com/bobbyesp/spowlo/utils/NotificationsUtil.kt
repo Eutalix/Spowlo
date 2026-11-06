@@ -122,8 +122,8 @@ object NotificationsUtil {
         text: String? = null,
         largeIcon: Bitmap? = null,
     ) {
-        if (!notificationsEnabled()) return
         val progressValue = progressToPost(notificationId, progress, text) ?: return
+        if (!notificationsEnabled()) return
 
         val pendingIntent = taskId?.let {
             Intent(context.applicationContext, NotificationActionReceiver::class.java)
@@ -249,8 +249,8 @@ object NotificationsUtil {
         title: String,
         largeIcon: Bitmap? = null,
     ) {
-        if (!notificationsEnabled()) return
         val progressValue = progressToPost(notificationId, progress, text) ?: return
+        if (!notificationsEnabled()) return
 
         val intent = Intent(context.applicationContext, NotificationActionReceiver::class.java)
             .putExtra(TASK_ID_KEY, taskId)

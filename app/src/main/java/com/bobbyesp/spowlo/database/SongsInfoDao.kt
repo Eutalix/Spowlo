@@ -75,13 +75,14 @@ interface SongsInfoDao {
     @Delete
     suspend fun deleteInfo(vararg info: DownloadedSongInfo)
 
+    @Query("SELECT * FROM downloaded_songs_info WHERE id IN (:idList)")
+    suspend fun getInfoByIdList(idList: List<Int>): List<DownloadedSongInfo>
+
     @Transaction
     suspend fun deleteInfoListByIdList(idList: List<Int>, deleteFile: Boolean = false) {
-        idList.forEach { id ->
-            val info = getInfoById(id)
-            if (deleteFile) FilesUtil.deleteFile(info.songPath)
-            deleteInfo(info)
-        }
+        val infos = getInfoByIdList(idList)
+        if (deleteFile) infos.forEach { FilesUtil.deleteFile(it.songPath) }
+        if (infos.isNotEmpty()) deleteInfo(*infos.toTypedArray())
     }
 
     @Query("SELECT * FROM CommandTemplate")
