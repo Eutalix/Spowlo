@@ -20,6 +20,9 @@ data class EmbeddedTags(
     val spotifyUrl: String = "",
     val taggedBySpowlo: Boolean = false,
     val artworkUri: String = "",
+    val hasArtwork: Boolean = false,
+    val hasLyrics: Boolean = false,
+    val durationSeconds: Double = 0.0,
 )
 
 /**
@@ -50,14 +53,20 @@ object EmbeddedTagReader {
 
     private fun readFile(file: File): EmbeddedTags {
         if (!file.isFile) return EmbeddedTags()
-        val tag = AudioFileIO.read(file).tag ?: return EmbeddedTags()
+        val audio = AudioFileIO.read(file)
+        val duration = audio.audioHeader?.trackLength?.toDouble() ?: 0.0
+        val tag = audio.tag ?: return EmbeddedTags(durationSeconds = duration)
         val taggedBySpowlo = hasSpowloMarker(tag)
+        val artwork = runCatching { tag.firstArtwork }.getOrNull()
         return EmbeddedTags(
             title = tag.getFirst(FieldKey.TITLE).trim(),
             artist = tag.getFirst(FieldKey.ARTIST).trim(),
             spotifyUrl = spotifyTrackUrl(tag),
             taggedBySpowlo = taggedBySpowlo,
-            artworkUri = if (taggedBySpowlo) cacheArtwork(file, tag.firstArtwork) else "",
+            artworkUri = if (taggedBySpowlo) cacheArtwork(file, artwork) else "",
+            hasArtwork = artwork != null,
+            hasLyrics = runCatching { tag.getFirst(FieldKey.LYRICS) }.getOrDefault("").isNotBlank(),
+            durationSeconds = duration,
         )
     }
 

@@ -17,6 +17,9 @@ interface SongsInfoDao {
     @Query("SELECT * FROM downloaded_songs_info")
     fun getAllMedia(): Flow<List<DownloadedSongInfo>>
 
+    @Query("SELECT * FROM downloaded_songs_info")
+    suspend fun getAllMediaList(): List<DownloadedSongInfo>
+
     @Query("DELETE FROM downloaded_songs_info")
     fun deleteAllMediaFromDb()
 
@@ -58,6 +61,15 @@ interface SongsInfoDao {
         if (getInfoByPath(path) != null) return false
         insertAll(songInfo)
         return true
+    }
+
+    @Transaction
+    suspend fun insertInfoListDistinctByPath(infoList: List<DownloadedSongInfo>): Int {
+        if (infoList.isEmpty()) return 0
+        val known = getAllPaths().toHashSet()
+        val fresh = infoList.filter { it.songPath !in known }.distinctBy { it.songPath }
+        if (fresh.isNotEmpty()) insertAll(*fresh.toTypedArray())
+        return fresh.size
     }
 
     @Delete

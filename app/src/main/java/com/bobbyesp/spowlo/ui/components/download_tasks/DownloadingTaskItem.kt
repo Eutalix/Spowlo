@@ -20,6 +20,7 @@ import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Error
 import androidx.compose.material.icons.outlined.Cancel
 import androidx.compose.material.icons.outlined.ContentCopy
+import androidx.compose.material.icons.outlined.Download
 import androidx.compose.material.icons.outlined.ErrorOutline
 import androidx.compose.material.icons.outlined.Link
 import androidx.compose.material.icons.outlined.RestartAlt
@@ -47,7 +48,6 @@ import androidx.compose.ui.unit.dp
 import com.bobbyesp.spowlo.R
 import com.bobbyesp.spowlo.ui.common.AsyncImageImpl
 import com.bobbyesp.spowlo.ui.components.FlatButtonChip
-import com.bobbyesp.spowlo.ui.components.text.MarqueeText
 import kotlin.math.roundToInt
 
 @Composable
@@ -87,7 +87,6 @@ fun DownloadingTaskItem(
         modifier = modifier,
         color = MaterialTheme.colorScheme.surfaceContainerHigh,
         shape = CardDefaults.shape,
-        onClick = { onShowLog() },
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -114,7 +113,7 @@ fun DownloadingTaskItem(
                 }
                 Spacer(Modifier.width(12.dp))
                 Column(modifier = Modifier.weight(1f)) {
-                    MarqueeText(
+                    Text(
                         text = header,
                         style = MaterialTheme.typography.titleSmall,
                         fontWeight = FontWeight.Bold,
@@ -135,7 +134,7 @@ fun DownloadingTaskItem(
                         Icon(
                             imageVector = when (status) {
                                 TaskState.FINISHED -> Icons.Filled.CheckCircle
-                                TaskState.RUNNING -> Icons.Outlined.Terminal
+                                TaskState.RUNNING -> Icons.Outlined.Download
                                 TaskState.ERROR -> Icons.Filled.Error
                                 TaskState.CANCELED -> Icons.Filled.Cancel
                             },
@@ -205,6 +204,7 @@ fun DownloadingTaskItem(
                 )
             }
 
+            Spacer(Modifier.height(4.dp))
             Row(modifier = Modifier.horizontalScroll(rememberScrollState())) {
                 FlatButtonChip(
                     icon = Icons.Outlined.ContentCopy,

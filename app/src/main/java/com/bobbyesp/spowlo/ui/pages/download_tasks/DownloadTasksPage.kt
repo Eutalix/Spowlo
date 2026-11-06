@@ -13,23 +13,31 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
-import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
@@ -41,7 +49,8 @@ import androidx.compose.material.icons.outlined.Check
 import androidx.compose.material.icons.outlined.Checklist
 import androidx.compose.material.icons.outlined.Clear
 import androidx.compose.material.icons.outlined.Close
-import androidx.compose.material.icons.outlined.DeleteSweep
+import androidx.compose.material.icons.outlined.DeleteOutline
+import androidx.compose.material.icons.outlined.Deselect
 import androidx.compose.material.icons.outlined.Description
 import androidx.compose.material.icons.outlined.DownloadForOffline
 import androidx.compose.material.icons.outlined.ErrorOutline
@@ -53,23 +62,19 @@ import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material.icons.outlined.QueueMusic
 import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material.icons.outlined.Search
+import androidx.compose.material.icons.outlined.SearchOff
+import androidx.compose.material.icons.outlined.SelectAll
 import androidx.compose.material.icons.outlined.Share
 import androidx.compose.material.icons.outlined.Sort
-import androidx.compose.material3.AssistChip
-import androidx.compose.material3.AssistChipDefaults
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.InputChip
-import androidx.compose.material3.InputChipDefaults
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
@@ -78,34 +83,36 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
-import androidx.compose.material3.TriStateCheckbox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
-import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalUriHandler
-import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.Lifecycle
@@ -115,20 +122,22 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.bobbyesp.spowlo.Downloader
 import com.bobbyesp.spowlo.R
 import com.bobbyesp.spowlo.database.DownloadedSongInfo
+import com.bobbyesp.spowlo.ui.components.ActionDialog
+import com.bobbyesp.spowlo.ui.components.AnchoredMenu
+import com.bobbyesp.spowlo.ui.components.AnchoredMenuItem
 import com.bobbyesp.spowlo.ui.components.BackButton
 import com.bobbyesp.spowlo.ui.components.ConfirmButton
 import com.bobbyesp.spowlo.ui.components.DismissButton
-import com.bobbyesp.spowlo.ui.components.MultiChoiceItem
 import com.bobbyesp.spowlo.ui.components.SpowloDialog
 import com.bobbyesp.spowlo.ui.components.download_tasks.ArtistSheet
-import com.bobbyesp.spowlo.ui.components.download_tasks.DownloadedSongCard
+import com.bobbyesp.spowlo.ui.components.download_tasks.DownloadedSongRow
 import com.bobbyesp.spowlo.ui.components.download_tasks.DownloadingTaskItem
-import com.bobbyesp.spowlo.ui.components.download_tasks.SortSheet
 import com.bobbyesp.spowlo.ui.components.download_tasks.TaskState
 import com.bobbyesp.spowlo.ui.components.download_tasks.artistLabel
 import com.bobbyesp.spowlo.ui.components.download_tasks.sortLabel
 import com.bobbyesp.spowlo.ui.dialogs.NotificationPermissionDialog
 import com.bobbyesp.spowlo.ui.dialogs.rememberNotificationPermissionRequest
+import com.bobbyesp.spowlo.ui.pages.metadata_viewer.pages.folderLabel
 import com.bobbyesp.spowlo.utils.ExportFormat
 import com.bobbyesp.spowlo.utils.FilesUtil
 import com.bobbyesp.spowlo.utils.HistoryImporter
@@ -141,6 +150,7 @@ import com.bobbyesp.spowlo.utils.PreferencesUtil
 import com.bobbyesp.spowlo.utils.ToastUtil
 import com.bobbyesp.spowlo.utils.toFileSizeText
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.time.Instant
@@ -148,6 +158,7 @@ import java.time.LocalDate
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.time.format.FormatStyle
+import kotlin.math.roundToInt
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
@@ -166,18 +177,20 @@ fun DownloadTasksPage(
     val artists by downloadsViewModel.artists.collectAsStateWithLifecycle()
     val songsList = library.allSongs
     val fileSizes by downloadsViewModel.fileSizes.collectAsStateWithLifecycle()
+    val songDates = remember(songsList) {
+        songsList.associate { it.id to it.downloadedAt }
+    }
 
-    var isSearchActive by rememberSaveable { mutableStateOf(false) }
-    var showSortSheet by remember { mutableStateOf(false) }
     var showArtistSheet by remember { mutableStateOf(false) }
     var selectionMenuExpanded by remember { mutableStateOf(false) }
 
     var isSelectEnabled by remember { mutableStateOf(false) }
     val selectedItemIds = remember { mutableStateListOf<Int>() }
     var showDeleteDialog by remember { mutableStateOf(false) }
-    var deleteFile by remember { mutableStateOf(false) }
     var pendingDeleteIds by remember { mutableStateOf<List<Int>>(emptyList()) }
     var showMissingDeleteDialog by remember { mutableStateOf(false) }
+    val listState = rememberLazyListState()
+    var restoreScrollPosition by remember { mutableStateOf<Pair<Int, Int>?>(null) }
 
     val scope = rememberCoroutineScope()
     var isImporting by remember { mutableStateOf(false) }
@@ -226,23 +239,35 @@ fun DownloadTasksPage(
     }
 
     val visibleIds = library.songs.map { it.id }
-    val selectedVisibleCount = selectedItemIds.count { it in visibleIds }
-    val checkBoxState = when {
-        selectedVisibleCount == 0 -> androidx.compose.ui.state.ToggleableState.Off
-        selectedVisibleCount == visibleIds.size && visibleIds.isNotEmpty() ->
-            androidx.compose.ui.state.ToggleableState.On
+    val allVisibleSelected =
+        visibleIds.isNotEmpty() && visibleIds.all { it in selectedItemIds }
 
-        else -> androidx.compose.ui.state.ToggleableState.Indeterminate
+    val toggleSelectAll: () -> Unit = {
+        if (allVisibleSelected) {
+            selectedItemIds.removeAll(visibleIds.toSet())
+        } else {
+            visibleIds.forEach { id ->
+                if (!selectedItemIds.contains(id)) selectedItemIds.add(id)
+            }
+        }
     }
 
     val closeSelectionMode = {
+        restoreScrollPosition =
+            listState.firstVisibleItemIndex to listState.firstVisibleItemScrollOffset
         isSelectEnabled = false
         selectedItemIds.clear()
     }
 
-    val exitSearch = {
-        isSearchActive = false
-        downloadsViewModel.setQuery("")
+    LaunchedEffect(isSelectEnabled, restoreScrollPosition) {
+        if (!isSelectEnabled) {
+            val target = restoreScrollPosition ?: return@LaunchedEffect
+            delay(220)
+            if (!listState.isScrollInProgress) {
+                listState.scrollToItem(target.first, target.second)
+            }
+            restoreScrollPosition = null
+        }
     }
 
     val importExistingFiles: () -> Unit = {
@@ -267,8 +292,9 @@ fun DownloadTasksPage(
         }
     }
 
-    BackHandler(isSelectEnabled || isSearchActive) {
-        if (isSelectEnabled) closeSelectionMode() else exitSearch()
+    BackHandler(isSelectEnabled) {
+        focusManager.clearFocus()
+        closeSelectionMode()
     }
 
     val updateMetadata: (List<Int>) -> Unit = { ids -> downloadsViewModel.updateMetadata(ids) }
@@ -291,14 +317,15 @@ fun DownloadTasksPage(
         ToastUtil.makeToast(context, context.getString(R.string.link_copied))
     }
 
-    val songCard: @Composable (DownloadedSongInfo) -> Unit = { song ->
-        DownloadedSongCard(
+    val songRow: @Composable (DownloadedSongInfo, Boolean) -> Unit = { song, showDivider ->
+        DownloadedSongRow(
             song = song,
             fileSize = fileSizes[song.id],
             selectionMode = isSelectEnabled,
             selected = selectedItemIds.contains(song.id),
             isUpdatingMetadata = metadataProgress.inProgressId == song.id,
             metadataUpdateEnabled = !isUpdatingMetadata,
+            showDivider = showDivider,
             onSelect = {
                 if (!isSelectEnabled) isSelectEnabled = true
                 if (!selectedItemIds.remove(song.id)) selectedItemIds.add(song.id)
@@ -314,19 +341,16 @@ fun DownloadTasksPage(
                             context.getString(R.string.share_file)
                         )
                     )
-                }
+                } ?: ToastUtil.makeToast(context, context.getString(R.string.file_unavailable))
             },
             onOpenInSpotify = {
                 runCatching { uriHandler.openUri(song.songUrl) }
                     .onFailure {
-                        ToastUtil.makeToastSuspend(
-                            context.getString(R.string.file_unavailable)
-                        )
+                        ToastUtil.makeToast(context, context.getString(R.string.link_open_failed))
                     }
             },
             onDelete = {
                 pendingDeleteIds = listOf(song.id)
-                deleteFile = false
                 showDeleteDialog = true
             },
             onRedownload = { requestRedownload(listOf(song.id)) },
@@ -380,79 +404,72 @@ fun DownloadTasksPage(
         topBar = {
             TopAppBar(
                 title = {
-                    if (isSearchActive && !isSelectEnabled) {
-                        SearchField(
-                            query = library.query,
-                            onQueryChange = downloadsViewModel::setQuery,
-                            onSearch = { focusManager.clearFocus() }
-                        )
-                    } else {
-                        Text(
-                            text = if (isSelectEnabled) {
-                                stringResource(R.string.multiselect_item_count).format(
-                                    selectedItemIds.size
-                                )
-                            } else {
-                                stringResource(R.string.downloads)
-                            },
-                            style = MaterialTheme.typography.titleMedium.copy(fontSize = 18.sp)
-                        )
-                    }
-                }, navigationIcon = {
-                    when {
-                        isSelectEnabled -> IconButton(onClick = { closeSelectionMode() }) {
+                    Text(
+                        text = if (isSelectEnabled) {
+                            stringResource(R.string.multiselect_item_count).format(
+                                selectedItemIds.size
+                            )
+                        } else {
+                            stringResource(R.string.downloads)
+                        },
+                        style = MaterialTheme.typography.titleMedium.copy(fontSize = 18.sp),
+                        maxLines = 1
+                    )
+                },
+                navigationIcon = {
+                    if (isSelectEnabled) {
+                        IconButton(onClick = {
+                            focusManager.clearFocus()
+                            closeSelectionMode()
+                        }) {
                             Icon(
                                 imageVector = Icons.Outlined.Close,
                                 contentDescription = stringResource(R.string.close)
                             )
                         }
-
-                        isSearchActive -> IconButton(onClick = exitSearch) {
-                            Icon(
-                                imageVector = Icons.Outlined.Close,
-                                contentDescription = stringResource(R.string.close_search)
-                            )
-                        }
-
-                        else -> BackButton {
+                    } else {
+                        BackButton {
                             onGoBack()
                         }
                     }
-                }, actions = {
-                    if (isSearchActive && !isSelectEnabled) {
-                        if (library.query.isNotEmpty()) {
-                            IconButton(onClick = { downloadsViewModel.setQuery("") }) {
-                                Icon(
-                                    imageVector = Icons.Outlined.Clear,
-                                    contentDescription = stringResource(R.string.clear_search)
+                },
+                actions = {
+                    if (isSelectEnabled) {
+                        IconButton(onClick = toggleSelectAll, enabled = visibleIds.isNotEmpty()) {
+                            Icon(
+                                imageVector = if (allVisibleSelected) {
+                                    Icons.Outlined.Deselect
+                                } else {
+                                    Icons.Outlined.SelectAll
+                                },
+                                contentDescription = stringResource(
+                                    if (allVisibleSelected) R.string.deselect_all
+                                    else R.string.select_all
                                 )
-                            }
+                            )
                         }
                     } else {
-                        if (!isSelectEnabled) {
-                            if (songsList.isNotEmpty()) {
-                                IconButton(onClick = { isSearchActive = true }) {
-                                    Icon(
-                                        imageVector = Icons.Outlined.Search,
-                                        contentDescription = stringResource(R.string.search_downloads)
-                                    )
-                                }
+                        TextButton(
+                            onClick = importExistingFiles,
+                            enabled = !isImporting,
+                            contentPadding = PaddingValues(horizontal = 12.dp)
+                        ) {
+                            if (isImporting) {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(18.dp),
+                                    strokeWidth = 2.dp
+                                )
+                            } else {
+                                Icon(
+                                    imageVector = Icons.Outlined.LibraryAdd,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(18.dp)
+                                )
                             }
-                            IconButton(onClick = importExistingFiles, enabled = !isImporting) {
-                                if (isImporting) {
-                                    CircularProgressIndicator(
-                                        modifier = Modifier.size(20.dp),
-                                        strokeWidth = 2.dp
-                                    )
-                                } else {
-                                    Icon(
-                                        imageVector = Icons.Outlined.LibraryAdd,
-                                        contentDescription = stringResource(R.string.import_existing_files)
-                                    )
-                                }
-                            }
+                            Spacer(Modifier.width(6.dp))
+                            Text(text = stringResource(R.string.import_action))
                         }
-                        if (!isSelectEnabled && songsList.isNotEmpty()) {
+                        if (songsList.isNotEmpty()) {
                             IconButton(onClick = {
                                 focusManager.clearFocus()
                                 isSelectEnabled = true
@@ -464,16 +481,17 @@ fun DownloadTasksPage(
                             }
                         }
                     }
-                }, scrollBehavior = scrollBehavior
+                },
+                scrollBehavior = scrollBehavior
             )
-        }, bottomBar = {
+        },
+        bottomBar = {
             AnimatedVisibility(
                 isSelectEnabled,
                 enter = expandVertically() + fadeIn(),
                 exit = shrinkVertically() + fadeOut()
             ) {
                 Column {
-                    val selectedSize = selectedItemIds.sumOf { fileSizes[it] ?: 0L }
                     AnimatedVisibility(
                         isUpdatingMetadata,
                         enter = expandVertically() + fadeIn(),
@@ -490,37 +508,10 @@ fun DownloadTasksPage(
                                 .fillMaxWidth()
                                 .navigationBarsPadding()
                                 .height(64.dp)
-                                .padding(horizontal = 4.dp),
+                                .padding(horizontal = 8.dp),
+                            horizontalArrangement = Arrangement.End,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            TriStateCheckbox(
-                                state = checkBoxState,
-                                onClick = {
-                                    when (checkBoxState) {
-                                        androidx.compose.ui.state.ToggleableState.On ->
-                                            selectedItemIds.clear()
-
-                                        else -> visibleIds
-                                            .filterNot { selectedItemIds.contains(it) }
-                                            .forEach { selectedItemIds.add(it) }
-                                    }
-                                },
-                            )
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(
-                                    text = stringResource(R.string.multiselect_item_count).format(
-                                        selectedItemIds.size
-                                    ),
-                                    style = MaterialTheme.typography.labelLarge,
-                                    maxLines = 1
-                                )
-                                Text(
-                                    text = selectedSize.toFileSizeText(),
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    maxLines = 1
-                                )
-                            }
                             IconButton(
                                 onClick = { requestRedownload(selectedItemIds.toList()) },
                                 enabled = selectedItemIds.isNotEmpty() && !isUpdatingMetadata
@@ -542,14 +533,14 @@ fun DownloadTasksPage(
                             IconButton(
                                 onClick = {
                                     pendingDeleteIds = selectedItemIds.toList()
-                                    deleteFile = false
                                     showDeleteDialog = true
                                 },
                                 enabled = selectedItemIds.isNotEmpty()
                             ) {
                                 Icon(
-                                    imageVector = Icons.Outlined.DeleteSweep,
-                                    contentDescription = stringResource(id = R.string.remove)
+                                    imageVector = Icons.Outlined.DeleteOutline,
+                                    contentDescription = stringResource(R.string.delete),
+                                    tint = MaterialTheme.colorScheme.error
                                 )
                             }
                             Box {
@@ -559,12 +550,12 @@ fun DownloadTasksPage(
                                         contentDescription = stringResource(R.string.show_more_actions)
                                     )
                                 }
-                                DropdownMenu(
+                                AnchoredMenu(
                                     expanded = selectionMenuExpanded,
                                     onDismissRequest = { selectionMenuExpanded = false }
                                 ) {
-                                    DropdownMenuItem(
-                                        text = { Text(stringResource(R.string.share)) },
+                                    AnchoredMenuItem(
+                                        text = stringResource(R.string.share),
                                         leadingIcon = { Icon(Icons.Outlined.Share, null) },
                                         onClick = {
                                             selectionMenuExpanded = false
@@ -572,8 +563,8 @@ fun DownloadTasksPage(
                                         },
                                         enabled = selectedItemIds.isNotEmpty()
                                     )
-                                    DropdownMenuItem(
-                                        text = { Text(stringResource(R.string.export_playlist)) },
+                                    AnchoredMenuItem(
+                                        text = stringResource(R.string.export_playlist),
                                         leadingIcon = { Icon(Icons.Outlined.QueueMusic, null) },
                                         onClick = {
                                             selectionMenuExpanded = false
@@ -583,8 +574,8 @@ fun DownloadTasksPage(
                                         },
                                         enabled = selectedItemIds.isNotEmpty()
                                     )
-                                    DropdownMenuItem(
-                                        text = { Text(stringResource(R.string.export_csv)) },
+                                    AnchoredMenuItem(
+                                        text = stringResource(R.string.export_csv),
                                         leadingIcon = { Icon(Icons.Outlined.Description, null) },
                                         onClick = {
                                             selectionMenuExpanded = false
@@ -600,192 +591,231 @@ fun DownloadTasksPage(
                     }
                 }
             }
-        }) { paddings ->
-        LazyColumn(
+        }
+    ) { paddings ->
+        Column(
             modifier = Modifier
                 .padding(paddings)
-                .fillMaxSize(),
-            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 24.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+                .fillMaxSize()
         ) {
-            if (activeTasks.isEmpty() && songsList.isEmpty()) {
-                item {
-                    EmptyDownloadsState(
-                        modifier = Modifier
-                            .fillParentMaxSize()
-                            .padding(32.dp),
-                        isImporting = isImporting,
-                        onImport = importExistingFiles
-                    )
-                }
-                return@LazyColumn
-            }
-
-            if (!notificationsOn && !hintDismissed) {
-                item {
-                    NotificationHint(
-                        onEnable = {
-                            if (Build.VERSION.SDK_INT >= 33 && !permissionRequested) {
-                                showNotificationDialog = true
-                            } else if (!NotificationsUtil.areNotificationsEnabled()) {
-                                PreferencesUtil.updateValue(NOTIFICATION, true)
-                                NotificationsUtil.openNotificationSettings()
-                            } else {
-                                PreferencesUtil.updateValue(NOTIFICATION, true)
-                                notificationsOn = true
-                            }
-                        },
-                        onDismiss = {
-                            hintDismissed = true
-                            PreferencesUtil.updateValue(NOTIFICATION_HINT_DISMISSED, true)
-                        }
-                    )
-                }
-            }
-
-            if (activeTasks.isNotEmpty()) {
-                item {
-                    SectionHeader(
-                        title = stringResource(R.string.downloads_in_progress),
-                        count = activeTasks.size
-                    )
-                }
-                items(activeTasks, key = { "active_${it.toKey()}" }) { task ->
-                    DownloadingTaskItem(
-                        status = task.state.toStatus(),
-                        progress = if (task.state is Downloader.DownloadTask.State.Running) {
-                            task.state.progress
-                        } else 0f,
-                        progressText = task.currentLine,
-                        url = task.url,
-                        header = task.taskName,
-                        artist = task.artist,
-                        artworkUrl = task.artworkUrl,
-                        onCopyError = { task.onCopyError(clipboardManager) },
-                        onCancel = { task.onCancel() },
-                        onRestart = { task.onRestart() },
-                        onCopyLog = { task.onCopyLog(clipboardManager) },
-                        onShowLog = { onNavigateToLog("active_${task.hashCode()}") },
-                        onCopyLink = { task.onCopyUrl(clipboardManager) },
-                    )
-                }
-            }
-
-            item {
-                SectionHeader(
-                    title = stringResource(R.string.downloads_completed),
-                    count = library.songs.size,
-                    total = if (library.isFiltered) songsList.size else null
+            AnimatedVisibility(
+                visible = songsList.isNotEmpty() && !isSelectEnabled,
+                enter = expandVertically() + fadeIn(),
+                exit = shrinkVertically() + fadeOut()
+            ) {
+                LibrarySearchField(
+                    query = library.query,
+                    onQueryChange = downloadsViewModel::setQuery,
+                    modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 6.dp)
                 )
             }
 
-            if (library.missingIds.isNotEmpty()) {
-                item {
-                    MissingFilesBanner(
-                        count = library.missingIds.size,
-                        showingMissing = library.missingOnly,
-                        onToggle = {
-                            downloadsViewModel.setMissingOnly(!library.missingOnly)
-                        },
-                        onRemove = { showMissingDeleteDialog = true }
+            Box(modifier = Modifier.fillMaxSize()) {
+                LazyColumn(
+                    modifier = Modifier.fillMaxSize(),
+                    state = listState,
+                    contentPadding = PaddingValues(
+                        start = 16.dp,
+                        end = 16.dp,
+                        top = 2.dp,
+                        bottom = 24.dp
                     )
-                }
-            }
+                ) {
+                    if (activeTasks.isEmpty() && songsList.isEmpty()) {
+                        item {
+                            EmptyDownloadsState(
+                                modifier = Modifier
+                                    .fillParentMaxSize()
+                                    .padding(32.dp),
+                                isImporting = isImporting,
+                                onImport = importExistingFiles
+                            )
+                        }
+                        return@LazyColumn
+                    }
 
-            if (songsList.size > 1 || isSelectEnabled || library.isFiltered) {
-                item {
-                    LibraryToolbar(
-                        sort = library.sort,
-                        query = library.query,
-                        author = library.author,
-                        formats = library.formats,
-                        format = library.format,
-                        missingCount = library.missingIds.size,
-                        missingOnly = library.missingOnly,
-                        showQueryChip = isSelectEnabled && library.query.isNotBlank(),
-                        onArtistClick = { showArtistSheet = true },
-                        onSortClick = { showSortSheet = true },
-                        onFormatSelected = downloadsViewModel::setFormat,
-                        onMissingClick = {
-                            downloadsViewModel.setMissingOnly(!library.missingOnly)
-                        },
-                        onClearQuery = { downloadsViewModel.setQuery("") }
-                    )
-                }
-            }
+                    if (!notificationsOn && !hintDismissed) {
+                        item {
+                            NotificationHint(
+                                modifier = Modifier.padding(bottom = 8.dp),
+                                onEnable = {
+                                    if (Build.VERSION.SDK_INT >= 33 && !permissionRequested) {
+                                        showNotificationDialog = true
+                                    } else if (!NotificationsUtil.areNotificationsEnabled()) {
+                                        PreferencesUtil.updateValue(NOTIFICATION, true)
+                                        NotificationsUtil.openNotificationSettings()
+                                    } else {
+                                        PreferencesUtil.updateValue(NOTIFICATION, true)
+                                        notificationsOn = true
+                                    }
+                                },
+                                onDismiss = {
+                                    hintDismissed = true
+                                    PreferencesUtil.updateValue(NOTIFICATION_HINT_DISMISSED, true)
+                                }
+                            )
+                        }
+                    }
 
-            if (library.songs.isEmpty()) {
-                item {
-                    if (library.isFiltered) {
-                        NoResultsState(onClearFilters = { downloadsViewModel.clearFilters() })
+                    if (activeTasks.isNotEmpty()) {
+                        item {
+                            SectionHeader(
+                                title = stringResource(R.string.downloads_in_progress),
+                                count = activeTasks.size
+                            )
+                        }
+                        items(activeTasks, key = { "active_${it.toKey()}" }) { task ->
+                            DownloadingTaskItem(
+                                modifier = Modifier.padding(bottom = 8.dp),
+                                status = task.state.toStatus(),
+                                progress = if (task.state is Downloader.DownloadTask.State.Running) {
+                                    task.state.progress
+                                } else 0f,
+                                progressText = task.currentLine,
+                                url = task.url,
+                                header = task.taskName,
+                                artist = task.artist,
+                                artworkUrl = task.artworkUrl,
+                                onCopyError = { task.onCopyError(clipboardManager) },
+                                onCancel = { task.onCancel() },
+                                onRestart = { task.onRestart() },
+                                onCopyLog = { task.onCopyLog(clipboardManager) },
+                                onShowLog = { onNavigateToLog("active_${task.hashCode()}") },
+                                onCopyLink = { task.onCopyUrl(clipboardManager) },
+                            )
+                        }
+                    }
+
+                    if (activeTasks.isEmpty() || songsList.isNotEmpty()) {
+                        item {
+                            LibraryHeader(
+                                count = library.songs.size,
+                                totalCount = library.totalCount,
+                                totalBytes = library.totalBytes,
+                                isFiltered = library.isFiltered,
+                                sort = library.sort,
+                                onSortSelected = downloadsViewModel::setSort
+                            )
+                        }
+                    }
+
+                    if (songsList.isNotEmpty() &&
+                        (songsList.size > 1 || library.isFiltered)
+                    ) {
+                        item {
+                            LibraryFilterRow(
+                                author = library.author,
+                                formats = library.formats,
+                                format = library.format,
+                                missingCount = library.missingIds.size,
+                                missingOnly = library.missingOnly,
+                                hasFilters = library.author != null ||
+                                    library.format != null ||
+                                    library.missingOnly,
+                                onArtistClick = { showArtistSheet = true },
+                                onFormatSelected = downloadsViewModel::setFormat,
+                                onMissingClick = {
+                                    downloadsViewModel.setMissingOnly(!library.missingOnly)
+                                },
+                                onClearFilters = downloadsViewModel::clearFilters,
+                                modifier = Modifier.padding(bottom = 4.dp)
+                            )
+                        }
+                    }
+
+                    if (library.missingIds.isNotEmpty()) {
+                        item {
+                            MissingFilesBanner(
+                                modifier = Modifier.padding(bottom = 8.dp),
+                                count = library.missingIds.size,
+                                showingMissing = library.missingOnly,
+                                onToggle = {
+                                    downloadsViewModel.setMissingOnly(!library.missingOnly)
+                                },
+                                onRemove = { showMissingDeleteDialog = true }
+                            )
+                        }
+                    }
+
+                    if (library.songs.isEmpty()) {
+                        item {
+                            NoResultsState(
+                                onClearFilters = { downloadsViewModel.clearFilters() }
+                            )
+                        }
+                    } else if (library.groupedByDay) {
+                        library.sections.forEach { section ->
+                            stickyHeader(key = "day_${section.dayStart}") {
+                                DayHeader(dayStart = section.dayStart, count = section.songs.size)
+                            }
+                            itemsIndexed(
+                                items = section.songs,
+                                key = { _, song -> song.id }
+                            ) { index, song ->
+                                songRow(song, index != section.songs.lastIndex)
+                            }
+                        }
                     } else {
-                        Text(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(vertical = 24.dp),
-                            text = stringResource(R.string.downloads_history_empty_state),
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            textAlign = TextAlign.Center
-                        )
+                        itemsIndexed(
+                            items = library.songs,
+                            key = { _, song -> song.id }
+                        ) { index, song ->
+                            songRow(song, index != library.songs.lastIndex)
+                        }
                     }
                 }
-            } else if (library.groupedByDay) {
-                library.sections.forEach { section ->
-                    stickyHeader(key = "day_${section.dayStart}") {
-                        DayHeader(dayStart = section.dayStart, count = section.songs.size)
-                    }
-                    items(section.songs, key = { it.id }) { song ->
-                        songCard(song)
-                    }
-                }
-            } else {
-                items(library.songs, key = { it.id }) { song ->
-                    songCard(song)
+
+                if (library.songs.size > 8) {
+                    FastScroller(
+                        listState = listState,
+                        songDates = songDates,
+                        modifier = Modifier
+                            .align(Alignment.CenterEnd)
+                            .padding(end = 6.dp)
+                    )
                 }
             }
         }
     }
 
     if (showDeleteDialog) {
-        val deleteSizeSum = pendingDeleteIds.sumOf { fileSizes[it] ?: 0L }
-        SpowloDialog(
+        val count = pendingDeleteIds.size
+        val singleSong = if (count == 1) {
+            songsList.firstOrNull { it.id == pendingDeleteIds.first() }
+        } else {
+            null
+        }
+        val title = when {
+            singleSong != null -> stringResource(R.string.delete_song_title, singleSong.songName)
+            count == 1 -> stringResource(R.string.delete_this_file)
+            else -> pluralStringResource(R.plurals.delete_songs_title, count, count)
+        }
+        val supportingText = when {
+            singleSong != null -> {
+                val folder = folderLabel(singleSong.songPath)
+                val size = fileSizes[singleSong.id] ?: 0L
+                if (size > 0L) {
+                    stringResource(R.string.delete_song_message, folder, size.toFileSizeText())
+                } else {
+                    stringResource(R.string.delete_song_message_no_size, folder)
+                }
+            }
+
+            count == 1 -> stringResource(R.string.delete_this_file_message, stringResource(R.string.downloads))
+            else -> pluralStringResource(R.plurals.delete_songs_message, count)
+        }
+        ActionDialog(
             onDismissRequest = { showDeleteDialog = false },
-            icon = { Icon(Icons.Outlined.DeleteSweep, null) },
-            title = { Text(stringResource(R.string.delete_info)) },
-            text = {
-                Column {
-                    Text(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 24.dp),
-                        text = stringResource(R.string.delete_multiple_items_msg).format(
-                            pendingDeleteIds.size
-                        )
-                    )
-                    MultiChoiceItem(
-                        modifier = Modifier.padding(horizontal = 12.dp),
-                        text = if (deleteSizeSum > 0L) {
-                            "${stringResource(R.string.delete_file)} (${deleteSizeSum.toFileSizeText()})"
-                        } else {
-                            stringResource(R.string.delete_file)
-                        },
-                        checked = deleteFile
-                    ) { deleteFile = !deleteFile }
-                }
-            },
-            confirmButton = {
-                ConfirmButton {
-                    downloadsViewModel.deleteItems(pendingDeleteIds, deleteFile)
-                    showDeleteDialog = false
-                    pendingDeleteIds = emptyList()
-                    if (isSelectEnabled) closeSelectionMode()
-                }
-            },
-            dismissButton = {
-                DismissButton {
-                    showDeleteDialog = false
-                }
+            icon = Icons.Outlined.DeleteOutline,
+            title = title,
+            supportingText = supportingText,
+            confirmText = stringResource(R.string.delete),
+            onConfirm = {
+                val ids = pendingDeleteIds
+                showDeleteDialog = false
+                pendingDeleteIds = emptyList()
+                if (isSelectEnabled) closeSelectionMode()
+                downloadsViewModel.deleteItems(ids, deleteFile = true)
             }
         )
     }
@@ -822,35 +852,21 @@ fun DownloadTasksPage(
 
     if (showRedownloadDialog) {
         val count = redownloadTargets.size
-        SpowloDialog(
+        ActionDialog(
             onDismissRequest = {
                 showRedownloadDialog = false
                 redownloadTargets = emptyList()
             },
-            icon = { Icon(Icons.Outlined.Refresh, null) },
-            title = {
-                Text(pluralStringResource(R.plurals.redownload_confirm_title, count, count))
-            },
-            text = {
-                Text(
-                    modifier = Modifier.padding(horizontal = 24.dp),
-                    text = pluralStringResource(R.plurals.redownload_confirm_message, count)
-                )
-            },
-            confirmButton = {
-                ConfirmButton(text = stringResource(R.string.redownload)) {
-                    val ids = redownloadTargets
-                    showRedownloadDialog = false
-                    redownloadTargets = emptyList()
-                    closeSelectionMode()
-                    downloadsViewModel.redownload(ids)
-                }
-            },
-            dismissButton = {
-                DismissButton {
-                    showRedownloadDialog = false
-                    redownloadTargets = emptyList()
-                }
+            icon = Icons.Outlined.Refresh,
+            title = pluralStringResource(R.plurals.redownload_confirm_title, count, count),
+            supportingText = pluralStringResource(R.plurals.redownload_confirm_message, count),
+            confirmText = stringResource(R.string.redownload),
+            onConfirm = {
+                val ids = redownloadTargets
+                showRedownloadDialog = false
+                redownloadTargets = emptyList()
+                closeSelectionMode()
+                downloadsViewModel.redownload(ids)
             }
         )
     }
@@ -891,17 +907,6 @@ fun DownloadTasksPage(
         )
     }
 
-    if (showSortSheet) {
-        SortSheet(
-            current = library.sort,
-            onSelect = {
-                downloadsViewModel.setSort(it)
-                showSortSheet = false
-            },
-            onDismiss = { showSortSheet = false }
-        )
-    }
-
     if (showArtistSheet) {
         ArtistSheet(
             artists = artists,
@@ -914,6 +919,214 @@ fun DownloadTasksPage(
         )
     }
 }
+
+@Composable
+private fun LibrarySearchField(
+    query: String,
+    onQueryChange: (String) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val focusManager = LocalFocusManager.current
+    Surface(
+        modifier = modifier
+            .fillMaxWidth()
+            .height(48.dp),
+        shape = CircleShape,
+        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(start = 16.dp, end = 4.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(
+                imageVector = Icons.Outlined.Search,
+                contentDescription = null,
+                modifier = Modifier.size(20.dp),
+                tint = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Spacer(Modifier.width(10.dp))
+            BasicTextField(
+                value = query,
+                onValueChange = onQueryChange,
+                modifier = Modifier.weight(1f),
+                singleLine = true,
+                textStyle = MaterialTheme.typography.bodyMedium.copy(
+                    color = MaterialTheme.colorScheme.onSurface
+                ),
+                cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
+                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                keyboardActions = KeyboardActions(
+                    onSearch = { focusManager.clearFocus() }
+                ),
+                decorationBox = { innerTextField ->
+                    Box(contentAlignment = Alignment.CenterStart) {
+                        if (query.isEmpty()) {
+                            Text(
+                                text = stringResource(R.string.search_downloads),
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                maxLines = 1
+                            )
+                        }
+                        innerTextField()
+                    }
+                }
+            )
+            if (query.isNotEmpty()) {
+                IconButton(
+                    onClick = { onQueryChange("") },
+                    modifier = Modifier.size(40.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Outlined.Clear,
+                        contentDescription = stringResource(R.string.clear_search),
+                        modifier = Modifier.size(18.dp),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun FastScroller(
+    listState: LazyListState,
+    songDates: Map<Int, Long>,
+    modifier: Modifier = Modifier,
+) {
+    val scope = rememberCoroutineScope()
+    val density = LocalDensity.current
+    val thumbHeightPx = with(density) { 44.dp.toPx() }
+    var trackHeight by remember { mutableIntStateOf(0) }
+    var dragging by remember { mutableStateOf(false) }
+    var bubbleHeight by remember { mutableIntStateOf(0) }
+
+    val totalItems by remember {
+        derivedStateOf { listState.layoutInfo.totalItemsCount }
+    }
+    val progress by remember {
+        derivedStateOf {
+            val info = listState.layoutInfo
+            val visible = info.visibleItemsInfo
+            if (visible.isEmpty() || info.totalItemsCount <= 1) {
+                0f
+            } else {
+                val visibleCount = visible.size
+                val lastIndex = visible.last().index
+                val denominator = (info.totalItemsCount - visibleCount).coerceAtLeast(1)
+                ((lastIndex + 1 - visibleCount).toFloat() / denominator).coerceIn(0f, 1f)
+            }
+        }
+    }
+    val bubbleDay by remember(songDates) {
+        derivedStateOf {
+            if (!dragging) return@derivedStateOf null
+            listState.layoutInfo.visibleItemsInfo.firstNotNullOfOrNull { item ->
+                when (val key = item.key) {
+                    is Int -> songDates[key]?.takeIf { it > 0L }
+                    is String -> key.removePrefix("day_").toLongOrNull()?.takeIf { it > 0L }
+                    else -> null
+                }
+            }
+        }
+    }
+
+    val jumpTo: (Float) -> Unit = jump@{ y ->
+        if (trackHeight <= 0 || totalItems <= 1) return@jump
+        val fraction = (y / trackHeight).coerceIn(0f, 1f)
+        val index = (fraction * (totalItems - 1)).roundToInt()
+        scope.launch { listState.scrollToItem(index) }
+    }
+
+    Box(
+        modifier = modifier
+            .width(140.dp)
+            .fillMaxHeight(),
+    ) {
+        Box(
+            modifier = Modifier
+                .align(Alignment.CenterEnd)
+                .width(16.dp)
+                .fillMaxHeight()
+                .onSizeChanged { trackHeight = it.height }
+                .pointerInput(totalItems) {
+                    detectTapGestures { offset -> jumpTo(offset.y) }
+                }
+                .pointerInput(totalItems) {
+                    // Do not consume the initial down: the system back gesture owns the screen edge.
+                    // Only take over once the finger has actually moved vertically.
+                    detectVerticalDragGestures(
+                        onDragStart = { offset ->
+                            dragging = true
+                            jumpTo(offset.y)
+                        },
+                        onDragEnd = { dragging = false },
+                        onDragCancel = { dragging = false },
+                        onVerticalDrag = { change, _ ->
+                            jumpTo(change.position.y)
+                            change.consume()
+                        },
+                    )
+                },
+            contentAlignment = Alignment.TopCenter,
+        ) {
+            Box(
+                modifier = Modifier
+                    .width(if (dragging) 6.dp else 4.dp)
+                    .height(44.dp)
+                    .offset {
+                        val travel = (trackHeight - thumbHeightPx).coerceAtLeast(0f)
+                        IntOffset(0, (travel * progress).roundToInt())
+                    }
+                    .clip(CircleShape)
+                    .background(
+                        MaterialTheme.colorScheme.onSurfaceVariant.copy(
+                            alpha = if (dragging) 0.72f else 0.3f
+                        )
+                    )
+            )
+        }
+
+        val day = bubbleDay
+        if (dragging && day != null) {
+            Surface(
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .offset {
+                        val travel = (trackHeight - thumbHeightPx).coerceAtLeast(0f)
+                        val thumbTop = travel * progress
+                        IntOffset(
+                            x = -28.dp.roundToPx(),
+                            y = (thumbTop + thumbHeightPx / 2f - bubbleHeight / 2f).roundToInt(),
+                        )
+                    }
+                    .onSizeChanged { bubbleHeight = it.height },
+                shape = RoundedCornerShape(8.dp),
+                color = MaterialTheme.colorScheme.inverseSurface,
+                contentColor = MaterialTheme.colorScheme.inverseOnSurface,
+                shadowElevation = 4.dp,
+            ) {
+                Text(
+                    text = formatBubbleDate(day),
+                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.Medium,
+                )
+            }
+        }
+    }
+}
+
+private val bubbleDateFormatter = DateTimeFormatter.ofPattern("d MMM yyyy")
+
+private fun formatBubbleDate(dayStart: Long): String =
+    Instant.ofEpochMilli(dayStart)
+        .atZone(ZoneId.systemDefault())
+        .toLocalDate()
+        .format(bubbleDateFormatter)
 
 @Composable
 private fun NotificationHint(
@@ -1074,11 +1287,11 @@ private fun MetadataUpdateProgress(progress: DownloadsViewModel.MetadataProgress
 }
 
 @Composable
-private fun SectionHeader(title: String, count: Int, total: Int? = null) {
+private fun SectionHeader(title: String, count: Int) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(top = 8.dp, bottom = 2.dp),
+            .padding(top = 8.dp, bottom = 4.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Text(
@@ -1089,11 +1302,107 @@ private fun SectionHeader(title: String, count: Int, total: Int? = null) {
         )
         Spacer(Modifier.size(6.dp))
         Text(
-            text = if (total == null) count.toString()
-            else stringResource(R.string.library_count_filtered, count, total),
+            text = count.toString(),
             style = MaterialTheme.typography.labelMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
+    }
+}
+
+@Composable
+private fun LibraryHeader(
+    count: Int,
+    totalCount: Int,
+    totalBytes: Long,
+    isFiltered: Boolean,
+    sort: LibrarySort,
+    onSortSelected: (LibrarySort) -> Unit,
+) {
+    val sizeText = if (totalBytes > 0L) totalBytes.toFileSizeText() else null
+    val countLabel = if (isFiltered) {
+        stringResource(R.string.library_count_filtered, count, totalCount)
+    } else {
+        totalCount.toString()
+    }
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = 10.dp, bottom = 2.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            text = stringResource(R.string.downloads_completed),
+            style = MaterialTheme.typography.titleSmall,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.onSurface
+        )
+        Spacer(Modifier.width(6.dp))
+        Text(
+            text = buildString {
+                append(countLabel)
+                if (sizeText != null) {
+                    append(" · ")
+                    append(sizeText)
+                }
+            },
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Spacer(Modifier.weight(1f))
+        SortControl(sort = sort, onSelect = onSortSelected)
+    }
+}
+
+@Composable
+private fun SortControl(
+    sort: LibrarySort,
+    onSelect: (LibrarySort) -> Unit,
+) {
+    var expanded by remember { mutableStateOf(false) }
+    Box {
+        TextButton(
+            onClick = { expanded = true },
+            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp)
+        ) {
+            Icon(
+                imageVector = Icons.Outlined.Sort,
+                contentDescription = null,
+                modifier = Modifier.size(16.dp)
+            )
+            Spacer(Modifier.width(6.dp))
+            Text(
+                text = sortLabel(sort),
+                style = MaterialTheme.typography.labelLarge,
+                maxLines = 1
+            )
+            Icon(
+                imageVector = Icons.Outlined.ArrowDropDown,
+                contentDescription = null,
+                modifier = Modifier.size(18.dp)
+            )
+        }
+        AnchoredMenu(
+            expanded = expanded,
+            onDismissRequest = { expanded = false }
+        ) {
+            LibrarySort.entries.forEach { option ->
+                AnchoredMenuItem(
+                    text = sortLabel(option),
+                    leadingIcon = {
+                        if (option == sort) {
+                            Icon(Icons.Outlined.Check, null, modifier = Modifier.size(18.dp))
+                        } else {
+                            Spacer(Modifier.size(18.dp))
+                        }
+                    },
+                    onClick = {
+                        expanded = false
+                        onSelect(option)
+                    }
+                )
+            }
+        }
     }
 }
 
@@ -1114,7 +1423,7 @@ private fun DayHeader(dayStart: Long, count: Int) {
         modifier = Modifier
             .fillMaxWidth()
             .background(MaterialTheme.colorScheme.background)
-            .padding(start = 4.dp, top = 12.dp, bottom = 4.dp),
+            .padding(start = 4.dp, top = 14.dp, bottom = 4.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Text(
@@ -1137,16 +1446,30 @@ private fun NoResultsState(onClearFilters: () -> Unit) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(vertical = 32.dp),
+            .padding(horizontal = 24.dp, vertical = 56.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
+        Icon(
+            imageVector = Icons.Outlined.SearchOff,
+            contentDescription = null,
+            modifier = Modifier.size(40.dp),
+            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+        )
+        Spacer(Modifier.height(12.dp))
         Text(
-            text = stringResource(R.string.no_matching_songs),
+            text = stringResource(R.string.no_results_title),
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.SemiBold,
+            textAlign = TextAlign.Center
+        )
+        Spacer(Modifier.height(4.dp))
+        Text(
+            text = stringResource(R.string.no_results_body),
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             textAlign = TextAlign.Center
         )
-        Spacer(Modifier.height(8.dp))
+        Spacer(Modifier.height(16.dp))
         TextButton(onClick = onClearFilters) {
             Text(text = stringResource(R.string.clear_filters))
         }
@@ -1154,108 +1477,94 @@ private fun NoResultsState(onClearFilters: () -> Unit) {
 }
 
 @Composable
-private fun LibraryToolbar(
-    sort: LibrarySort,
-    query: String,
+private fun LibraryFilterRow(
     author: String?,
     formats: List<LibraryFormat>,
     format: String?,
     missingCount: Int,
     missingOnly: Boolean,
-    showQueryChip: Boolean,
+    hasFilters: Boolean,
     onArtistClick: () -> Unit,
-    onSortClick: () -> Unit,
     onFormatSelected: (String?) -> Unit,
     onMissingClick: () -> Unit,
-    onClearQuery: () -> Unit,
+    onClearFilters: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
-    val label = if (author == null) stringResource(R.string.artist) else artistLabel(author)
     Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .horizontalScroll(rememberScrollState()),
+        modifier = modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        FilterChip(
-            selected = author != null,
-            onClick = onArtistClick,
-            label = { Text(text = label) },
-            leadingIcon = {
-                Icon(
-                    imageVector = Icons.Outlined.Person,
-                    contentDescription = null,
-                    modifier = Modifier.size(FilterChipDefaults.IconSize)
-                )
-            },
-            trailingIcon = {
-                Icon(
-                    imageVector = Icons.Outlined.ArrowDropDown,
-                    contentDescription = null
-                )
-            }
-        )
-        Spacer(Modifier.width(8.dp))
-        AssistChip(
-            onClick = onSortClick,
-            label = { Text(text = sortLabel(sort)) },
-            leadingIcon = {
-                Icon(
-                    imageVector = Icons.Outlined.Sort,
-                    contentDescription = null,
-                    modifier = Modifier.size(AssistChipDefaults.IconSize)
-                )
-            },
-            trailingIcon = {
-                Icon(
-                    imageVector = Icons.Outlined.ArrowDropDown,
-                    contentDescription = null
+        LazyRow(
+            modifier = Modifier.weight(1f),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            contentPadding = PaddingValues(end = 4.dp)
+        ) {
+            item(key = "artist") {
+                val selected = author != null
+                FilterChip(
+                    selected = selected,
+                    onClick = onArtistClick,
+                    label = {
+                        Text(
+                            text = if (author == null) stringResource(R.string.artist)
+                            else artistLabel(author),
+                            fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal
+                        )
+                    },
+                    leadingIcon = {
+                        Icon(
+                            imageVector = Icons.Outlined.Person,
+                            contentDescription = null,
+                            modifier = Modifier.size(FilterChipDefaults.IconSize)
+                        )
+                    },
+                    trailingIcon = {
+                        Icon(
+                            imageVector = Icons.Outlined.ArrowDropDown,
+                            contentDescription = null
+                        )
+                    }
                 )
             }
-        )
-        if (formats.size > 1) {
-            Spacer(Modifier.width(8.dp))
-            FormatFilterChip(
-                formats = formats,
-                selected = format,
-                onSelect = onFormatSelected
-            )
-        }
-        if (missingCount > 0) {
-            Spacer(Modifier.width(8.dp))
-            FilterChip(
-                selected = missingOnly,
-                onClick = onMissingClick,
-                label = { Text(text = stringResource(R.string.missing_count, missingCount)) },
-                leadingIcon = {
-                    Icon(
-                        imageVector = Icons.Outlined.ErrorOutline,
-                        contentDescription = null,
-                        modifier = Modifier.size(FilterChipDefaults.IconSize)
+            if (formats.size > 1) {
+                item(key = "format") {
+                    FormatFilterChip(
+                        formats = formats,
+                        selected = format,
+                        onSelect = onFormatSelected
                     )
                 }
-            )
-        }
-        if (showQueryChip && query.isNotBlank()) {
-            Spacer(Modifier.width(8.dp))
-            InputChip(
-                selected = false,
-                onClick = onClearQuery,
-                label = { Text(text = query) },
-                leadingIcon = {
-                    Icon(
-                        imageVector = Icons.Outlined.Search,
-                        contentDescription = null,
-                        modifier = Modifier.size(InputChipDefaults.IconSize)
-                    )
-                },
-                trailingIcon = {
-                    Icon(
-                        imageVector = Icons.Outlined.Close,
-                        contentDescription = stringResource(R.string.clear_search),
-                        modifier = Modifier.size(InputChipDefaults.IconSize)
+            }
+            if (missingCount > 0) {
+                item(key = "missing") {
+                    FilterChip(
+                        selected = missingOnly,
+                        onClick = onMissingClick,
+                        label = {
+                            Text(
+                                text = stringResource(R.string.missing_count, missingCount),
+                                fontWeight = if (missingOnly) FontWeight.SemiBold
+                                else FontWeight.Normal
+                            )
+                        },
+                        leadingIcon = {
+                            Icon(
+                                imageVector = Icons.Outlined.ErrorOutline,
+                                contentDescription = null,
+                                modifier = Modifier.size(FilterChipDefaults.IconSize)
+                            )
+                        }
                     )
                 }
-            )
+            }
+        }
+        if (hasFilters) {
+            TextButton(
+                onClick = onClearFilters,
+                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp)
+            ) {
+                Text(text = stringResource(R.string.clear))
+            }
         }
     }
 }
@@ -1272,7 +1581,11 @@ private fun FormatFilterChip(
             selected = selected != null,
             onClick = { expanded = true },
             label = {
-                Text(text = selected ?: stringResource(R.string.format))
+                Text(
+                    text = selected ?: stringResource(R.string.format),
+                    fontWeight = if (selected != null) FontWeight.SemiBold
+                    else FontWeight.Normal
+                )
             },
             leadingIcon = {
                 Icon(
@@ -1288,23 +1601,33 @@ private fun FormatFilterChip(
                 )
             }
         )
-        DropdownMenu(
+        AnchoredMenu(
             expanded = expanded,
             onDismissRequest = { expanded = false }
         ) {
-            DropdownMenuItem(
-                text = { Text(stringResource(R.string.all_formats)) },
-                leadingIcon = { if (selected == null) Icon(Icons.Outlined.Check, null) },
+            AnchoredMenuItem(
+                text = stringResource(R.string.all_formats),
+                leadingIcon = {
+                    if (selected == null) {
+                        Icon(Icons.Outlined.Check, null)
+                    } else {
+                        Spacer(Modifier.size(18.dp))
+                    }
+                },
                 onClick = {
                     expanded = false
                     onSelect(null)
                 }
             )
             formats.forEach { entry ->
-                DropdownMenuItem(
-                    text = { Text("${entry.name} (${entry.count})") },
+                AnchoredMenuItem(
+                    text = "${entry.name} (${entry.count})",
                     leadingIcon = {
-                        if (selected == entry.name) Icon(Icons.Outlined.Check, null)
+                        if (selected == entry.name) {
+                            Icon(Icons.Outlined.Check, null)
+                        } else {
+                            Spacer(Modifier.size(18.dp))
+                        }
                     },
                     onClick = {
                         expanded = false
@@ -1314,47 +1637,6 @@ private fun FormatFilterChip(
             }
         }
     }
-}
-
-@Composable
-private fun SearchField(
-    query: String,
-    onQueryChange: (String) -> Unit,
-    onSearch: () -> Unit,
-) {
-    val focusRequester = remember { FocusRequester() }
-    LaunchedEffect(Unit) {
-        // Compose focuses the navigation icon first with a hardware keyboard.
-        withFrameNanos { }
-        runCatching { focusRequester.requestFocus() }
-    }
-    BasicTextField(
-        value = query,
-        onValueChange = onQueryChange,
-        modifier = Modifier
-            .fillMaxWidth()
-            .focusRequester(focusRequester),
-        singleLine = true,
-        textStyle = MaterialTheme.typography.titleMedium.copy(
-            color = MaterialTheme.colorScheme.onSurface
-        ),
-        cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
-        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-        keyboardActions = KeyboardActions(onSearch = { onSearch() }),
-        decorationBox = { innerTextField ->
-            Box(contentAlignment = Alignment.CenterStart) {
-                if (query.isEmpty()) {
-                    Text(
-                        text = stringResource(R.string.search_downloads),
-                        style = MaterialTheme.typography.titleMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 1
-                    )
-                }
-                innerTextField()
-            }
-        }
-    )
 }
 
 @Composable
@@ -1368,13 +1650,21 @@ private fun EmptyDownloadsState(
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Icon(
-            imageVector = Icons.Outlined.DownloadForOffline,
-            contentDescription = null,
-            modifier = Modifier.size(72.dp),
-            tint = MaterialTheme.colorScheme.primary
-        )
-        Spacer(Modifier.height(16.dp))
+        Box(
+            modifier = Modifier
+                .size(88.dp)
+                .clip(CircleShape)
+                .background(MaterialTheme.colorScheme.primaryContainer),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                imageVector = Icons.Outlined.DownloadForOffline,
+                contentDescription = null,
+                modifier = Modifier.size(40.dp),
+                tint = MaterialTheme.colorScheme.onPrimaryContainer
+            )
+        }
+        Spacer(Modifier.height(20.dp))
         Text(
             text = stringResource(R.string.downloads_empty_title),
             style = MaterialTheme.typography.headlineSmall,

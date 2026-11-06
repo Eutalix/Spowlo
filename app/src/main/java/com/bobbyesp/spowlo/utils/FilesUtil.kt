@@ -19,6 +19,7 @@ import com.bobbyesp.spowlo.R
 import okhttp3.internal.closeQuietly
 import java.io.File
 import java.io.InputStream
+import java.util.Locale
 
 
 //////////////////////////////////////////////////////////////
@@ -28,6 +29,13 @@ import java.io.InputStream
 
 const val AUDIO_REGEX = "(mp3|aac|opus|m4a)$"
 const val THUMBNAIL_REGEX = "\\.(jpg|png)$"
+
+private val AUDIO_EXTENSIONS = setOf("mp3", "m4a", "aac", "opus", "ogg", "flac", "wav")
+
+fun File.isAudioFile(): Boolean = extension.lowercase(Locale.ROOT) in AUDIO_EXTENSIONS
+
+/** `.lrc` sidecars live next to downloads; they are not library entries. */
+fun String.isLyricsSidecar(): Boolean = File(this).extension.equals("lrc", ignoreCase = true)
 
 object FilesUtil {
     fun readFile(file: File): String {
@@ -143,7 +151,7 @@ object FilesUtil {
         File(downloadDir)
             .walkTopDown()
             //THE TITLE IS THE [xx67238xx] THAT SEAL USES TO IDENTIFY THE FILE.
-            .filter { it.isFile && it.path.contains(title) }
+            .filter { it.isFile && it.isAudioFile() && it.path.contains(title) }
             .map { it.absolutePath }
             .toMutableList()
             .apply {

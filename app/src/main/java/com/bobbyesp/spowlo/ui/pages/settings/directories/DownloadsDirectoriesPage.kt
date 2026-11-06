@@ -30,7 +30,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
@@ -54,13 +53,16 @@ import com.bobbyesp.spowlo.ui.components.settings.SettingsSectionHeader
 import com.bobbyesp.spowlo.ui.components.settings.SettingsSwitchWithDivider
 import com.bobbyesp.spowlo.utils.DatabaseUtil
 import com.bobbyesp.spowlo.utils.FilesUtil
+import com.bobbyesp.spowlo.utils.HistoryImporter
 import com.bobbyesp.spowlo.utils.PreferencesUtil
 import com.bobbyesp.spowlo.utils.PreferencesUtil.getString
 import com.bobbyesp.spowlo.utils.SDCARD_DOWNLOAD
 import com.bobbyesp.spowlo.utils.SDCARD_URI
+import com.bobbyesp.spowlo.utils.ToastUtil
 import com.google.accompanist.permissions.ExperimentalPermissionsApi
 import com.google.accompanist.permissions.PermissionStatus
 import com.google.accompanist.permissions.rememberPermissionState
+import kotlinx.coroutines.launch
 
 private const val validDirectoryRegex = "/storage/emulated/0/(Download|Documents)"
 private fun String.isValidDirectory(): Boolean {
@@ -79,7 +81,6 @@ fun DownloadsDirectoriesPage(
 
     val uriHandler = LocalUriHandler.current
     val clipboardManager = LocalClipboardManager.current
-    val scope = rememberCoroutineScope()
     val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior(
         rememberTopAppBarState(),
         canScroll = { true }
@@ -135,9 +136,24 @@ fun DownloadsDirectoriesPage(
                 val path = FilesUtil.getRealPath(it)
                 if (path != App.audioDownloadDir) {
                     App.updateDownloadDir(path)
-                    DatabaseUtil.clearHistory()
+                    audioDirectoryText = path
+                    // Keep scanning even if the user leaves this screen.
+                    App.applicationScope.launch {
+                        DatabaseUtil.clearHistoryNow()
+                        if (!HistoryImporter.hasReadableSource()) return@launch
+                        val result = HistoryImporter.importExistingFiles()
+                        val message = if (result.imported > 0) {
+                            context.resources.getQuantityString(
+                                R.plurals.imported_songs, result.imported, result.imported
+                            )
+                        } else {
+                            context.getString(R.string.import_no_new_songs)
+                        }
+                        ToastUtil.makeToastSuspend(context, message)
+                    }
+                } else {
+                    audioDirectoryText = path
                 }
-                audioDirectoryText = path
             }
         }
 
