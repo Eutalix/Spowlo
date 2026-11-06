@@ -1,0 +1,19 @@
+{
+  "schema": 1,
+  "updatedAt": "2026-11-06T11:12:35Z",
+  "webPlayer": "web-player.9d2e05ca",
+  "clientVersion": "1.3.10.157.g1e259d5b1059",
+  "source": "https://open.spotifycdn.com/cdn/build/web-player/web-player.9d2e05ca.js",
+  "operations": {
+    "searchDesktop": "eef7cc54888d91bdd6802623477873caa3948ae173a0c34fd86827b267e94c03",
+    "getTrack": "e7b1bf4e95cb3d733d48b442f93006e9712fd504e8b88d7a82e6e3bac9306a6b",
+    "getAlbum": "0b6ce3511e1b02e4a40fa95440f992acbe85080eb308af9194322d708fc1914f",
+    "queryArtistOverview": "eafb1620d783ece118e72fbfede2b0064483e029d3c1aafafa1c2de0e25a89e7",
+    "queryArtistDiscographyAll": "5e07d323febb57b4a56a42abbf781490e58764aa45feb6e3dc0591564fc56599",
+    "fetchPlaylist": "21ea11a6ac75a5f3e01fd365d29c18e0a4a8b7dc09f89bbb5d73910190c6acaf",
+    "profileAttributes": "08ffb4730af3746e04a8301396f20875dbbce10c75243803091a9274eacc8ac0",
+    "libraryV3": "390c78e5b951029bad359785e69b07b536a509c581cbcd0aded5e5067f187455",
+    "fetchLibraryTracks": "087278b20b743578a6262c2b0b4bcd20d879c503cc359a2285baf083ef944240",
+    "home": "5fb7da7a03ee2776c0670856609cb85a189a3cecc36cc160b91cde79063b9cf1"
+  }
+}
