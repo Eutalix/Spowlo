@@ -23,6 +23,7 @@ import com.bobbyesp.spowlo.ui.components.songs.metadata_viewer.CollectionDownloa
 import com.bobbyesp.spowlo.ui.components.songs.metadata_viewer.TrackComponent
 import com.bobbyesp.spowlo.ui.pages.metadata_viewer.playlists.TrackDownload
 import com.bobbyesp.spowlo.utils.ChromeCustomTabsUtil
+import com.bobbyesp.spowlo.utils.GeneralTextUtils
 
 @Composable
 fun AlbumPage(
@@ -56,6 +57,8 @@ fun AlbumPage(
     val pendingDurationMs = data.tracks.items
         .filter { it.id !in downloadedTrackIds }
         .sumOf { it.durationMs.toLong() }
+    val totalDurationMs = data.tracks.items.sumOf { it.durationMs.toLong() }
+    val downloadedCount = data.tracks.items.count { it.id in downloadedTrackIds }
     val downloadAll: (() -> Unit)? = data.externalUrls.spotify?.let { url ->
         { trackDownloadCallback(url, data.name) }
     }
@@ -66,6 +69,7 @@ fun AlbumPage(
         modifier = modifier,
         seed = seed,
         backdrop = { ArtworkBackdrop(artworkUrl) },
+        actions = { MetadataOverflowMenu(data.externalUrls.spotify.orEmpty()) },
     ) { paddingValues, listState ->
         LazyColumn(
             state = listState,
@@ -80,23 +84,21 @@ fun AlbumPage(
                 MetadataHero(
                     title = data.name,
                     artwork = {
-                        if (artworkUrl.isNotEmpty()) CollectionArtwork(artworkUrl)
+                        if (artworkUrl.isNotEmpty()) CollectionArtwork(artworkUrl, listState)
                     },
                 ) {
                     MetadataArtistLine(
                         artists = data.artists,
                         onArtistClick = onOpenArtist,
                     )
-                    MetadataTags(
-                        listOf(
-                            stringResource(R.string.album),
-                            data.releaseDate.year.takeIf { it > 0 }?.toString().orEmpty(),
-                            if (trackCount > 0) {
-                                pluralStringResource(R.plurals.song_count, trackCount, trackCount)
-                            } else {
-                                ""
-                            },
-                        )
+                    MetadataMetaLine(
+                        data.releaseDate.year.takeIf { it > 0 }?.toString().orEmpty(),
+                        if (trackCount > 0) {
+                            pluralStringResource(R.plurals.song_count, trackCount, trackCount)
+                        } else {
+                            ""
+                        },
+                        GeneralTextUtils.formatCollectionDuration(totalDurationMs),
                     )
                 }
             }
@@ -110,6 +112,8 @@ fun AlbumPage(
                         missingTracks = missingTracks,
                         onDownloadAll = downloadAll,
                         onDownloadMissing = onDownloadTracks,
+                        downloadFullCollection = downloadedCount == 0,
+                        idleLabel = stringResource(R.string.download_album_count, trackCount),
                     )
                 }
             }
@@ -127,7 +131,7 @@ fun AlbumPage(
                     spotifyUrl = track.externalUrls.spotify ?: "",
                     isExplicit = track.explicit,
                     isDownloaded = track.id in downloadedTrackIds,
-                    imageUrl = artworkUrl,
+                    trackNumber = (index + 1).toString(),
                     onOpen = {
                         if (onOpenTrack != null) {
                             onOpenTrack(track.id)

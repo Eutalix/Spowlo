@@ -1,5 +1,6 @@
 package com.bobbyesp.spowlo.ui.pages.metadata_viewer.pages
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -8,20 +9,26 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.text.selection.SelectionContainer
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextLinkStyles
 import androidx.compose.ui.text.fromHtml
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.adamratzman.spotify.models.Playlist
 import com.bobbyesp.spowlo.App
@@ -64,9 +71,16 @@ fun PlaylistViewPage(
     val pendingDurationMs = data.tracks.items.mapNotNull { item ->
         item.track?.asTrack?.takeIf { it.id !in downloadedTrackIds }
     }.sumOf { it.durationMs.toLong() }
+    val totalDurationMs = data.tracks.items.mapNotNull { it.track?.asTrack }
+        .sumOf { it.durationMs.toLong() }
+    val downloadedCount = data.tracks.items.count { item ->
+        item.track?.asTrack?.id in downloadedTrackIds
+    }
     val downloadAll: (() -> Unit)? = data.externalUrls.spotify?.let { url ->
         { trackDownloadCallback(url, data.name) }
     }
+    var descriptionExpanded by rememberSaveable(data.id) { mutableStateOf(false) }
+    var descriptionOverflows by remember(data.id) { mutableStateOf(false) }
 
     MetadataScreen(
         topBarTitle = data.name,
@@ -74,6 +88,7 @@ fun PlaylistViewPage(
         modifier = modifier,
         seed = seed,
         backdrop = { ArtworkBackdrop(artworkUrl) },
+        actions = { MetadataOverflowMenu(data.externalUrls.spotify.orEmpty()) },
     ) { paddingValues, listState ->
         LazyColumn(
             state = listState,
@@ -88,44 +103,59 @@ fun PlaylistViewPage(
                 MetadataHero(
                     title = data.name,
                     artwork = {
-                        if (artworkUrl.isNotEmpty()) CollectionArtwork(artworkUrl)
+                        if (artworkUrl.isNotEmpty()) CollectionArtwork(artworkUrl, listState)
                     },
                 ) {
-                    MetadataLine(
-                        text = data.owner.displayName ?: data.owner.id,
-                        emphasized = true,
+                    MetadataOwnerLine(
+                        name = data.owner.displayName ?: data.owner.id,
+                        imageUrl = data.owner.images?.firstOrNull()?.url.orEmpty(),
                     )
-                    MetadataTags(
-                        listOf(
-                            stringResource(R.string.playlist),
-                            if ((data.followers.total ?: 0) > 0) {
-                                "${GeneralTextUtils.formatCount((data.followers.total ?: 0).toLong())} ${
-                                    App.context.getString(R.string.followers).lowercase()
-                                }"
-                            } else {
-                                ""
-                            },
-                            if (trackCount > 0) {
-                                pluralStringResource(R.plurals.song_count, trackCount, trackCount)
-                            } else {
-                                ""
-                            },
-                        )
+                    MetadataMetaLine(
+                        if ((data.followers.total ?: 0) > 0) {
+                            "${GeneralTextUtils.formatCompactCount((data.followers.total ?: 0).toLong())} ${
+                                App.context.getString(R.string.followers).lowercase()
+                            }"
+                        } else {
+                            ""
+                        },
+                        if (trackCount > 0) {
+                            pluralStringResource(R.plurals.song_count, trackCount, trackCount)
+                        } else {
+                            ""
+                        },
+                        GeneralTextUtils.formatCollectionDuration(totalDurationMs),
                     )
                     data.description?.takeIf { it.isNotBlank() }?.let { description ->
-                        SelectionContainer {
-                            Text(
-                                text = AnnotatedString.fromHtml(
-                                    description,
-                                    linkStyles = TextLinkStyles(
-                                        style = SpanStyle(
-                                            color = MaterialTheme.colorScheme.primary,
-                                        )
+                        Text(
+                            text = AnnotatedString.fromHtml(
+                                description,
+                                linkStyles = TextLinkStyles(
+                                    style = SpanStyle(
+                                        color = MaterialTheme.colorScheme.primary,
                                     )
+                                )
+                            ),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = if (descriptionExpanded) Int.MAX_VALUE else 2,
+                            overflow = TextOverflow.Ellipsis,
+                            onTextLayout = {
+                                if (!descriptionExpanded) {
+                                    descriptionOverflows = it.hasVisualOverflow
+                                }
+                            },
+                        )
+                        if (descriptionOverflows || descriptionExpanded) {
+                            Text(
+                                text = stringResource(
+                                    if (descriptionExpanded) R.string.less else R.string.more
                                 ),
-                                style = MaterialTheme.typography.bodySmall,
-                                maxLines = 4,
-                                modifier = Modifier.alpha(alpha = 0.7f),
+                                style = MaterialTheme.typography.labelLarge,
+                                color = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(6.dp))
+                                    .clickable { descriptionExpanded = !descriptionExpanded }
+                                    .padding(horizontal = 2.dp, vertical = 2.dp),
                             )
                         }
                     }
@@ -141,6 +171,8 @@ fun PlaylistViewPage(
                         missingTracks = missingTracks,
                         onDownloadAll = downloadAll,
                         onDownloadMissing = onDownloadTracks,
+                        downloadFullCollection = downloadedCount == 0,
+                        idleLabel = stringResource(R.string.download_playlist_count, trackCount),
                     )
                 }
             }

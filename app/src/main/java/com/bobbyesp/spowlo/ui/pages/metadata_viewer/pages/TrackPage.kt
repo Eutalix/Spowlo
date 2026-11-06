@@ -1,31 +1,15 @@
 package com.bobbyesp.spowlo.ui.pages.metadata_viewer.pages
 
-import androidx.compose.foundation.layout.Arrangement
+import android.content.Intent
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.outlined.ContentCopy
+import androidx.compose.material.icons.outlined.DeleteOutline
 import androidx.compose.material.icons.outlined.Download
-import androidx.compose.material.icons.outlined.Headphones
-import androidx.compose.material.icons.outlined.Refresh
-import androidx.compose.material.icons.outlined.Timer
-import androidx.compose.material3.FilledTonalButton
-import androidx.compose.material3.Button
-import androidx.compose.material3.FilledTonalIconButton
-import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -36,26 +20,37 @@ import androidx.compose.runtime.saveable.Saver
 import androidx.compose.runtime.saveable.SaverScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.pluralStringResource
-import androidx.compose.ui.res.vectorResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.adamratzman.spotify.models.ReleaseDate
 import com.adamratzman.spotify.models.Track
+import com.bobbyesp.spowlo.Downloader
 import com.bobbyesp.spowlo.R
-import com.bobbyesp.spowlo.features.spotify_api.data.remote.SpotifyApiRequests
+import com.bobbyesp.spowlo.database.DownloadedSongInfo
 import com.bobbyesp.spowlo.ui.components.ActionDialog
+import com.bobbyesp.spowlo.ui.components.FORMAT_CHOICES
+import com.bobbyesp.spowlo.ui.components.FORMAT_MP3
+import com.bobbyesp.spowlo.ui.components.QUALITY_CHOICES
+import com.bobbyesp.spowlo.ui.components.QUALITY_ORIGINAL
 import com.bobbyesp.spowlo.utils.ChromeCustomTabsUtil
+import com.bobbyesp.spowlo.utils.DatabaseUtil
+import com.bobbyesp.spowlo.utils.DownloaderUtil
+import com.bobbyesp.spowlo.utils.FilesUtil
 import com.bobbyesp.spowlo.utils.GeneralTextUtils
+import com.bobbyesp.spowlo.utils.ORIGINAL_AUDIO
+import com.bobbyesp.spowlo.utils.PreferencesUtil
 import com.bobbyesp.spowlo.utils.RedownloadUtil
+import com.bobbyesp.spowlo.utils.ToastUtil
+import com.bobbyesp.spowlo.utils.toFileSizeText
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
+import java.io.File
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import java.time.format.FormatStyle
@@ -67,10 +62,10 @@ fun TrackPage(
     data: Track,
     modifier: Modifier,
     onBack: () -> Unit,
-    trackDownloadCallback: (String, String) -> Unit,
+    trackDownloadCallback: (String, String, DownloaderUtil.DownloadPreferences?) -> Unit,
     onOpenAlbum: (String) -> Unit = {},
     onOpenArtist: (String) -> Unit = {},
-    isDownloaded: Boolean = false,
+    downloadedSong: DownloadedSongInfo? = null,
 ) {
     var trackData by rememberSaveable(stateSaver = TrackSaver) {
         mutableStateOf(data)
@@ -84,10 +79,52 @@ fun TrackPage(
     val artworkUrl = trackData.album.images.firstOrNull()?.url.orEmpty()
     val seed = rememberArtworkSeed(artworkUrl)
     val spotifyUrl = trackData.externalUrls.spotify.orEmpty()
-    val playCount = remember(trackData.id) { SpotifyApiRequests.getTrackPlayCount(trackData.id) }
     val releaseDate = formatReleaseDate(trackData.album.releaseDate)
+    val isrc = trackData.externalIds.firstOrNull {
+        it.key.equals("isrc", ignoreCase = true)
+    }?.id.orEmpty()
+    val durationMs = trackData.durationMs.toLong()
+
+    val initialFormat = PreferencesUtil.getAudioFormat().takeIf { it in FORMAT_CHOICES } ?: FORMAT_MP3
+    val initialQuality = if (PreferencesUtil.getValue(ORIGINAL_AUDIO)) {
+        QUALITY_ORIGINAL
+    } else {
+        PreferencesUtil.getAudioQuality().takeIf { it in QUALITY_CHOICES } ?: QUALITY_ORIGINAL
+    }
+    var formatIndex by rememberSaveable { mutableStateOf(initialFormat) }
+    var qualityIndex by rememberSaveable { mutableStateOf(initialQuality) }
+    var showOptions by rememberSaveable { mutableStateOf(false) }
     var showRedownloadDialog by remember { mutableStateOf(false) }
+    var showDeleteDialog by remember { mutableStateOf(false) }
+
+    val providers = remember {
+        PreferencesUtil.getAudioProvider().ifEmpty { listOf("YouTube Music") }
+    }
+    var sourceIndex by rememberSaveable { mutableStateOf(0) }
+    val source = providers.getOrElse(sourceIndex) { providers.firstOrNull().orEmpty() }
+
+    val taskKey = remember(spotifyUrl) { Downloader.makeKey(spotifyUrl, spotifyUrl.reversed()) }
+    val taskState = Downloader.mutableTaskList[taskKey]?.state
+    val downloading = taskState is Downloader.DownloadTask.State.Running
+    val progress = (taskState as? Downloader.DownloadTask.State.Running)?.progress
+    val failed = taskState is Downloader.DownloadTask.State.Error
+
+    val isOnline = rememberIsOnline()
     val scope = rememberCoroutineScope()
+    val context = LocalContext.current
+
+    val download = {
+        trackDownloadCallback(
+            spotifyUrl,
+            "$artists - ${trackData.name}",
+            DownloaderUtil.DownloadPreferences().copy(
+                audioFormat = formatIndex,
+                audioQuality = qualityIndex,
+                preserveOriginalAudio = false,
+                audioProviders = source,
+            ),
+        )
+    }
 
     MetadataScreen(
         topBarTitle = trackData.name,
@@ -101,127 +138,84 @@ fun TrackPage(
             modifier = Modifier.fillMaxSize(),
             contentPadding = PaddingValues(
                 top = paddingValues.calculateTopPadding(),
-                bottom = paddingValues.calculateBottomPadding() + 24.dp,
+                bottom = paddingValues.calculateBottomPadding() + 32.dp,
             ),
         ) {
             item {
                 MetadataHero(
                     title = trackData.name,
                     artwork = {
-                        if (artworkUrl.isNotEmpty()) CollectionArtwork(artworkUrl)
+                        if (artworkUrl.isNotEmpty()) CollectionArtwork(artworkUrl, listState)
                     },
                 ) {
                     MetadataArtistLine(
                         artists = trackData.artists,
                         onArtistClick = onOpenArtist,
                     )
-                    MetadataTags(
-                        listOf(
-                            stringResource(R.string.track),
-                            trackData.album.releaseDate?.year
-                                ?.takeIf { it > 0 }
-                                ?.toString()
-                                .orEmpty(),
-                            if (trackData.explicit) {
-                                stringResource(R.string.explicit)
-                            } else {
-                                ""
-                            },
-                        )
-                    ) {
-                        if (isDownloaded) {
-                            MetadataTag(
-                                text = stringResource(R.string.downloaded),
-                                icon = Icons.Filled.CheckCircle,
-                            )
-                        }
-                    }
+                    MetadataMetaLine(
+                        GeneralTextUtils.formatTrackDuration(trackData.durationMs.toLong()),
+                        if (trackData.explicit) stringResource(R.string.explicit) else "",
+                    )
                 }
             }
 
             item {
-                Row(
+                Column(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(horizontal = 16.dp, vertical = 12.dp),
-                    verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Button(
-                        onClick = {
-                            if (isDownloaded) {
-                                showRedownloadDialog = true
-                            } else {
-                                trackDownloadCallback(spotifyUrl, "$artists - ${trackData.name}")
-                            }
-                        },
-                        shape = CircleShape,
-                        modifier = Modifier
-                            .weight(1f)
-                            .heightIn(min = 48.dp),
-                    ) {
-                        Icon(
-                            imageVector = if (isDownloaded) {
-                                Icons.Outlined.Refresh
-                            } else {
-                                Icons.Outlined.Download
+                    if (downloadedSong != null) {
+                        SavedActions(
+                            song = downloadedSong,
+                            track = trackData,
+                            onPlay = {
+                                FilesUtil.openFile(downloadedSong.songPath) {
+                                    ToastUtil.makeToastSuspend(
+                                        context.getString(R.string.file_unavailable)
+                                    )
+                                }
                             },
-                            contentDescription = null,
-                            modifier = Modifier.size(20.dp),
+                            onShare = {
+                                FilesUtil.createIntentForSharingFile(downloadedSong.songPath)
+                                    ?.let { intent ->
+                                        context.startActivity(
+                                            Intent.createChooser(
+                                                intent,
+                                                context.getString(R.string.share_file),
+                                            )
+                                        )
+                                    }
+                            },
+                            onShowInFolder = {
+                                if (!openContainingFolder(downloadedSong.songPath)) {
+                                    ToastUtil.makeToastSuspend(
+                                        context.getString(R.string.folder_unavailable)
+                                    )
+                                }
+                            },
+                            onDelete = { showDeleteDialog = true },
+                            onRedownload = { showRedownloadDialog = true },
+                            onCopyLink = { GeneralTextUtils.copyToClipboardAndNotify(spotifyUrl) },
+                            onOpenSpotify = { ChromeCustomTabsUtil.openUrl(spotifyUrl) },
                         )
-                        Spacer(modifier = Modifier.width(10.dp))
-                        Text(
-                            text = stringResource(
-                                if (isDownloaded) R.string.redownload else R.string.download
-                            ),
-                            style = MaterialTheme.typography.labelLarge,
-                        )
-                    }
-                    Spacer(modifier = Modifier.width(8.dp))
-                    FilledTonalIconButton(
-                        onClick = { ChromeCustomTabsUtil.openUrl(spotifyUrl) },
-                        shape = CircleShape,
-                        modifier = Modifier.size(48.dp),
-                    ) {
-                        Icon(
-                            modifier = Modifier.size(22.dp),
-                            imageVector = ImageVector.vectorResource(id = R.drawable.spotify_logo),
-                            contentDescription = stringResource(R.string.open_in_spotify),
-                        )
-                    }
-                    Spacer(modifier = Modifier.width(8.dp))
-                    FilledTonalIconButton(
-                        onClick = { GeneralTextUtils.copyToClipboardAndNotify(spotifyUrl) },
-                        shape = CircleShape,
-                        modifier = Modifier.size(48.dp),
-                    ) {
-                        Icon(
-                            modifier = Modifier.size(20.dp),
-                            imageVector = Icons.Outlined.ContentCopy,
-                            contentDescription = stringResource(R.string.copy_link),
-                        )
-                    }
-                }
-            }
-
-            item {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 4.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    MetadataStat(
-                        modifier = Modifier.weight(1f),
-                        icon = Icons.Outlined.Timer,
-                        value = GeneralTextUtils.convertDuration(trackData.durationMs.toDouble()),
-                        label = stringResource(R.string.track_duration),
-                    )
-                    playCount?.let {
-                        MetadataStat(
-                            modifier = Modifier.weight(1f),
-                            icon = Icons.Outlined.Headphones,
-                            value = formatCompactCount(it),
-                            label = stringResource(R.string.track_plays),
+                    } else {
+                        DownloadActions(
+                            downloading = downloading,
+                            progress = progress,
+                            failed = failed,
+                            online = isOnline,
+                            urlAvailable = spotifyUrl.isNotBlank(),
+                            formatIndex = formatIndex,
+                            qualityIndex = qualityIndex,
+                            durationMs = durationMs,
+                            source = source,
+                            onDownload = download,
+                            onCancel = { Downloader.mutableTaskList[taskKey]?.onCancel() },
+                            onOpenOptions = { showOptions = true },
+                            onChangeSource = { showOptions = true },
+                            onCopyLink = { GeneralTextUtils.copyToClipboardAndNotify(spotifyUrl) },
+                            onOpenSpotify = { ChromeCustomTabsUtil.openUrl(spotifyUrl) },
                         )
                     }
                 }
@@ -232,33 +226,25 @@ fun TrackPage(
             }
 
             item {
-                Column(modifier = Modifier.fillMaxWidth()) {
+                MetadataDetailCard {
                     MetadataDetailRow(
                         label = stringResource(R.string.album),
                         value = trackData.album.name,
                         onClick = { onOpenAlbum(trackData.album.id) },
                     )
-                    if (releaseDate.isNotBlank()) {
+                    if (isrc.isNotBlank()) {
+                        DetailDivider()
+                        MetadataDetailRow(
+                            label = stringResource(R.string.song_isrc),
+                            value = isrc,
+                        )
+                    }
+                    val releaseRow = releaseSummary(trackData, releaseDate)
+                    if (releaseRow.isNotBlank()) {
+                        DetailDivider()
                         MetadataDetailRow(
                             label = stringResource(R.string.release_date),
-                            value = releaseDate,
-                        )
-                    }
-                    if (trackData.trackNumber > 0) {
-                        val total = trackData.album.totalTracks ?: 0
-                        MetadataDetailRow(
-                            label = stringResource(R.string.track_number),
-                            value = if (total > 0) {
-                                "${trackData.trackNumber} / $total"
-                            } else {
-                                trackData.trackNumber.toString()
-                            },
-                        )
-                    }
-                    if (trackData.discNumber > 1) {
-                        MetadataDetailRow(
-                            label = stringResource(R.string.disc_number),
-                            value = trackData.discNumber.toString(),
+                            value = releaseRow,
                         )
                     }
                 }
@@ -266,19 +252,79 @@ fun TrackPage(
         }
     }
 
-    if (showRedownloadDialog) {
-        ActionDialog(
-            onDismissRequest = { showRedownloadDialog = false },
-            icon = Icons.Outlined.Refresh,
-            title = pluralStringResource(R.plurals.redownload_confirm_title, 1, 1),
-            supportingText = pluralStringResource(R.plurals.redownload_confirm_message, 1),
-            confirmText = stringResource(R.string.redownload),
-            onConfirm = {
-                showRedownloadDialog = false
-                scope.launch(Dispatchers.IO) { RedownloadUtil.redownload(spotifyUrl, "$artists - ${trackData.name}") }
-            },
-        )
+    ArtworkPaletteTheme(seed = seed) {
+        if (showOptions) {
+            DownloadOptionsSheet(
+                formatIndex = formatIndex,
+                qualityIndex = qualityIndex,
+                durationMs = durationMs,
+                providers = providers,
+                sourceIndex = sourceIndex,
+                onFormatChange = { formatIndex = it },
+                onQualityChange = { qualityIndex = it },
+                onSourceChange = { sourceIndex = it },
+                onDownload = {
+                    showOptions = false
+                    download()
+                },
+                onDismiss = { showOptions = false },
+            )
+        }
+
+        if (showRedownloadDialog) {
+            ActionDialog(
+                onDismissRequest = { showRedownloadDialog = false },
+                icon = Icons.Outlined.Download,
+                title = pluralStringResource(R.plurals.redownload_confirm_title, 1, 1),
+                supportingText = pluralStringResource(R.plurals.redownload_confirm_message, 1),
+                confirmText = stringResource(R.string.redownload),
+                onConfirm = {
+                    showRedownloadDialog = false
+                    scope.launch(Dispatchers.IO) {
+                        RedownloadUtil.redownload(spotifyUrl, "$artists - ${trackData.name}")
+                    }
+                },
+            )
+        }
+
+        if (showDeleteDialog && downloadedSong != null) {
+            val sizeBytes = remember(downloadedSong.songPath) {
+                runCatching { File(downloadedSong.songPath).length() }.getOrDefault(0L)
+            }
+            val folder = folderLabel(downloadedSong.songPath)
+            ActionDialog(
+                onDismissRequest = { showDeleteDialog = false },
+                icon = Icons.Outlined.DeleteOutline,
+                title = stringResource(R.string.delete_song_title, downloadedSong.songName),
+                supportingText = if (sizeBytes > 0L) {
+                    stringResource(
+                        R.string.delete_song_message,
+                        folder,
+                        sizeBytes.toFileSizeText()
+                    )
+                } else {
+                    stringResource(R.string.delete_song_message_no_size, folder)
+                },
+                confirmText = stringResource(R.string.delete),
+                onConfirm = {
+                    showDeleteDialog = false
+                    scope.launch(Dispatchers.IO) {
+                        DatabaseUtil.deleteInfoListByIdList(listOf(downloadedSong.id), true)
+                    }
+                },
+            )
+        }
     }
+}
+
+private fun releaseSummary(track: Track, releaseDate: String): String {
+    val total = track.album.totalTracks ?: 0
+    val trackNumber = if (track.trackNumber > 0) {
+        if (total > 0) "Track ${track.trackNumber} of $total" else "Track ${track.trackNumber}"
+    } else {
+        ""
+    }
+    return listOf(releaseDate, trackNumber).filter { it.isNotBlank() }.joinToString("  ·  ")
 }
 
 private fun formatReleaseDate(date: ReleaseDate?): String {
@@ -295,13 +341,6 @@ private fun formatReleaseDate(date: ReleaseDate?): String {
     return localDate.format(formatter.withLocale(Locale.getDefault()))
 }
 
-private fun formatCompactCount(count: Long): String = when {
-    count >= 1_000_000_000 -> String.format(Locale.US, "%.1fB", count / 1_000_000_000.0)
-    count >= 1_000_000 -> String.format(Locale.US, "%.1fM", count / 1_000_000.0)
-    count >= 10_000 -> String.format(Locale.US, "%.0fK", count / 1_000.0)
-    else -> count.toString()
-}
-
 @ExperimentalSerializationApi
 object TrackSaver : Saver<Track, String> {
     override fun restore(value: String): Track {
@@ -312,4 +351,3 @@ object TrackSaver : Saver<Track, String> {
         return Json.encodeToString(value)
     }
 }
-
