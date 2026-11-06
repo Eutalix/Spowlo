@@ -45,8 +45,10 @@ import com.bobbyesp.spowlo.ui.pages.download_tasks.DownloadTasksPage
 import com.bobbyesp.spowlo.ui.pages.download_tasks.FullscreenConsoleOutput
 import com.bobbyesp.spowlo.ui.pages.downloader.DownloaderPage
 import com.bobbyesp.spowlo.ui.pages.downloader.DownloaderViewModel
+import com.bobbyesp.spowlo.ui.pages.library.LibraryShelfPage
 import com.bobbyesp.spowlo.ui.pages.library.LikedSongsPage
 import com.bobbyesp.spowlo.ui.pages.library.UserLibraryPage
+import com.bobbyesp.spowlo.ui.pages.library.UserLibraryViewModel
 import com.bobbyesp.spowlo.ui.pages.metadata_viewer.playlists.SpotifyItemPage
 import com.bobbyesp.spowlo.ui.pages.playlist.PlaylistMetadataPage
 import com.bobbyesp.spowlo.ui.pages.searcher.SearcherPage
@@ -71,6 +73,7 @@ import com.bobbyesp.spowlo.utils.NOTIFICATION_PROMPT_SHOWN
 import com.bobbyesp.spowlo.utils.NotificationsUtil
 import com.bobbyesp.spowlo.utils.PreferencesUtil
 import com.bobbyesp.spowlo.utils.ToastUtil
+import com.bobbyesp.spowlo.utils.UrlValidator
 import com.google.accompanist.navigation.material.ExperimentalMaterialNavigationApi
 import com.google.accompanist.navigation.material.rememberBottomSheetNavigator
 import com.google.accompanist.permissions.ExperimentalPermissionsApi
@@ -168,12 +171,12 @@ fun InitialEntry(
         }
     }
 
-    if (isUrlShared) {
-        if (navController.currentDestination?.route != Route.DOWNLOADER) {
-            navController.popBackStack(
-                route = Route.DOWNLOADER, inclusive = false, saveState = true
-            )
-        }
+    // A shared or opened Spotify link goes straight to its page instead of the home screen.
+    LaunchedEffect(isUrlShared) {
+        if (!isUrlShared) return@LaunchedEffect
+        val link = UrlValidator.parseSpotifyLink(downloaderViewModel.viewStateFlow.value.url)
+        if (link != null) openMetadataPage(link.type, link.id)
+        downloaderViewModel.onShareIntentConsumed()
     }
     NavHost(
         modifier = Modifier
@@ -197,10 +200,8 @@ fun InitialEntry(
                     navigateToDownloaderSheet = {
                         showDownloaderBottomSheet = true
                     },
-                    onSongCardClicked = {
-                        navController.navigate(Route.PLAYLIST_METADATA_PAGE) {
-                            launchSingleTop = true
-                        }
+                    onOpenSpotifyItem = { type, id ->
+                        openMetadataPage(type, id)
                     },
                     navigateToTasks = {
                         navController.navigate(Route.DownloadTasksNavi)
@@ -226,19 +227,58 @@ fun InitialEntry(
                     navController = navController
                 )
             }
-            animatedComposable(Route.LIBRARY) {
-                UserLibraryPage(
-                    onBackPressed = onBackPressed,
-                    onOpenPlaylist = { id ->
-                        navController.navigate(
-                            Route.PLAYLIST_PAGE + "/playlist/" + id + "?account=true",
-                            navOptions = navOptions {
-                                launchSingleTop = true
-                                restoreState = true
-                            })
-                    },
-                    onOpenLikedSongs = { navController.navigate(Route.LIKED_SONGS) },
-                )
+            navigation(startDestination = Route.LIBRARY, route = Route.LibraryNavi) {
+                animatedComposable(Route.LIBRARY) { entry ->
+                    val libraryEntry = remember(entry) {
+                        navController.getBackStackEntry(Route.LibraryNavi)
+                    }
+                    UserLibraryPage(
+                        viewModel = viewModel<UserLibraryViewModel>(libraryEntry),
+                        onBackPressed = onBackPressed,
+                        onOpenPlaylist = { id ->
+                            navController.navigate(
+                                Route.PLAYLIST_PAGE + "/playlist/" + id + "?account=true",
+                                navOptions = navOptions {
+                                    launchSingleTop = true
+                                    restoreState = true
+                                })
+                        },
+                        onOpenLikedSongs = { navController.navigate(Route.LIKED_SONGS) },
+                        onOpenShelf = { shelfId ->
+                            navController.navigate(
+                                Route.LIBRARY_SHELF + "?shelf=" + Uri.encode(shelfId)
+                            )
+                        },
+                        onOpenTrack = { trackId -> openMetadataPage("track", trackId) },
+                        onOpenAlbum = { albumId -> openMetadataPage("album", albumId) },
+                        onOpenArtist = { artistId -> openMetadataPage("artist", artistId) },
+                    )
+                }
+
+                animatedComposable(
+                    Route.LIBRARY_SHELF + "?shelf={shelf}",
+                    arguments = listOf(navArgument("shelf") { type = NavType.StringType })
+                ) { entry ->
+                    val libraryEntry = remember(entry) {
+                        navController.getBackStackEntry(Route.LibraryNavi)
+                    }
+                    LibraryShelfPage(
+                        shelfId = entry.arguments?.getString("shelf").orEmpty(),
+                        viewModel = viewModel<UserLibraryViewModel>(libraryEntry),
+                        onBackPressed = onBackPressed,
+                        onOpenPlaylist = { id ->
+                            navController.navigate(
+                                Route.PLAYLIST_PAGE + "/playlist/" + id + "?account=true",
+                                navOptions = navOptions {
+                                    launchSingleTop = true
+                                    restoreState = true
+                                })
+                        },
+                        onOpenTrack = { trackId -> openMetadataPage("track", trackId) },
+                        onOpenAlbum = { albumId -> openMetadataPage("album", albumId) },
+                        onOpenArtist = { artistId -> openMetadataPage("artist", artistId) },
+                    )
+                }
             }
             animatedComposable(Route.LIKED_SONGS) {
                 LikedSongsPage(
@@ -503,9 +543,7 @@ fun InitialEntry(
                     storagePermission.launchPermissionRequest()
                 }
             },
-            onRequestMetadata = {
-                downloaderViewModel.requestMetadata()
-            },
+            navigateToTrack = { id -> openMetadataPage("track", id) },
             navigateToPlaylist = { id -> openMetadataPage("playlist", id) },
             navigateToAlbum = { id -> openMetadataPage("album", id) },
             navigateToArtist = { id -> openMetadataPage("artist", id) },

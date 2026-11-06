@@ -10,7 +10,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material3.CircularProgressIndicator
@@ -24,8 +23,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
@@ -34,11 +33,13 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.bobbyesp.spowlo.R
 import com.bobbyesp.spowlo.ui.components.songs.metadata_viewer.CollectionDownloadActions
 import com.bobbyesp.spowlo.ui.components.songs.metadata_viewer.TrackComponent
+import com.bobbyesp.spowlo.ui.pages.metadata_viewer.pages.ArtworkShape
 import com.bobbyesp.spowlo.ui.pages.metadata_viewer.pages.ColorBackdrop
 import com.bobbyesp.spowlo.ui.pages.metadata_viewer.pages.MetadataHero
+import com.bobbyesp.spowlo.ui.pages.metadata_viewer.pages.MetadataMetaLine
 import com.bobbyesp.spowlo.ui.pages.metadata_viewer.pages.MetadataScreen
 import com.bobbyesp.spowlo.ui.pages.metadata_viewer.pages.MetadataSectionTitle
-import com.bobbyesp.spowlo.ui.pages.metadata_viewer.pages.MetadataTags
+import com.bobbyesp.spowlo.ui.pages.metadata_viewer.pages.rememberArtworkSize
 import com.bobbyesp.spowlo.ui.pages.metadata_viewer.playlists.TrackDownload
 import com.bobbyesp.spowlo.utils.ChromeCustomTabsUtil
 
@@ -97,13 +98,11 @@ fun LikedSongsPage(
                             artwork = { LikedSongsArtwork() },
                         ) {
                             if (state.total > 0) {
-                                MetadataTags(
-                                    listOf(
-                                        pluralStringResource(
-                                            R.plurals.song_count,
-                                            state.total,
-                                            state.total
-                                        )
+                                MetadataMetaLine(
+                                    pluralStringResource(
+                                        R.plurals.song_count,
+                                        state.total,
+                                        state.total
                                     )
                                 )
                             }
@@ -178,21 +177,28 @@ fun LikedSongsPage(
 
 @Composable
 private fun LikedSongsArtwork() {
-    val size = (LocalConfiguration.current.screenHeightDp / 3).dp
-    val shape = RoundedCornerShape(24.dp)
+    val size = rememberArtworkSize()
     Box(
         modifier = Modifier
             .size(size)
             .aspectRatio(1f, matchHeightConstraintsFirst = true)
             .shadow(
-                elevation = 16.dp,
-                shape = shape,
+                elevation = 18.dp,
+                shape = ArtworkShape,
                 clip = false,
-                ambientColor = Color.Black.copy(alpha = 0.45f),
-                spotColor = Color.Black.copy(alpha = 0.45f),
+                ambientColor = Color.Black.copy(alpha = 0.5f),
+                spotColor = Color.Black.copy(alpha = 0.5f),
             )
-            .clip(shape)
-            .background(LikedSongsColor),
+            .clip(ArtworkShape)
+            .background(
+                Brush.linearGradient(
+                    colors = listOf(
+                        Color(0xFF8B5CF6),
+                        LikedSongsColor,
+                        Color(0xFF2A0A6E),
+                    )
+                )
+            ),
         contentAlignment = Alignment.Center
     ) {
         Icon(

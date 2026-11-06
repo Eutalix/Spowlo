@@ -3,11 +3,15 @@ package com.bobbyesp.spowlo.ui.pages.library
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.bobbyesp.spowlo.features.spotify_api.data.remote.web.HomeShelf
 import com.bobbyesp.spowlo.features.spotify_api.data.remote.web.SpotifyUserApi
 import com.bobbyesp.spowlo.features.spotify_api.data.remote.web.SpotifyUserSession
 import com.bobbyesp.spowlo.features.spotify_api.data.remote.web.UserPlaylist
 import com.bobbyesp.spowlo.features.spotify_api.data.remote.web.UserProfile
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -22,11 +26,13 @@ sealed interface UserLibraryState {
     data object LoggedOut : UserLibraryState
     data object Error : UserLibraryState
 
+    /** Spotify leaves the user's own playlists out of the home feed, so [playlists] backs that shelf. */
     data class Ready(
         val profile: UserProfile,
         val likedCount: Int,
-        val mixes: List<UserPlaylist>,
+        val shelves: List<HomeShelf>,
         val playlists: List<UserPlaylist>,
+        val mixes: List<UserPlaylist>,
     ) : UserLibraryState
 }
 
@@ -70,6 +76,7 @@ class UserLibraryViewModel : ViewModel() {
                 }.getOrNull()
                 if (token != null) {
                     loadJob?.cancel()
+                    mutableState.value = UserLibraryState.Loading
                     mutableState.value = loadLibrary()
                     return@launch
                 }
@@ -84,16 +91,38 @@ class UserLibraryViewModel : ViewModel() {
     }
 
     private suspend fun loadLibrary(): UserLibraryState = runCatching {
-        val profile = SpotifyUserApi.profile()
-        val playlists = SpotifyUserApi.playlists()
-        val likedCount = SpotifyUserApi.likedCount()
-        UserLibraryState.Ready(
-            profile = profile,
-            likedCount = likedCount,
-            mixes = playlists.filter { it.isSpotifyOwned },
-            playlists = playlists.filterNot { it.isSpotifyOwned },
-        )
+        coroutineScope {
+            val home = async {
+                runCatching { SpotifyUserApi.home() }
+                    .onFailure { Log.w(TAG, "Could not load the Spotify home shelves: ${it.message}") }
+                    .getOrDefault(emptyList())
+            }
+
+            val profile = SpotifyUserApi.profile()
+            val playlists = SpotifyUserApi.playlists()
+            val likedCount = SpotifyUserApi.likedCount()
+            val mixes = playlists.filter { it.isSpotifyOwned }
+            val ownPlaylists = playlists.filterNot { it.isSpotifyOwned }
+
+            // Show the library before the slower home feed arrives.
+            mutableState.value = UserLibraryState.Ready(
+                profile = profile,
+                likedCount = likedCount,
+                shelves = emptyList(),
+                playlists = ownPlaylists,
+                mixes = mixes,
+            )
+
+            UserLibraryState.Ready(
+                profile = profile,
+                likedCount = likedCount,
+                shelves = home.await(),
+                playlists = ownPlaylists,
+                mixes = mixes,
+            )
+        }
     }.getOrElse { error ->
+        if (error is CancellationException) throw error
         Log.w(TAG, "Could not load the account library: ${error.message}")
         val stillSignedIn = runCatching {
             SpotifyUserSession.accessToken(forceRefresh = true)
