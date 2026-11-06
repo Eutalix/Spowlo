@@ -1,5 +1,6 @@
 package com.bobbyesp.spowlo.features.spotify_api.data.remote.web
 
+import android.os.SystemClock
 import android.util.Log
 import com.adamratzman.spotify.models.Album
 import com.adamratzman.spotify.models.Artist
@@ -10,12 +11,17 @@ import com.adamratzman.spotify.models.SimpleAlbum
 import com.adamratzman.spotify.models.SimplePlaylist
 import com.adamratzman.spotify.models.SimpleTrack
 import com.adamratzman.spotify.models.Track
-import kotlinx.serialization.json.Json
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.async
 import kotlinx.coroutines.withContext
+import kotlinx.serialization.json.Json
 import okhttp3.HttpUrl.Companion.toHttpUrl
 import org.json.JSONArray
 import org.json.JSONObject
+import java.util.TimeZone
 import java.util.concurrent.ConcurrentHashMap
 
 /**
@@ -32,19 +38,7 @@ object SpotifyWebApi {
     const val PLAYLIST_PAGE_SIZE = 100
     const val ALBUM_PAGE_SIZE = 50
     const val DISCOGRAPHY_PAGE_SIZE = 50
-
-    /** Persisted GraphQL query hashes bundled with the current web player build. */
-    private val OPERATION_HASHES = mapOf(
-        "searchDesktop" to "eef7cc54888d91bdd6802623477873caa3948ae173a0c34fd86827b267e94c03",
-        "getTrack" to "fe16b8083eec2305854db612ca75589bcb71e009dc7a4d014f29bd534a4c01f5",
-        "getAlbum" to "0b6ce3511e1b02e4a40fa95440f992acbe85080eb308af9194322d708fc1914f",
-        "queryArtistOverview" to "9f8134ef565e78621f1e1793555bd6633c5ac144ae0f89604ed3ae3f80b3c8e6",
-        "queryArtistDiscographyAll" to "5e07d323febb57b4a56a42abbf781490e58764aa45feb6e3dc0591564fc56599",
-        "fetchPlaylist" to "21ea11a6ac75a5f3e01fd365d29c18e0a4a8b7dc09f89bbb5d73910190c6acaf",
-        "profileAttributes" to "08ffb4730af3746e04a8301396f20875dbbce10c75243803091a9274eacc8ac0",
-        "libraryV3" to "390c78e5b951029bad359785e69b07b536a509c581cbcd0aded5e5067f187455",
-        "fetchLibraryTracks" to "087278b20b743578a6262c2b0b4bcd20d879c503cc359a2285baf083ef944240",
-    )
+    const val HOME_SECTION_LIMIT = 20
 
     private val json = Json {
         ignoreUnknownKeys = true
@@ -56,6 +50,14 @@ object SpotifyWebApi {
     /** Play counts and monthly listeners, only returned by the detail queries. */
     private val playCounts = ConcurrentHashMap<String, Long>()
     private val monthlyListeners = ConcurrentHashMap<String, Long>()
+
+    // One response feeds every tab; the web call returns all shelves anyway.
+    private const val SEARCH_FIRST_PAGE = 40
+    private const val SEARCH_CACHE_MS = 5_000L
+    private data class SearchKey(val query: String, val limit: Int, val offset: Int)
+    private val searchCache = ConcurrentHashMap<SearchKey, Pair<Long, JSONObject>>()
+    private val searchInFlight = ConcurrentHashMap<SearchKey, Deferred<JSONObject>>()
+    private val searchScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     fun playCount(trackId: String): Long? = playCounts[trackId]
 
@@ -120,6 +122,74 @@ object SpotifyWebApi {
         }
 
         return paging(playlists, container.optInt("totalCount", playlists.size), offset, limit)
+    }
+
+    // The web player's own ranking, above the per-type shelves.
+    suspend fun searchTopResults(query: String): List<SearchTopResult> {
+        val root = search(query, SEARCH_FIRST_PAGE, 0)
+        val items = root.optJSONObject("topResultsV2")?.optJSONArray("items")
+        val ranked = items?.let { array ->
+            (0 until array.length()).mapNotNull { index ->
+                val entry = array.optJSONObject(index) ?: return@mapNotNull null
+                val data = entry.optJSONObject("data") ?: return@mapNotNull null
+                decodeTopResult(data, entry.optString("__typename"))
+            }
+        }.orEmpty()
+        if (ranked.isNotEmpty()) return ranked
+
+        // Older bundles don't return topResultsV2, fall back to the first hit of each shelf.
+        return buildList {
+            root.optJSONObject("tracksV2")?.optJSONArray("items")
+                ?.optJSONObject(0)?.optJSONObject("item")?.optJSONObject("data")
+                ?.let { decodeOrNull<Track>(trackJson(it).toString()) }
+                ?.let { add(SearchTopResult.TrackItem(it)) }
+
+            root.optJSONObject("albumsV2")?.optJSONArray("items")
+                ?.optJSONObject(0)?.optJSONObject("data")
+                ?.let { decodeOrNull<SimpleAlbum>(simpleAlbumJson(it).toString()) }
+                ?.let { add(SearchTopResult.AlbumItem(it)) }
+
+            root.optJSONObject("artists")?.optJSONArray("items")
+                ?.optJSONObject(0)?.optJSONObject("data")
+                ?.let { decodeOrNull<Artist>(artistJson(it).toString()) }
+                ?.let { add(SearchTopResult.ArtistItem(it)) }
+
+            root.optJSONObject("playlists")?.optJSONArray("items")
+                ?.optJSONObject(0)?.optJSONObject("data")
+                ?.let { decodeOrNull<SimplePlaylist>(simplePlaylistJson(it).toString()) }
+                ?.let { add(SearchTopResult.PlaylistItem(it)) }
+        }
+    }
+
+    private fun decodeTopResult(node: JSONObject, typename: String): SearchTopResult? {
+        val uri = node.optString("uri")
+        val kind = uri.substringAfter("spotify:", "").substringBefore(':').ifBlank {
+            typename.removeSuffix("ResponseWrapper").lowercase()
+        }
+        val name = node.optString("name")
+        return when {
+            kind == "track" || kind == "trackunion" ->
+                decodeOrNull<Track>(trackJson(node).toString())
+                    ?.takeIf { it.name.isNotBlank() }
+                    ?.let(SearchTopResult::TrackItem)
+
+            kind == "album" ->
+                decodeOrNull<SimpleAlbum>(simpleAlbumJson(node).toString())
+                    ?.takeIf { it.name.isNotBlank() || name.isNotBlank() }
+                    ?.let(SearchTopResult::AlbumItem)
+
+            kind == "artist" ->
+                decodeOrNull<Artist>(artistJson(node).toString())
+                    ?.takeIf { it.name.isNotBlank() || name.isNotBlank() }
+                    ?.let(SearchTopResult::ArtistItem)
+
+            kind == "playlist" ->
+                decodeOrNull<SimplePlaylist>(simplePlaylistJson(node).toString())
+                    ?.takeIf { it.name.isNotBlank() || name.isNotBlank() }
+                    ?.let(SearchTopResult::PlaylistItem)
+
+            else -> null
+        }
     }
 
     suspend fun getTrack(trackId: String): Track {
@@ -286,6 +356,27 @@ object SpotifyWebApi {
         return decode(playlistJson(node).toString())
     }
 
+    data class PlaylistStats(val songCount: Int, val followers: Int)
+
+    /** Search nodes have no counts, so fetch the playlist itself. */
+    suspend fun getPlaylistStats(playlistId: String): PlaylistStats {
+        val root = graphql(
+            "fetchPlaylist",
+            JSONObject()
+                .put("uri", "spotify:playlist:$playlistId")
+                .put("offset", 0)
+                .put("limit", 1)
+                .put("enableWatchFeedEntrypoint", false),
+        )
+        val node = root.optJSONObject("data")?.optJSONObject("playlistV2")
+            ?: throw SpotifyWebException(200, "Playlist $playlistId was not found")
+
+        return PlaylistStats(
+            songCount = node.optJSONObject("content")?.optInt("totalCount", 0) ?: 0,
+            followers = node.optInt("followers", 0),
+        )
+    }
+
     suspend fun getPlaylistTracks(
         playlistId: String,
         limit: Int,
@@ -357,7 +448,50 @@ object SpotifyWebApi {
             ?: JSONObject()
     }
 
+    /**
+     * The personalized home feed behind the web player's home tab. Spotify decides the sections,
+     * so this is the only way to get the same shelves without scraping the UI.
+     */
+    suspend fun accountHome(): JSONObject {
+        val deviceId = runCatching { SpotifyWebAuth.session().deviceId }.getOrDefault("")
+        val root = graphql(
+            "home",
+            JSONObject()
+                .put("includeHomeChapterVideoCards", false)
+                .put("homeEndUserIntegration", "INTEGRATION_WEB_PLAYER")
+                .put("timeZone", TimeZone.getDefault().id)
+                .put("sp_t", deviceId)
+                .put("facet", "")
+                .put("sectionItemsLimit", HOME_SECTION_LIMIT)
+                .put("includeEpisodeContentRatingsV2", false),
+            account = true,
+        )
+        return root.optJSONObject("data")?.optJSONObject("home") ?: JSONObject()
+    }
+
     private suspend fun search(query: String, limit: Int, offset: Int): JSONObject {
+        val key = SearchKey(query, limit, offset)
+        searchCache[key]?.let { (at, body) ->
+            if (SystemClock.elapsedRealtime() - at < SEARCH_CACHE_MS) return body
+        }
+
+        val deferred = searchInFlight.compute(key) { _, running ->
+            running ?: searchScope.async { fetchSearch(query, limit, offset) }
+        }!!
+        val body = try {
+            deferred.await()
+        } catch (exception: Exception) {
+            searchInFlight.remove(key, deferred)
+            throw exception
+        }
+
+        searchInFlight.remove(key, deferred)
+        if (searchCache.size > 8) searchCache.clear()
+        searchCache[key] = SystemClock.elapsedRealtime() to body
+        return body
+    }
+
+    private suspend fun fetchSearch(query: String, limit: Int, offset: Int): JSONObject {
         val root = graphql(
             "searchDesktop",
             JSONObject()
@@ -379,13 +513,27 @@ object SpotifyWebApi {
         variables: JSONObject,
         account: Boolean = false,
     ): JSONObject = withContext(Dispatchers.IO) {
-        val hash = OPERATION_HASHES[operation]
-            ?: throw IllegalArgumentException("Unknown Spotify operation: $operation")
+        var hash = SpotifyHashes.hashFor(operation)
 
         var session = SpotifyWebAuth.session()
         val accountToken = if (account) SpotifyUserSession.accessToken() else null
         var accessToken = accountToken ?: session.accessToken
         var response = execute(session, operation, hash, variables, accessToken)
+
+        // Spotify rotates these hashes with its web player builds. Its also a 400, but
+        // refreshing the token wont do anything here.
+        if (response.body.contains("PersistedQueryNotFound")) {
+            Log.w(TAG, "$operation has a stale hash, pulling the manifest")
+            val fresh = SpotifyHashes.refreshStale(operation)
+            if (fresh != null && fresh != hash) {
+                hash = fresh
+                response = execute(session, operation, hash, variables, accessToken)
+            }
+            if (response.body.contains("PersistedQueryNotFound")) {
+                Log.e(TAG, "$operation still has no working hash, the manifest is behind")
+                throw SpotifyWebException(response.code, "No working hash for $operation")
+            }
+        }
 
         // The client token expires independently of the access token.
         if (response.code == 401 || response.code == 400 || response.code == 403) {
@@ -652,9 +800,12 @@ object SpotifyWebApi {
             .put("uri", "spotify:artist:$id")
     }
 
-    private fun simplePlaylistJson(node: JSONObject): JSONObject {
-        val uri = node.optString("uri")
-        val id = uri.substringAfterLast(':')
+    private fun simplePlaylistJson(rawNode: JSONObject): JSONObject {
+        // Some search shelves wrap the playlist entity in another data object.
+        val nested = rawNode.optJSONObject("data")
+        val node = if (nested != null && rawNode.optString("uri").isBlank()) nested else rawNode
+        val uri = node.optString("uri").ifBlank { rawNode.optString("uri") }
+        val id = node.optString("id").ifBlank { uri.substringAfterLast(':') }
         val owner = node.optJSONObject("ownerV2")?.optJSONObject("data")
         val ownerUri = owner?.optString("uri").orEmpty()
         val ownerId = ownerUri.substringAfterLast(':').ifBlank { "spotify" }
@@ -751,3 +902,18 @@ object SpotifyWebApi {
             .put("uri", "spotify:album:$id")
     }
 }
+
+sealed interface SearchTopResult {
+    data class TrackItem(val item: Track) : SearchTopResult
+    data class AlbumItem(val item: SimpleAlbum) : SearchTopResult
+    data class ArtistItem(val item: Artist) : SearchTopResult
+    data class PlaylistItem(val item: SimplePlaylist) : SearchTopResult
+}
+
+val SearchTopResult.name: String
+    get() = when (this) {
+        is SearchTopResult.TrackItem -> item.name
+        is SearchTopResult.AlbumItem -> item.name
+        is SearchTopResult.ArtistItem -> item.name
+        is SearchTopResult.PlaylistItem -> item.name
+    }

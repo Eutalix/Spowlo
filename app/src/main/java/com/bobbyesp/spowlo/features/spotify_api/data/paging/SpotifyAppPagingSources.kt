@@ -40,12 +40,14 @@ class TrackPagingSource(
     @Suppress("UNUSED_PARAMETER") private var spotifyApi: SpotifyAppApi? = null,
     private var query: String,
     private val filters: List<SearchFilter> = emptyList(),
+    private val onTotalLoaded: ((Int) -> Unit)? = null,
 ) : PagingSource<Int, Track>() {
 
     override suspend fun load(params: LoadParams<Int>): LoadResult<Int, Track> {
         val offset = params.key ?: 0
         return try {
             val response = SpotifyWebApi.searchTracks(query, params.loadSize, offset)
+            onTotalLoaded?.invoke(response.total)
             page(response.items, offset, params.loadSize)
         } catch (exception: Exception) {
             failure("Track search", exception)
@@ -59,12 +61,14 @@ class SimpleAlbumPagingSource(
     @Suppress("UNUSED_PARAMETER") private var spotifyApi: SpotifyAppApi? = null,
     private var query: String,
     private val filters: List<SearchFilter> = emptyList(),
+    private val onTotalLoaded: ((Int) -> Unit)? = null,
 ) : PagingSource<Int, SimpleAlbum>() {
 
     override suspend fun load(params: LoadParams<Int>): LoadResult<Int, SimpleAlbum> {
         val offset = params.key ?: 0
         return try {
             val response = SpotifyWebApi.searchAlbums(query, params.loadSize, offset)
+            onTotalLoaded?.invoke(response.total)
             page(response.items, offset, params.loadSize)
         } catch (exception: Exception) {
             failure("Album search", exception)
@@ -96,6 +100,7 @@ class ArtistsPagingSource(
     @Suppress("UNUSED_PARAMETER") private var spotifyApi: SpotifyAppApi? = null,
     private var query: String,
     private val filters: List<SearchFilter> = emptyList(),
+    private val onTotalLoaded: ((Int) -> Unit)? = null,
 ) : PagingSource<Int, Artist>() {
 
     override fun getRefreshKey(state: PagingState<Int, Artist>): Int? = state.anchorPosition
@@ -104,6 +109,7 @@ class ArtistsPagingSource(
         val offset = params.key ?: 0
         return try {
             val response = SpotifyWebApi.searchArtists(query, params.loadSize, offset)
+            onTotalLoaded?.invoke(response.total)
             page(response.items, offset, params.loadSize)
         } catch (exception: Exception) {
             failure("Artist search", exception)
@@ -115,6 +121,7 @@ class SimplePlaylistPagingSource(
     @Suppress("UNUSED_PARAMETER") private var spotifyApi: SpotifyAppApi? = null,
     private var query: String,
     private val filters: List<SearchFilter> = emptyList(),
+    private val onTotalLoaded: ((Int) -> Unit)? = null,
 ) : PagingSource<Int, SimplePlaylist>() {
 
     override fun getRefreshKey(state: PagingState<Int, SimplePlaylist>): Int? = state.anchorPosition
@@ -123,6 +130,7 @@ class SimplePlaylistPagingSource(
         val offset = params.key ?: 0
         return try {
             val response = SpotifyWebApi.searchPlaylists(query, params.loadSize, offset)
+            onTotalLoaded?.invoke(response.total)
             page(response.items, offset, params.loadSize)
         } catch (exception: Exception) {
             failure("Playlist search", exception)

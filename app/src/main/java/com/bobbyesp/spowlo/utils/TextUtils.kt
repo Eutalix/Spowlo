@@ -15,6 +15,7 @@ import kotlinx.coroutines.launch
 import java.text.DateFormat
 import java.text.NumberFormat
 import java.util.Date
+import java.util.Locale
 import java.util.regex.Pattern
 
 object ToastUtil {
@@ -45,20 +46,16 @@ object ToastUtil {
 
 object GeneralTextUtils {
 
-    fun convertDuration(durationOfSong: Double): String {
-        //First of all the duration comes with this format "146052" but it has to be "146.052"
-        val duration: Double = if (durationOfSong > 100000.0) {
-            durationOfSong / 1000
-        } else {
-            durationOfSong
-        }
-        val hours = (duration / 3600).toInt()
-        val minutes = ((duration % 3600) / 60).toInt()
-        val seconds = (duration % 60).toInt()
+    /** Seconds to m:ss, or h:mm:ss for long tracks. */
+    fun convertDuration(durationInSeconds: Double): String {
+        val totalSeconds = durationInSeconds.toInt().coerceAtLeast(0)
+        val hours = totalSeconds / 3600
+        val minutes = (totalSeconds % 3600) / 60
+        val seconds = totalSeconds % 60
         return if (hours > 0) {
             String.format("%d:%02d:%02d", hours, minutes, seconds)
         } else {
-            String.format("%02d:%02d", minutes, seconds)
+            String.format("%d:%02d", minutes, seconds)
         }
     }
 
@@ -74,9 +71,59 @@ object GeneralTextUtils {
 
     fun formatCount(count: Long): String = NumberFormat.getIntegerInstance().format(count)
 
+    // 56.9M, 1.2K, used for followers and plays.
+    fun formatCompactCount(count: Long): String {
+        if (count < 1_000) return count.toString()
+        val (divisor, suffix) = when {
+            count >= 1_000_000_000L -> 1_000_000_000L to "B"
+            count >= 1_000_000L -> 1_000_000L to "M"
+            else -> 1_000L to "K"
+        }
+        val scaled = count.toDouble() / divisor
+        val value = if (scaled < 100) String.format(Locale.US, "%.1f", scaled) else scaled.toLong().toString()
+        return value.removeSuffix(".0") + suffix
+    }
+
+    fun formatTrackDuration(millis: Long): String {
+        val totalSeconds = millis / 1000
+        val hours = totalSeconds / 3600
+        val minutes = (totalSeconds % 3600) / 60
+        val seconds = totalSeconds % 60
+        return if (hours > 0) {
+            String.format("%d:%02d:%02d", hours, minutes, seconds)
+        } else {
+            String.format("%d:%02d", minutes, seconds)
+        }
+    }
+
+    fun formatCollectionDuration(millis: Long): String {
+        if (millis <= 0L) return ""
+        val minutes = (millis / 60_000).toInt().coerceAtLeast(1)
+        val hours = minutes / 60
+        val rest = minutes % 60
+        return when {
+            hours <= 0 -> context.getString(R.string.duration_minutes, rest)
+            rest == 0 -> context.getString(R.string.duration_hours, hours)
+            else -> context.getString(R.string.duration_hours_minutes, hours, rest)
+        }
+    }
+
     fun formatDate(timestamp: Long): String =
         if (timestamp <= 0L) ""
         else DateFormat.getDateInstance(DateFormat.MEDIUM).format(Date(timestamp))
+
+    /** "Just now", "12 min ago", "3 h ago", "5 d ago", then the date. */
+    fun formatRelativeTime(timestamp: Long): String {
+        if (timestamp <= 0L) return ""
+        val minutes = ((System.currentTimeMillis() - timestamp) / 60_000).coerceAtLeast(0)
+        return when {
+            minutes < 1 -> context.getString(R.string.time_just_now)
+            minutes < 60 -> context.getString(R.string.time_minutes_ago, minutes)
+            minutes < 24 * 60 -> context.getString(R.string.time_hours_ago, minutes / 60)
+            minutes < 7 * 24 * 60 -> context.getString(R.string.time_days_ago, minutes / (24 * 60))
+            else -> formatDate(timestamp)
+        }
+    }
 }
 
 private const val GIGA_BYTES = 1024f * 1024f * 1024f
