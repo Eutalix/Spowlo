@@ -18,13 +18,16 @@ import java.io.BufferedInputStream
 import java.io.File
 import java.io.FileInputStream
 import java.io.FileOutputStream
+import java.io.IOException
 import java.net.URL
-import java.nio.charset.Charset
+import java.util.UUID
 import java.util.zip.ZipInputStream
 
 object SpotDLDependencyUpdater {
 
     private const val TAG = "SpowloDebug"
+    private const val HOTFIX_STAGING_PREFIX = ".hotfix-staging-"
+    private const val HOTFIX_BACKUP_PREFIX = ".hotfix-backup-"
     private val mutex = Mutex()
     private val isDebug = BuildConfig.DEBUG
 
@@ -66,7 +69,9 @@ object SpotDLDependencyUpdater {
 
                 var updatesCount = 0
 
+                recoverHotfixWorkDirs(sitePackages)
                 dropPinnedOverrides(sitePackages)
+                dropWheelDataDirs(sitePackages)
 
                 TARGET_PACKAGES.forEach { pkgName ->
                     try {
@@ -123,10 +128,20 @@ object SpotDLDependencyUpdater {
         return getLocalVersion(sitePackages, "yt-dlp")
     }
 
+    /** True when every volatile package is present in custom site-packages. */
+    fun areDependenciesInstalled(context: Context): Boolean {
+        val sitePackages = getSitePackagesDir(context)
+        if (!sitePackages.exists()) return false
+        return TARGET_PACKAGES.all { getLocalVersion(sitePackages, it) != "0.0.0" }
+    }
+
     /** Drops hotfix copies of packages that must stay on the bundled version. */
     fun prunePinnedOverrides(context: Context) {
         val sitePackages = getSitePackagesDir(context)
-        if (sitePackages.exists()) dropPinnedOverrides(sitePackages)
+        if (sitePackages.exists()) {
+            dropPinnedOverrides(sitePackages)
+            dropWheelDataDirs(sitePackages)
+        }
     }
 
     suspend fun areUpdatesAvailable(context: Context): Boolean {
@@ -142,8 +157,9 @@ object SpotDLDependencyUpdater {
                     val pypiInfo = getPypiInfo(pkgName) ?: return@any false
                     val remoteVersion = resolveRemoteVersion(pkgName, pypiInfo.info.version)
                     val localVersion = getLocalVersion(sitePackages, pkgName)
-                    
-                    localVersion != remoteVersion && localVersion != "0.0.0"
+
+                    // Missing packages (0.0.0) count as outdated.
+                    localVersion != remoteVersion
                 } catch (e: Exception) {
                     false
                 }
@@ -185,12 +201,9 @@ object SpotDLDependencyUpdater {
         val tempFile = File.createTempFile("hotfix_${pkgName}", ".whl")
         try {
             FileUtils.copyURLToFile(URL(wheelUrl), tempFile, 10000, 30000)
-            
-            if(isDebug) Log.d(TAG, ">>> DepUpdater: Clearing old versions for $pkgName")
-            clearOldVersions(sitePackagesDir, pkgName)
-            
+
             if(isDebug) Log.d(TAG, ">>> DepUpdater: Installing new wheel...")
-            installWheel(tempFile, sitePackagesDir)
+            installWheelAtomically(tempFile, sitePackagesDir, pkgName)
             return "[Updated] $pkgName: ($localVersion -> $remoteVersion)"
         } finally {
             tempFile.delete()
@@ -203,6 +216,12 @@ object SpotDLDependencyUpdater {
         } else {
             latestVersion
         }
+
+    private fun dropWheelDataDirs(sitePackages: File) {
+        sitePackages.listFiles { file ->
+            file.isDirectory && file.name.startsWith("yt_dlp-") && file.name.endsWith(".data")
+        }?.forEach { FileUtils.deleteQuietly(it) }
+    }
 
     // The PyPI name (soundcloud-v2) differs from the module name (soundcloud).
     private fun dropPinnedOverrides(sitePackages: File) {
@@ -217,33 +236,89 @@ object SpotDLDependencyUpdater {
         }?.forEach { FileUtils.deleteDirectory(it) }
     }
 
-    private fun clearOldVersions(sitePackages: File, pkgName: String) {
-        val normalizedName = pkgName.replace("-", "_")
-        val possibleNames = listOf(pkgName, normalizedName)
+    // Stage the wheel first; the installed copy stays intact until extraction succeeds.
+    private fun installWheelAtomically(wheelFile: File, sitePackagesDir: File, pkgName: String) {
+        val baseDir = sitePackagesDir.parentFile ?: sitePackagesDir
+        val token = UUID.randomUUID().toString()
+        val stagingDir = File(baseDir, HOTFIX_STAGING_PREFIX + token)
+        val backupDir = File(baseDir, HOTFIX_BACKUP_PREFIX + token)
+        var keepBackup = false
 
-        sitePackages.listFiles { f -> 
-            f.isDirectory && f.name.endsWith(".dist-info") && possibleNames.any { name -> f.name.startsWith(name) }
-        }?.forEach { 
-            if(isDebug) Log.d(TAG, ">>> DepUpdater: Deleting metadata dir: ${it.name}")
-            FileUtils.deleteDirectory(it) 
-        }
+        try {
+            if (!stagingDir.mkdirs()) throw IOException("Unable to create staging directory")
+            extractWheel(wheelFile, stagingDir)
 
-        possibleNames.forEach { name ->
-            val pkgDir = File(sitePackages, name)
-            if (pkgDir.exists() && pkgDir.isDirectory) {
-                if(isDebug) Log.d(TAG, ">>> DepUpdater: Deleting package dir: ${pkgDir.name}")
-                FileUtils.deleteDirectory(pkgDir)
+            val stagedEntries = stagingDir.listFiles().orEmpty()
+            if (stagedEntries.isEmpty()) throw IOException("Wheel contains no files")
+
+            val oldEntries = findInstalledEntries(sitePackagesDir, pkgName)
+            val movedOld = mutableListOf<Pair<File, File>>()
+            val installedNew = mutableListOf<File>()
+
+            try {
+                if (oldEntries.isNotEmpty() && !backupDir.mkdirs()) {
+                    throw IOException("Unable to create backup directory")
+                }
+
+                oldEntries.forEach { old ->
+                    val saved = File(backupDir, old.name)
+                    if (!old.renameTo(saved)) throw IOException("Unable to back up ${old.name}")
+                    movedOld += old to saved
+                    if (isDebug) Log.d(TAG, ">>> DepUpdater: Backed up ${old.name}")
+                }
+
+                stagedEntries.forEach { entry ->
+                    val target = File(sitePackagesDir, entry.name)
+                    if (!entry.renameTo(target)) throw IOException("Unable to install ${entry.name}")
+                    installedNew += target
+                }
+            } catch (e: Exception) {
+                installedNew.forEach { FileUtils.deleteQuietly(it) }
+                movedOld.forEach { (old, saved) ->
+                    if (!saved.renameTo(old)) {
+                        keepBackup = true
+                        Log.e(TAG, ">>> DepUpdater: Failed to restore ${old.name}")
+                    }
+                }
+                throw e
             }
+        } finally {
+            FileUtils.deleteQuietly(stagingDir)
+            if (!keepBackup) FileUtils.deleteQuietly(backupDir)
         }
     }
 
-    private fun installWheel(wheelFile: File, outputDir: File) {
+    private fun findInstalledEntries(sitePackages: File, pkgName: String): List<File> {
+        val possibleNames = listOf(pkgName, pkgName.replace("-", "_")).distinct()
+        return sitePackages.listFiles { file ->
+            file.name in possibleNames || (file.isDirectory && file.name.endsWith(".dist-info") &&
+                possibleNames.any { name -> file.name.startsWith("$name-") })
+        }?.toList().orEmpty()
+    }
+
+    private fun recoverHotfixWorkDirs(sitePackages: File) {
+        val baseDir = sitePackages.parentFile ?: return
+        baseDir.listFiles { file ->
+            file.isDirectory && file.name.startsWith(HOTFIX_BACKUP_PREFIX)
+        }?.forEach { backupDir ->
+            backupDir.listFiles()?.forEach { saved ->
+                val target = File(sitePackages, saved.name)
+                if (!target.exists()) saved.renameTo(target)
+            }
+            FileUtils.deleteQuietly(backupDir)
+        }
+        baseDir.listFiles { file ->
+            file.isDirectory && file.name.startsWith(HOTFIX_STAGING_PREFIX)
+        }?.forEach { FileUtils.deleteQuietly(it) }
+    }
+
+    private fun extractWheel(wheelFile: File, outputDir: File) {
         ZipInputStream(BufferedInputStream(FileInputStream(wheelFile))).use { zis ->
             var entry = zis.nextEntry
             while (entry != null) {
                 if (!entry.isDirectory) {
                     val fileName = entry.name
-                    if (!fileName.contains("..")) {
+                    if (!fileName.contains("..") && !isYtDlpDataEntry(fileName)) {
                         val targetFile = File(outputDir, fileName)
                         targetFile.parentFile?.mkdirs()
                         FileOutputStream(targetFile).use { fos ->
@@ -258,6 +333,12 @@ object SpotDLDependencyUpdater {
                 entry = zis.nextEntry
             }
         }
+    }
+
+    private fun isYtDlpDataEntry(name: String): Boolean {
+        val topLevel = name.substringBefore('/')
+        return topLevel.startsWith("yt_dlp-", ignoreCase = true) &&
+            topLevel.endsWith(".data", ignoreCase = true)
     }
 
     private fun getSitePackagesDir(context: Context): File {

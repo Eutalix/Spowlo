@@ -366,10 +366,11 @@ fun InitialEntry(
 
             val isInitialized = PreferencesUtil.getValue(DEPENDENCIES_INITIALIZED)
             val currentVersion = SpotDLDependencyUpdater.getLocalSpotDLVersion(context)
-            
-            Log.d(TAG, ">>> InitialEntry: isInitialized=$isInitialized, currentVersion=$currentVersion")
-            
-            if (!isInitialized || currentVersion == "0.0.0") {
+            val dependenciesInstalled = SpotDLDependencyUpdater.areDependenciesInstalled(context)
+
+            Log.d(TAG, ">>> InitialEntry: isInitialized=$isInitialized, installed=$dependenciesInstalled, currentVersion=$currentVersion")
+
+            if (!isInitialized || !dependenciesInstalled) {
                 withContext(Dispatchers.Main) {
                     ToastUtil.makeToast("Initializing critical dependencies... Please wait.")
                 }
@@ -377,9 +378,9 @@ fun InitialEntry(
                     SpotDLDependencyUpdater.updateVolatileDependencies(context)
                     
                     // DOUBLE CHECK: Did it actually work?
-                    val checkVersion = SpotDLDependencyUpdater.getLocalSpotDLVersion(context)
-                    Log.d(TAG, ">>> InitialEntry: Post-install check version=$checkVersion")
-                    if (checkVersion != "0.0.0") {
+                    val installed = SpotDLDependencyUpdater.areDependenciesInstalled(context)
+                    Log.d(TAG, ">>> InitialEntry: Post-install check installed=$installed")
+                    if (installed) {
                         PreferencesUtil.updateValue(DEPENDENCIES_INITIALIZED, true)
                         // Trigger ViewModel refresh if necessary
                         downloaderViewModel.refreshDependencyState()
