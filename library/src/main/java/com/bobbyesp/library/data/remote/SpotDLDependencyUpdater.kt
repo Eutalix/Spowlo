@@ -128,6 +128,13 @@ object SpotDLDependencyUpdater {
         return getLocalVersion(sitePackages, "yt-dlp")
     }
 
+    /** Versions of the hotfix packages in effect, spotDL first. Missing ones report "0.0.0". */
+    fun getInstalledVersions(context: Context): Map<String, String> {
+        val sitePackages = getSitePackagesDir(context)
+        val ordered = listOf("spotdl") + TARGET_PACKAGES.filterNot { it == "spotdl" }
+        return ordered.associateWith { getLocalVersion(sitePackages, it) }
+    }
+
     /** True when every volatile package is present in custom site-packages. */
     fun areDependenciesInstalled(context: Context): Boolean {
         val sitePackages = getSitePackagesDir(context)
