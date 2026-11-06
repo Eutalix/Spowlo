@@ -13,6 +13,16 @@ data class SpotifyCollection(
     val songs: List<SpotifySong>,
 )
 
+/** Link preview shown on Home before downloading. */
+data class SpotifyLinkPreview(
+    val type: String,
+    val name: String,
+    val subtitle: String,
+    val artworkUrl: String,
+    val songCount: Int = 0,
+    val durationMs: Long = 0,
+)
+
 /** Fetches track metadata for the downloader through [SpotifyWebApi]. */
 object SpotifyMetadataFetcher {
 
@@ -52,6 +62,62 @@ object SpotifyMetadataFetcher {
             }
         } catch (e: Exception) {
             Log.e(TAG, "Could not fetch collection for $spotifyUrl: ${e.message}", e)
+            null
+        }
+    }
+
+    /** Link preview without loading a collection's tracks. */
+    suspend fun fetchLinkPreview(spotifyUrl: String): SpotifyLinkPreview? {
+        val url = UrlValidator.normalize(spotifyUrl)
+        return try {
+            when (UrlValidator.classify(url)) {
+                UrlValidator.Type.SpotifyTrack -> {
+                    val track = SpotifyWebApi.getTrack(url.spotifyIdAfter("/track/"))
+                    SpotifyLinkPreview(
+                        type = "track",
+                        name = track.name,
+                        subtitle = track.artists.joinToString(", ") { it.name },
+                        artworkUrl = track.album.images.firstOrNull()?.url.orEmpty(),
+                        durationMs = track.durationMs.toLong(),
+                    )
+                }
+
+                UrlValidator.Type.SpotifyAlbum -> {
+                    val album = SpotifyWebApi.getAlbum(url.spotifyIdAfter("/album/"))
+                    SpotifyLinkPreview(
+                        type = "album",
+                        name = album.name,
+                        subtitle = album.artists.joinToString(", ") { it.name },
+                        artworkUrl = album.images.firstOrNull()?.url.orEmpty(),
+                        songCount = maxOf(album.totalTracks, album.tracks.total),
+                    )
+                }
+
+                UrlValidator.Type.SpotifyPlaylist -> {
+                    val playlist = SpotifyWebApi.getPlaylist(url.spotifyIdAfter("/playlist/"))
+                    SpotifyLinkPreview(
+                        type = "playlist",
+                        name = playlist.name,
+                        subtitle = playlist.owner.displayName.orEmpty(),
+                        artworkUrl = playlist.images.firstOrNull()?.url.orEmpty(),
+                        songCount = playlist.tracks.total,
+                    )
+                }
+
+                UrlValidator.Type.SpotifyArtist -> {
+                    val artist = SpotifyWebApi.getArtist(url.spotifyIdAfter("/artist/"))
+                    SpotifyLinkPreview(
+                        type = "artist",
+                        name = artist.name,
+                        subtitle = "",
+                        artworkUrl = artist.images.firstOrNull()?.url.orEmpty(),
+                    )
+                }
+
+                else -> null
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Could not preview $spotifyUrl: ${e.message}", e)
             null
         }
     }

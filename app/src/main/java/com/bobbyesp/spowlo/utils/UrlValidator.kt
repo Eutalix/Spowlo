@@ -20,7 +20,13 @@ object UrlValidator {
     )
 
     fun normalize(url: String): String {
-        return url.trim()
+        val trimmed = url.trim()
+        val schemeFixed = when {
+            trimmed.startsWith("https://", ignoreCase = true) -> "https://" + trimmed.substring(8)
+            trimmed.startsWith("http://", ignoreCase = true) -> "http://" + trimmed.substring(7)
+            else -> trimmed
+        }
+        return schemeFixed
             .replace("https://open.spotify.com/intl-[a-z]+/".toRegex(), "https://open.spotify.com/")
     }
 

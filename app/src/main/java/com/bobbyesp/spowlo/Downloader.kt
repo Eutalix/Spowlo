@@ -1,6 +1,7 @@
 package com.bobbyesp.spowlo
 
 import android.app.PendingIntent
+import android.graphics.Bitmap
 import android.util.Log
 import androidx.annotation.CheckResult
 import androidx.compose.runtime.mutableStateMapOf
@@ -163,6 +164,9 @@ object Downloader {
     val errorState = mutableErrorState.asStateFlow()
     private val mutableProcessCount = MutableStateFlow(0)
     val processCount = mutableProcessCount.asStateFlow()
+    // Metadata still loading, before a task exists.
+    private val mutableFetchingCount = MutableStateFlow(0)
+    val fetchingCount = mutableFetchingCount.asStateFlow()
     private val mutableQuickDownloadCount = MutableStateFlow(0)
     private val activeParallelDownloads = ConcurrentHashMap<String, Boolean>()
     val mutableTaskList = mutableStateMapOf<String, DownloadTask>()
@@ -181,7 +185,8 @@ object Downloader {
         url: String,
         name: String,
         artist: String = "",
-        artworkUrl: String = ""
+        artworkUrl: String = "",
+        largeIcon: Bitmap? = null,
     ) =
         DownloadTask(
             url = url,
@@ -195,10 +200,11 @@ object Downloader {
             mutableTaskList[this.toKey()] = this
             val key = makeKey(url, url.reversed())
             NotificationsUtil.notifyProgress(
-                name,
+                title = listOf(name, artist).filter(String::isNotBlank).joinToString(" - "),
                 notificationId = key.toNotificationId(),
                 progress = 0,
-                text = context.getString(R.string.downloading)
+                text = context.getString(R.string.downloading),
+                largeIcon = largeIcon,
             )
         }
 
@@ -231,7 +237,12 @@ object Downloader {
         return (matchResult?.groupValues?.get(1)?.toFloatOrNull() ?: 0f) / 100f
     }
 
-    fun onTaskEnded(url: String, response: String? = null, notificationTitle: String? = null): Boolean {
+    fun onTaskEnded(
+        url: String,
+        response: String? = null,
+        notificationTitle: String? = null,
+        largeIcon: Bitmap? = null,
+    ): Boolean {
         val key = makeKey(url, url.reversed())
         val oldValue = mutableTaskList[key] ?: return false
         if (oldValue.state is DownloadTask.State.Error || oldValue.state is DownloadTask.State.Canceled) return false
@@ -239,6 +250,7 @@ object Downloader {
             notificationId = key.toNotificationId(),
             title = notificationTitle,
             text = context.getString(R.string.status_completed),
+            largeIcon = largeIcon,
         )
         val newValue = oldValue.copy(state = DownloadTask.State.Completed).run {
             response?.let { copy(consoleOutput = response) } ?: this
@@ -248,14 +260,20 @@ object Downloader {
         return true
     }
 
-    fun onTaskError(message: String, url: String, details: String? = null) =
+    fun onTaskError(
+        message: String,
+        url: String,
+        details: String? = null,
+        largeIcon: Bitmap? = null,
+    ) =
         mutableTaskList.run {
             val key = makeKey(url, url.reversed())
             val oldValue = mutableTaskList[key] ?: return
             NotificationsUtil.makeErrorReportNotification(
                 title = oldValue.taskName.ifBlank { context.getString(R.string.download_error_msg) },
                 notificationId = key.toNotificationId(),
-                error = message
+                error = message,
+                largeIcon = largeIcon,
             )
             mutableTaskList[key] = oldValue.copy(
                 state = DownloadTask.State.Error(details ?: message),
@@ -266,12 +284,18 @@ object Downloader {
 
     fun onProcessEnded() = mutableProcessCount.update { it - 1 }
     fun onProcessStarted() = mutableProcessCount.update { it + 1 }
+    fun onFetchStarted() = mutableFetchingCount.update { it + 1 }
+    fun onFetchEnded() = mutableFetchingCount.update { it - 1 }
 
     fun isTaskRunning(url: String): Boolean =
         mutableTaskList[makeKey(url, url.reversed())]?.state is DownloadTask.State.Running
 
-    fun onProcessCanceled(taskId: String) =
-        mutableTaskList.run { get(taskId)?.let { this.put(taskId, it.copy(state = DownloadTask.State.Canceled)) } }
+    fun onProcessCanceled(taskId: String) {
+        NotificationsUtil.cancelNotification(taskId.toNotificationId())
+        mutableTaskList.run {
+            get(taskId)?.let { this.put(taskId, it.copy(state = DownloadTask.State.Canceled)) }
+        }
+    }
 
     fun isDownloaderAvailable(): Boolean {
         if (downloaderState.value !is State.Idle) {
@@ -483,7 +507,11 @@ object Downloader {
         }
     }
 
-    fun executeParallelDownloadWithUrl(url: String, name: String) = applicationScope.launch(Dispatchers.IO) {
+    fun executeParallelDownloadWithUrl(
+        url: String,
+        name: String,
+        preferences: DownloaderUtil.DownloadPreferences? = null,
+    ) = applicationScope.launch(Dispatchers.IO) {
         if (!isNetworkAllowed()) return@launch
         val requestKey = makeKey(url, url.reversed())
         if (activeParallelDownloads.putIfAbsent(requestKey, true) != null) {
@@ -495,10 +523,17 @@ object Downloader {
                 val cleanedUrl = cleanSpotifyUrl(url)
                 when (UrlValidator.classify(cleanedUrl)) {
                     UrlValidator.Type.SpotifyTrack -> {
-                        val track = SpotifyMetadataFetcher.fetchTrackFromUrl(cleanedUrl)
-                            ?: throw SpotifyApiException("Failed to fetch metadata from Spotify API.")
+                        val song = fetchMetadata {
+                            val track = SpotifyMetadataFetcher.fetchTrackFromUrl(cleanedUrl)
+                                ?: throw SpotifyApiException("Failed to fetch metadata from Spotify API.")
+                            track.toSpotifySongWithDetails()
+                        }
 
-                        DownloaderUtil.executeParallelDownload(track.toSpotifySongWithDetails(), name)
+                        DownloaderUtil.executeParallelDownload(
+                            song,
+                            name,
+                            preferences = preferences,
+                        )
                     }
 
                     UrlValidator.Type.SpotifyPlaylist,
@@ -512,12 +547,22 @@ object Downloader {
         }
     }
 
+    private suspend fun <T> fetchMetadata(block: suspend () -> T): T {
+        onFetchStarted()
+        return try {
+            block()
+        } finally {
+            onFetchEnded()
+        }
+    }
+
     fun downloadCollection(url: String, fallbackName: String = "") =
         applicationScope.launch(Dispatchers.IO) {
             if (!isNetworkAllowed()) return@launch
             runCatching {
-                val collection = SpotifyMetadataFetcher.fetchCollectionFromUrl(url)
-                    ?: throw SpotifyApiException("Could not load the Spotify album or playlist.")
+                val collection = fetchMetadata {
+                    SpotifyMetadataFetcher.fetchCollectionFromUrl(url)
+                } ?: throw SpotifyApiException("Could not load the Spotify album or playlist.")
                 DownloaderUtil.executeCollectionDownload(collection, fallbackName)
             }.onFailure { manageDownloadError(it, isFetchingInfo = true) }
         }

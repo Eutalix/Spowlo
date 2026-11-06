@@ -11,10 +11,20 @@ import com.bobbyesp.spowlo.App
 import com.bobbyesp.spowlo.Downloader
 import com.bobbyesp.spowlo.Downloader.showErrorMessage
 import com.bobbyesp.spowlo.R
+import com.bobbyesp.spowlo.database.DownloadedSongInfo
+import com.bobbyesp.spowlo.utils.DatabaseUtil
+import com.bobbyesp.spowlo.utils.SpotifyLinkPreview
+import com.bobbyesp.spowlo.utils.SpotifyMetadataFetcher
 import com.bobbyesp.spowlo.utils.UrlValidator
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
@@ -28,6 +38,22 @@ class DownloaderViewModel : ViewModel() {
     
     private val _isDependenciesReady = MutableStateFlow(false)
     val isDependenciesReady = _isDependenciesReady.asStateFlow()
+
+    val recentDownloads: StateFlow<List<DownloadedSongInfo>> = DatabaseUtil.getMediaInfo()
+        .map { songs -> songs.sortedByDescending { it.downloadedAt }.take(RECENT_LIMIT) }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    sealed interface LinkPreviewState {
+        data object None : LinkPreviewState
+        data object Loading : LinkPreviewState
+        data class Loaded(val preview: SpotifyLinkPreview) : LinkPreviewState
+    }
+
+    private val mutableLinkPreview = MutableStateFlow<LinkPreviewState>(LinkPreviewState.None)
+    val linkPreview = mutableLinkPreview.asStateFlow()
+
+    private var previewJob: Job? = null
+    private val previewCache = mutableMapOf<String, SpotifyLinkPreview>()
 
     data class ViewState(
         val url: String = "",
@@ -59,6 +85,30 @@ class DownloaderViewModel : ViewModel() {
         }
         if (urlChanged && Downloader.errorState.value.isErrorOccurred()) {
             Downloader.clearErrorState()
+        }
+        previewLink(url)
+    }
+
+    private fun previewLink(url: String) {
+        previewJob?.cancel()
+        val link = UrlValidator.parseSpotifyLink(url)
+        if (link == null) {
+            mutableLinkPreview.value = LinkPreviewState.None
+            return
+        }
+        val key = "${link.type}/${link.id}"
+        previewCache[key]?.let {
+            mutableLinkPreview.value = LinkPreviewState.Loaded(it)
+            return
+        }
+        mutableLinkPreview.value = LinkPreviewState.Loading
+        previewJob = viewModelScope.launch {
+            delay(PREVIEW_DEBOUNCE_MS)
+            val preview = SpotifyMetadataFetcher.fetchLinkPreview(url)
+            if (preview != null) previewCache[key] = preview
+            mutableLinkPreview.value = preview
+                ?.let { LinkPreviewState.Loaded(it) }
+                ?: LinkPreviewState.None
         }
     }
 
@@ -126,9 +176,8 @@ class DownloaderViewModel : ViewModel() {
         val url = viewStateFlow.value.url
 
         Downloader.clearErrorState()
-        if (!Downloader.isDownloaderAvailable()) return
         if (!validateLinkOrShowError(url)) return
-        Downloader.getInfoAndDownload(url, skipInfoFetch = skipInfoFetch)
+        Downloader.executeParallelDownloadWithUrl(url, name = url.trim())
     }
 
     fun goToMetadataViewer(songs: List<SpotifySong>) {
@@ -137,5 +186,10 @@ class DownloaderViewModel : ViewModel() {
 
     fun onShareIntentConsumed() {
         mutableViewStateFlow.update { it.copy(isUrlSharingTriggered = false) }
+    }
+
+    private companion object {
+        const val RECENT_LIMIT = 6
+        const val PREVIEW_DEBOUNCE_MS = 350L
     }
 }
