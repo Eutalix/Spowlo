@@ -135,26 +135,25 @@ fun SearcherPage(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(start = 4.dp, top = 4.dp),
+                    .padding(start = 4.dp, end = 16.dp, top = 4.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 BackButton { navController.popBackStack() }
+                QueryTextBox(
+                    modifier = Modifier.weight(1f),
+                    query = query,
+                    onValueChange = onQueryChange,
+                    onSearchCallback = {
+                        val link = UrlValidator.parseSpotifyLink(query)
+                        if (link != null) {
+                            openItem(link.type, link.id)
+                        } else {
+                            viewModel.search()
+                        }
+                    },
+                    requestFocusOnStart = initialQuery.isBlank(),
+                )
             }
-
-            QueryTextBox(
-                modifier = Modifier.padding(horizontal = 16.dp),
-                query = query,
-                onValueChange = onQueryChange,
-                onSearchCallback = {
-                    val link = UrlValidator.parseSpotifyLink(query)
-                    if (link != null) {
-                        openItem(link.type, link.id)
-                    } else {
-                        viewModel.search()
-                    }
-                },
-                requestFocusOnStart = initialQuery.isBlank(),
-            )
 
             SearchTabs(
                 modifier = Modifier.padding(top = 2.dp),
