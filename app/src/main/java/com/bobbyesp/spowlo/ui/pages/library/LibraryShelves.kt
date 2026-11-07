@@ -40,20 +40,15 @@ internal fun rememberLibraryShelves(state: UserLibraryState.Ready): List<HomeShe
 
         if (playlistCards.isEmpty()) return@remember shelves
 
-        val spotifyShelfIndex = shelves.indexOfFirst { it.isOwnPlaylistsShelf(ownPlaylistIds) }
-        shelves.toMutableList().apply {
-            if (spotifyShelfIndex >= 0) {
-                this[spotifyShelfIndex] = this[spotifyShelfIndex].copy(cards = playlistCards)
-            } else {
-                add(
-                    index = minOf(size, 2),
-                    element = HomeShelf(
-                        id = "library-playlists",
-                        title = yourPlaylistsTitle,
-                        cards = playlistCards,
-                    )
+        buildList {
+            add(
+                HomeShelf(
+                    id = "library-playlists",
+                    title = yourPlaylistsTitle,
+                    cards = playlistCards,
                 )
-            }
+            )
+            addAll(shelves.filterNot { it.isOwnPlaylistsShelf(ownPlaylistIds) })
         }
     }
 }

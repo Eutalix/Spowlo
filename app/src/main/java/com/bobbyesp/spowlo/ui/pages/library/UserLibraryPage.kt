@@ -67,6 +67,8 @@ import com.bobbyesp.spowlo.ui.common.AsyncImageImpl
 import com.bobbyesp.spowlo.ui.components.BackButton
 
 private val ShelfArtworkShape = RoundedCornerShape(10.dp)
+private const val INITIAL_SHELF_COUNT = 4
+private const val SHELF_PAGE_SIZE = 4
 private val LikedSongsBrush = Brush.linearGradient(
     listOf(Color(0xFF7C5CFF), Color(0xFF4A1FD6))
 )
@@ -153,6 +155,12 @@ private fun LibraryContent(
     onOpenArtist: (String) -> Unit,
 ) {
     val shelves = rememberLibraryShelves(state)
+    var visibleShelfCount by rememberSaveable { mutableStateOf(INITIAL_SHELF_COUNT) }
+    val visibleShelves = if (visibleShelfCount >= shelves.size) {
+        shelves
+    } else {
+        shelves.take(visibleShelfCount)
+    }
     val onOpenCard: (HomeCard) -> Unit = remember(onOpenPlaylist, onOpenTrack, onOpenAlbum, onOpenArtist) {
         { card -> card.open(onOpenPlaylist, onOpenTrack, onOpenAlbum, onOpenArtist) }
     }
@@ -175,13 +183,21 @@ private fun LibraryContent(
             }
         }
 
-        items(shelves, key = { "shelf-${it.id}" }) { shelf ->
+        items(visibleShelves, key = { "shelf-${it.id}" }) { shelf ->
             ShelfSection(
                 shelf = shelf,
                 profileName = state.profile.name,
                 onShowAll = { onOpenShelf(shelf.id) },
                 onOpenCard = onOpenCard,
             )
+        }
+
+        if (visibleShelves.size < shelves.size) {
+            item(key = "shelf-more") {
+                LaunchedEffect(visibleShelves.size) {
+                    visibleShelfCount += SHELF_PAGE_SIZE
+                }
+            }
         }
     }
 }
