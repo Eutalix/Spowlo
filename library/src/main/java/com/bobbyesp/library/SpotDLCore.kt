@@ -438,6 +438,17 @@ abstract class SpotDLCore {
                 patch_youtube()
 
 
+            def silence_dependency_warnings():
+                try:
+                    import warnings
+
+                    from bs4 import MarkupResemblesLocatorWarning
+
+                    warnings.filterwarnings("ignore", category=MarkupResemblesLocatorWarning)
+                except Exception:
+                    pass
+
+
             def patch_error_reporting():
                 try:
                     from spotdl.providers.audio import base
@@ -682,6 +693,7 @@ abstract class SpotDLCore {
 
             def main():
                 register_spotdl_package()
+                silence_dependency_warnings()
                 patch_search_providers()
                 patch_error_reporting()
 
