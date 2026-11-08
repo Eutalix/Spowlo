@@ -745,8 +745,12 @@ object DownloaderUtil {
     }
 
     private fun Throwable.taskDetails(): String =
-        (message?.takeIf { it.isNotBlank() } ?: stackTraceToString())
-            .replace(ANSI_ESCAPE_REGEX, "")
+        removeDuplicateLines(
+            clearLinesWithEllipsis(
+                (message?.takeIf { it.isNotBlank() } ?: stackTraceToString())
+                    .replace(ANSI_ESCAPE_REGEX, "")
+            )
+        )
 
     private fun Throwable.isTransient(): Boolean {
         val causes = generateSequence(this) { it.cause }.toList()
@@ -798,7 +802,12 @@ object DownloaderUtil {
     }
 
     fun removeDuplicateLines(input: String): String {
-        return input.split("\n").distinct().joinToString("\n")
+        val lines = mutableListOf<String>()
+        for (line in input.split("\n")) {
+            val trimmed = line.trimEnd()
+            if (lines.lastOrNull() != trimmed) lines.add(trimmed)
+        }
+        return lines.joinToString("\n")
     }
 
     fun buildPathForDatabase(
