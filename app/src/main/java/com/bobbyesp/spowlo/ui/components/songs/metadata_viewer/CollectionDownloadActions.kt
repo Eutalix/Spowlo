@@ -27,9 +27,6 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.bobbyesp.spowlo.R
 import com.bobbyesp.spowlo.ui.components.ActionDialog
-import com.bobbyesp.spowlo.ui.components.ConfirmButton
-import com.bobbyesp.spowlo.ui.components.DismissButton
-import com.bobbyesp.spowlo.ui.components.SpowloDialog
 import com.bobbyesp.spowlo.ui.pages.metadata_viewer.playlists.TrackDownload
 import com.bobbyesp.spowlo.utils.DownloadSizeEstimator
 import com.bobbyesp.spowlo.utils.ToastUtil
@@ -162,33 +159,22 @@ fun CollectionDownloadActions(
     }
 
     pendingAction?.let { action ->
-        SpowloDialog(
+        ActionDialog(
             onDismissRequest = {
                 pendingAction = null
             },
-            icon = { Icon(Icons.Outlined.Download, null) },
-            title = { Text(stringResource(R.string.not_enough_space_title)) },
-            text = {
-                Text(
-                    modifier = Modifier.padding(horizontal = 24.dp),
-                    text = stringResource(
-                        R.string.not_enough_space_message,
-                        pendingBytes.toFileSizeText(),
-                        pendingFreeBytes.toFileSizeText()
-                    )
-                )
+            icon = Icons.Outlined.Download,
+            title = stringResource(R.string.not_enough_space_title),
+            supportingText = stringResource(
+                R.string.not_enough_space_message,
+                pendingBytes.toFileSizeText(),
+                pendingFreeBytes.toFileSizeText()
+            ),
+            confirmText = stringResource(R.string.download_anyway),
+            onConfirm = {
+                pendingAction = null
+                action()
             },
-            confirmButton = {
-                ConfirmButton(text = stringResource(R.string.download_anyway)) {
-                    pendingAction = null
-                    action()
-                }
-            },
-            dismissButton = {
-                DismissButton {
-                    pendingAction = null
-                }
-            }
         )
     }
 
