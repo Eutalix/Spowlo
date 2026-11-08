@@ -176,7 +176,7 @@ object Downloader {
     val mutableTaskList = mutableStateMapOf<String, DownloadTask>()
 
     private val consoleBuilders = ConcurrentHashMap<String, StringBuilder>()
-    private val consoleSeenLines = ConcurrentHashMap<String, MutableSet<String>>()
+    private val consoleLastLines = ConcurrentHashMap<String, String>()
     private val consoleLastFlush = ConcurrentHashMap<String, Long>()
 
     init {
@@ -219,7 +219,8 @@ object Downloader {
     fun updateTaskOutput(url: String, line: String, progress: Float, isPlaylist: Boolean = false) {
         val key = makeKey(url, url.reversed())
         val oldValue = mutableTaskList[key] ?: return
-        if (oldValue.currentLine == line || line.containsEllipsis() || !appendConsoleLine(key, line)) return
+        val trimmedLine = line.trimEnd()
+        if (oldValue.currentLine == trimmedLine || trimmedLine.containsEllipsis() || !appendConsoleLine(key, trimmedLine)) return
 
         val now = SystemClock.elapsedRealtime()
         if (now - (consoleLastFlush[key] ?: 0L) < CONSOLE_FLUSH_INTERVAL_MS) return
@@ -227,19 +228,19 @@ object Downloader {
 
         val runningProgress = when {
             !isPlaylist -> progress
-            line.contains("Total") -> getProgress(line)
+            trimmedLine.contains("Total") -> getProgress(trimmedLine)
             else -> (oldValue.state as? DownloadTask.State.Running)?.progress ?: 0f
         }
         mutableTaskList[key] = oldValue.copy(
             consoleOutput = consoleText(key),
-            currentLine = line,
+            currentLine = trimmedLine,
             state = DownloadTask.State.Running(runningProgress),
         )
     }
 
     private fun appendConsoleLine(key: String, line: String): Boolean {
-        val seen = consoleSeenLines.getOrPut(key) { HashSet() }
-        if (!seen.add(line)) return false
+        if (consoleLastLines[key] == line) return false
+        consoleLastLines[key] = line
         val builder = consoleBuilders.getOrPut(key) { StringBuilder() }
         builder.append(line).append('\n')
         if (builder.length > MAX_CONSOLE_CHARS) {
@@ -252,7 +253,7 @@ object Downloader {
 
     private fun forgetConsole(key: String) {
         consoleBuilders.remove(key)
-        consoleSeenLines.remove(key)
+        consoleLastLines.remove(key)
         consoleLastFlush.remove(key)
     }
 
