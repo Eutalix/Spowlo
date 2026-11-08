@@ -126,9 +126,6 @@ import com.bobbyesp.spowlo.ui.components.ActionDialog
 import com.bobbyesp.spowlo.ui.components.AnchoredMenu
 import com.bobbyesp.spowlo.ui.components.AnchoredMenuItem
 import com.bobbyesp.spowlo.ui.components.BackButton
-import com.bobbyesp.spowlo.ui.components.ConfirmButton
-import com.bobbyesp.spowlo.ui.components.DismissButton
-import com.bobbyesp.spowlo.ui.components.SpowloDialog
 import com.bobbyesp.spowlo.ui.components.download_tasks.ArtistSheet
 import com.bobbyesp.spowlo.ui.components.download_tasks.DownloadedSongRow
 import com.bobbyesp.spowlo.ui.components.download_tasks.DownloadingTaskItem
@@ -822,31 +819,20 @@ fun DownloadTasksPage(
 
     if (showMissingDeleteDialog) {
         val count = library.missingIds.size
-        SpowloDialog(
+        ActionDialog(
             onDismissRequest = { showMissingDeleteDialog = false },
-            icon = { Icon(Icons.Outlined.ErrorOutline, null) },
-            title = { Text(stringResource(R.string.remove_missing_title)) },
-            text = {
-                Text(
-                    modifier = Modifier.padding(horizontal = 24.dp),
-                    text = pluralStringResource(R.plurals.remove_missing_message, count, count)
+            icon = Icons.Outlined.ErrorOutline,
+            title = stringResource(R.string.remove_missing_title),
+            supportingText = pluralStringResource(R.plurals.remove_missing_message, count, count),
+            confirmText = stringResource(R.string.remove),
+            onConfirm = {
+                showMissingDeleteDialog = false
+                downloadsViewModel.deleteItems(library.missingIds.toList(), deleteFile = false)
+                ToastUtil.makeToast(
+                    context,
+                    context.resources.getQuantityString(R.plurals.removed_entries, count, count)
                 )
             },
-            confirmButton = {
-                ConfirmButton {
-                    showMissingDeleteDialog = false
-                    downloadsViewModel.deleteItems(library.missingIds.toList(), deleteFile = false)
-                    ToastUtil.makeToast(
-                        context,
-                        context.resources.getQuantityString(R.plurals.removed_entries, count, count)
-                    )
-                }
-            },
-            dismissButton = {
-                DismissButton {
-                    showMissingDeleteDialog = false
-                }
-            }
         )
     }
 
@@ -872,27 +858,16 @@ fun DownloadTasksPage(
     }
 
     if (showStorageAccessDialog) {
-        SpowloDialog(
+        ActionDialog(
             onDismissRequest = { showStorageAccessDialog = false },
-            icon = { Icon(Icons.Outlined.Folder, null) },
-            title = { Text(stringResource(R.string.import_storage_access_title)) },
-            text = {
-                Text(
-                    modifier = Modifier.padding(horizontal = 24.dp),
-                    text = stringResource(R.string.import_storage_access_summary)
-                )
+            icon = Icons.Outlined.Folder,
+            title = stringResource(R.string.import_storage_access_title),
+            supportingText = stringResource(R.string.import_storage_access_summary),
+            confirmText = stringResource(R.string.open_settings),
+            onConfirm = {
+                showStorageAccessDialog = false
+                FilesUtil.openAllFilesAccessSettings()
             },
-            confirmButton = {
-                ConfirmButton(text = stringResource(R.string.open_settings)) {
-                    showStorageAccessDialog = false
-                    FilesUtil.openAllFilesAccessSettings()
-                }
-            },
-            dismissButton = {
-                DismissButton {
-                    showStorageAccessDialog = false
-                }
-            }
         )
     }
 
