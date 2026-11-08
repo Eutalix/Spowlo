@@ -101,7 +101,7 @@ abstract class SpotDLCore {
                          pythonVerDir.absolutePath
         
         HOME = baseDirectory.absolutePath
-        TMPDIR = context.cacheDir.absolutePath
+        TMPDIR = File(context.cacheDir, "spotdl_tmp").ensure().absolutePath
         LDFLAGS = "-L" + pythonDir.absolutePath + "/usr/lib -rdynamic"
 
         try {
@@ -259,6 +259,7 @@ abstract class SpotDLCore {
             this["PYTHONHOME"] = ENV_PYTHONHOME
             this["PYTHONPATH"] = ENV_PYTHONPATH
             this["HOME"] = HOME 
+            this["TMPDIR"] = TMPDIR
             this["LDFLAGS"] = LDFLAGS
             this["TERM"] = "xterm-256color"
             this["FORCE_COLOR"] = "true"
