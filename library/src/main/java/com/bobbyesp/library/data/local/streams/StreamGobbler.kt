@@ -18,6 +18,9 @@ internal class StreamGobbler(private val buffer: StringBuilder, private val stre
             var nextChar: Int
             while (`in`.read().also { nextChar = it } != -1) {
                 buffer.append(nextChar.toChar())
+                if (buffer.length > MAX_OUTPUT_CHARS + TRIM_CHARS) {
+                    buffer.delete(0, buffer.length - MAX_OUTPUT_CHARS)
+                }
             }
         } catch (e: IOException) {
             if (BuildConfig.DEBUG) Log.e(TAG, "failed to read stream", e)
@@ -26,5 +29,7 @@ internal class StreamGobbler(private val buffer: StringBuilder, private val stre
 
     companion object {
         private val TAG = StreamGobbler::class.java.simpleName
+        private const val MAX_OUTPUT_CHARS = 256 * 1024
+        private const val TRIM_CHARS = 16 * 1024
     }
 }

@@ -37,27 +37,20 @@ internal class StreamProcessExtractor(
             val reader: Reader = InputStreamReader(stream, StandardCharsets.UTF_8)
             val bufferedReader = BufferedReader(reader)
             var line: String?
-            val arrayOfLines: MutableList<String> = mutableListOf()
             while (bufferedReader.readLine().also { line = it } != null) {
-                //Just read the line, cut that line in it's end and add it to the buffer.
-                // Then, the buffer will be read by the UI and after that, it will be cleared
-
                 val readLine = line as CharSequence
 
                 //clean output
                 val matcher: Matcher = cleanOutRegex.matcher(readLine)
                 val cleanLine = matcher.replaceAll("")
-                if(cleanLine != "") processOutputLine(cleanLine)
-                arrayOfLines.add(cleanLine)
-                buffer.setLength(0)
-                continue
+                if (cleanLine != "") processOutputLine(cleanLine)
+                // Only the tail is ever read: full error reports take the last few thousand chars.
+                if (buffer.isNotEmpty()) buffer.append('\n')
+                buffer.append(cleanLine)
+                if (buffer.length > MAX_OUTPUT_CHARS + TRIM_CHARS) {
+                    buffer.delete(0, buffer.length - MAX_OUTPUT_CHARS)
+                }
             }
-
-            //Make appear all the lines in the stdOut of the Logcat
-            //delete from the array the empty lines
-            arrayOfLines.removeAll { it == "" }
-            buffer.append(arrayOfLines.joinToString("\n"))
-
         } catch (e: IOException) {
             if (BuildConfig.DEBUG) Log.e(TAG, "Failed to read stream", e)
         }
@@ -100,6 +93,8 @@ internal class StreamProcessExtractor(
 
     companion object{
         private val TAG = StreamProcessExtractor::class.java.simpleName
+        private const val MAX_OUTPUT_CHARS = 256 * 1024
+        private const val TRIM_CHARS = 16 * 1024
 
         private var ETA: Long = -1
         private var PERCENT = -1.0f
