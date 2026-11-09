@@ -427,6 +427,9 @@ fun InitialEntry(
                     onGoBack = onBackPressed,
                     onNavigateToLog = { key ->
                         navController.navigate("${Route.FULLSCREEN_LOG}/$key")
+                    },
+                    onOpenCookies = {
+                        navController.navigate(Route.COOKIE_PROFILE)
                     }
                 )
             }

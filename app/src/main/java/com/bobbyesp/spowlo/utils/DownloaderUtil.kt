@@ -16,6 +16,7 @@ import com.bobbyesp.spowlo.App.Companion.context
 import com.bobbyesp.spowlo.Downloader
 import com.bobbyesp.spowlo.R
 import com.bobbyesp.spowlo.database.DownloadedSongInfo
+import com.bobbyesp.spowlo.requiresYoutubeSignIn
 import com.bobbyesp.spowlo.utils.FilesUtil.getCookiesFile
 import com.bobbyesp.spowlo.utils.FilesUtil.getSdcardTempDir
 import com.bobbyesp.spowlo.utils.FilesUtil.moveFilesToSdcard
@@ -509,12 +510,17 @@ object DownloaderUtil {
             if (it is CanceledException) return@onFailure
             Log.e(TAG, if (metadataOnly) "Metadata update failed" else "Parallel download failed", it)
             if (!metadataOnly) {
-                ToastUtil.makeToastSuspend(context.getString(R.string.download_error_msg))
+                val message = context.getString(
+                    if (it.requiresYoutubeSignIn()) R.string.download_sign_in_required
+                    else R.string.download_error_msg
+                )
+                ToastUtil.makeToastSuspend(message)
                 Downloader.onTaskError(
-                    message = context.getString(R.string.download_error_msg),
+                    message = message,
                     details = it.taskDetails(),
                     url = url,
                     largeIcon = artwork,
+                    signInRequired = it.requiresYoutubeSignIn(),
                 )
             }
         }
@@ -624,8 +630,11 @@ object DownloaderUtil {
                     )
                 }.getOrDefault(0)
             val message = context.getString(
-                if (downloaded > 0) R.string.partial_download_error
-                else R.string.collection_download_error
+                when {
+                    it.requiresYoutubeSignIn() -> R.string.download_sign_in_required
+                    downloaded > 0 -> R.string.partial_download_error
+                    else -> R.string.collection_download_error
+                }
             )
             ToastUtil.makeToastSuspend(message)
             Downloader.onTaskError(
@@ -633,6 +642,7 @@ object DownloaderUtil {
                 details = it.taskDetails(),
                 url = url,
                 largeIcon = artwork,
+                signInRequired = it.requiresYoutubeSignIn(),
             )
         }
         Downloader.onProcessEnded()
@@ -689,6 +699,7 @@ object DownloaderUtil {
     private fun Throwable.isTransient(): Boolean {
         val causes = generateSequence(this) { it.cause }.toList()
         if (causes.any { it is CanceledException }) return false
+        if (requiresYoutubeSignIn()) return false
         if (causes.any { NON_RETRYABLE_ERROR_REGEX.containsMatchIn(it.message.orEmpty()) }) return false
         return causes.any { RETRYABLE_ERROR_REGEX.containsMatchIn(it.message.orEmpty()) }
     }

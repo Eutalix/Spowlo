@@ -75,6 +75,7 @@ object Downloader {
         val taskName: String,
         val artist: String = "",
         val artworkUrl: String = "",
+        val signInRequired: Boolean = false,
     ) {
         fun toKey() = makeKey(url, url.reversed())
         sealed class State {
@@ -92,7 +93,8 @@ object Downloader {
             return url == other.url &&
                     consoleOutput == other.consoleOutput &&
                     state == other.state &&
-                    currentLine == other.currentLine
+                    currentLine == other.currentLine &&
+                    signInRequired == other.signInRequired
         }
 
         fun onCopyLog(clipboardManager: androidx.compose.ui.platform.ClipboardManager) {
@@ -292,6 +294,7 @@ object Downloader {
         url: String,
         details: String? = null,
         largeIcon: Bitmap? = null,
+        signInRequired: Boolean = false,
     ) =
         mutableTaskList.run {
             val key = makeKey(url, url.reversed())
@@ -305,7 +308,8 @@ object Downloader {
             mutableTaskList[key] = oldValue.copy(
                 state = DownloadTask.State.Error(details ?: message),
                 currentLine = message,
-                consoleOutput = consoleText(key).ifEmpty { oldValue.consoleOutput } + "\n" + (details ?: message)
+                consoleOutput = consoleText(key).ifEmpty { oldValue.consoleOutput } + "\n" + (details ?: message),
+                signInRequired = signInRequired,
             )
             forgetConsole(key)
         }
@@ -667,3 +671,13 @@ object Downloader {
         return toSpotifySong(fullAlbum, fullArtist)
     }
 }
+
+private val YOUTUBE_AUTH_REGEX = Regex(
+    "sign in to confirm|cookies are no longer valid",
+    RegexOption.IGNORE_CASE,
+)
+
+internal fun Throwable.requiresYoutubeSignIn(): Boolean =
+    generateSequence(this) { it.cause }.any {
+        YOUTUBE_AUTH_REGEX.containsMatchIn(it.message.orEmpty())
+    }

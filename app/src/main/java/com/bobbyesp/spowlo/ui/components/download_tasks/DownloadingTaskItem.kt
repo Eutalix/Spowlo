@@ -20,6 +20,7 @@ import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Error
 import androidx.compose.material.icons.outlined.Cancel
 import androidx.compose.material.icons.outlined.ContentCopy
+import androidx.compose.material.icons.outlined.Cookie
 import androidx.compose.material.icons.outlined.Download
 import androidx.compose.material.icons.outlined.ErrorOutline
 import androidx.compose.material.icons.outlined.Link
@@ -60,11 +61,13 @@ fun DownloadingTaskItem(
     artist: String = "Alan Walker",
     artworkUrl: String = "",
     progressText: String = "",
+    signInRequired: Boolean = false,
     onCopyLog: () -> Unit = {},
     onCopyError: () -> Unit = {},
     onRestart: () -> Unit = {},
     onShowLog: () -> Unit = {},
     onCopyLink: () -> Unit = {},
+    onOpenCookies: () -> Unit = {},
     onCancel: () -> Unit = {}
 ) {
     val accentColor = when (status) {
@@ -206,6 +209,13 @@ fun DownloadingTaskItem(
 
             Spacer(Modifier.height(4.dp))
             Row(modifier = Modifier.horizontalScroll(rememberScrollState())) {
+                if (status == TaskState.ERROR && signInRequired) {
+                    FlatButtonChip(
+                        icon = Icons.Outlined.Cookie,
+                        label = stringResource(id = R.string.add_cookies_here),
+                        iconColor = MaterialTheme.colorScheme.error,
+                    ) { onOpenCookies() }
+                }
                 FlatButtonChip(
                     icon = Icons.Outlined.ContentCopy,
                     label = stringResource(id = R.string.copy_log)

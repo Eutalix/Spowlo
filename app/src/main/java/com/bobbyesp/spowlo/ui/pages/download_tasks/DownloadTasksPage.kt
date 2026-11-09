@@ -162,6 +162,7 @@ import kotlin.math.roundToInt
 fun DownloadTasksPage(
     onGoBack: () -> Unit = {},
     onNavigateToLog: (String) -> Unit,
+    onOpenCookies: () -> Unit = {},
     downloadsViewModel: DownloadsViewModel = viewModel()
 ) {
     val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior()
@@ -673,12 +674,14 @@ fun DownloadTasksPage(
                                 header = task.taskName,
                                 artist = task.artist,
                                 artworkUrl = task.artworkUrl,
+                                signInRequired = task.signInRequired,
                                 onCopyError = { task.onCopyError(clipboardManager) },
                                 onCancel = { task.onCancel() },
                                 onRestart = { task.onRestart() },
                                 onCopyLog = { task.onCopyLog(clipboardManager) },
                                 onShowLog = { onNavigateToLog("active_${task.hashCode()}") },
                                 onCopyLink = { task.onCopyUrl(clipboardManager) },
+                                onOpenCookies = onOpenCookies,
                             )
                         }
                     }
