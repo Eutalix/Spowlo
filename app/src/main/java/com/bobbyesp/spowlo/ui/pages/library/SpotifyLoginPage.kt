@@ -79,7 +79,7 @@ fun SpotifyLoginPage(
             WebView(
                 state = webViewState,
                 modifier = Modifier.fillMaxSize(),
-                captureBackPresses = false,
+                captureBackPresses = true,
                 client = remember {
                     object : AccompanistWebViewClient() {
                         private var finished = false
