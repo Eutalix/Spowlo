@@ -90,6 +90,15 @@ class UserLibraryViewModel : ViewModel() {
         refresh()
     }
 
+    fun signOut() {
+        signInJob?.cancel()
+        loadJob?.cancel()
+        viewModelScope.launch {
+            SpotifyUserSession.signOut()
+            mutableState.value = UserLibraryState.LoggedOut
+        }
+    }
+
     private suspend fun loadLibrary(): UserLibraryState = runCatching {
         coroutineScope {
             val home = async {

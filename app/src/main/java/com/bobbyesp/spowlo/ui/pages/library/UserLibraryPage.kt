@@ -22,6 +22,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.Logout
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.LibraryMusic
 import androidx.compose.material.icons.filled.Person
@@ -29,6 +30,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
@@ -64,6 +66,7 @@ import com.bobbyesp.spowlo.features.spotify_api.data.remote.web.HomeCardType
 import com.bobbyesp.spowlo.features.spotify_api.data.remote.web.HomeShelf
 import com.bobbyesp.spowlo.features.spotify_api.data.remote.web.UserProfile
 import com.bobbyesp.spowlo.ui.common.AsyncImageImpl
+import com.bobbyesp.spowlo.ui.components.ActionDialog
 import com.bobbyesp.spowlo.ui.components.BackButton
 
 private val ShelfArtworkShape = RoundedCornerShape(10.dp)
@@ -87,6 +90,7 @@ fun UserLibraryPage(
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     var showLogin by rememberSaveable { mutableStateOf(false) }
+    var showSignOutDialog by rememberSaveable { mutableStateOf(false) }
 
     LaunchedEffect(state) {
         if (state is UserLibraryState.Ready) showLogin = false
@@ -111,7 +115,17 @@ fun UserLibraryPage(
     Scaffold(modifier = Modifier.fillMaxSize(), topBar = {
         TopAppBar(
             title = { Text(stringResource(R.string.your_library)) },
-            navigationIcon = { BackButton(onBackPressed) }
+            navigationIcon = { BackButton(onBackPressed) },
+            actions = {
+                if (state is UserLibraryState.Ready || state is UserLibraryState.Error) {
+                    IconButton(onClick = { showSignOutDialog = true }) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Outlined.Logout,
+                            contentDescription = stringResource(R.string.sign_out),
+                        )
+                    }
+                }
+            }
         )
     }) { paddingValues ->
         Box(
@@ -141,6 +155,19 @@ fun UserLibraryPage(
                 )
             }
         }
+    }
+
+    if (showSignOutDialog) {
+        ActionDialog(
+            onDismissRequest = { showSignOutDialog = false },
+            icon = Icons.AutoMirrored.Outlined.Logout,
+            title = stringResource(R.string.sign_out_confirm_title),
+            confirmText = stringResource(R.string.sign_out),
+            onConfirm = {
+                showSignOutDialog = false
+                viewModel.signOut()
+            },
+        )
     }
 }
 

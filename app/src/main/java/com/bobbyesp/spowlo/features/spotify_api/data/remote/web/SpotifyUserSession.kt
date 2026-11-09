@@ -61,6 +61,21 @@ internal object SpotifyUserSession {
         cached = null
     }
 
+    suspend fun signOut() = withContext(Dispatchers.Main.immediate) {
+        invalidate()
+        val manager = CookieManager.getInstance()
+        listOf("open.spotify.com", "accounts.spotify.com").forEach { host ->
+            val url = "https://$host"
+            manager.getCookie(url)?.split(';')?.forEach { cookie ->
+                val name = cookie.substringBefore('=').trim()
+                if (name.isEmpty()) return@forEach
+                manager.setCookie(url, "$name=; Max-Age=0; Path=/")
+                manager.setCookie(url, "$name=; Max-Age=0; Path=/; Domain=.spotify.com")
+            }
+        }
+        manager.flush()
+    }
+
     suspend fun hasAccountCookies(): Boolean =
         withContext(Dispatchers.Main.immediate) { sessionCookies() != null }
 

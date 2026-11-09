@@ -173,7 +173,7 @@
     <string name="done">Done</string>
     <string name="cookies">YouTube cookies</string>
     <string name="use_cookies">Use YouTube cookies</string>
-    <string name="use_cookies_desc">Pass your YouTube cookies to yt-dlp.</string>
+    <string name="use_cookies_desc">Pass your cookies to yt-dlp.</string>
     <string name="youtube_account">Account</string>
     <string name="sign_in_youtube">Sign in to YouTube</string>
     <string name="sign_in_youtube_signed_in">Tap to switch accounts.</string>
@@ -575,6 +575,8 @@
     <string name="no_playlists_yet">No playlists yet.</string>
     <string name="library_sign_in_body">Sign in to see your liked songs and playlists.</string>
     <string name="sign_in_with_spotify">Sign in with Spotify</string>
+    <string name="sign_out">Sign out</string>
+    <string name="sign_out_confirm_title">Sign out of Spotify?</string>
     <string name="library_error">Couldn\'t load your library.</string>
     <string name="liked_songs_error">Couldn\'t load your liked songs.</string>
     <string name="retry">Try again</string>
