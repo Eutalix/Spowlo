@@ -22,15 +22,13 @@ import com.bobbyesp.library.data.remote.SpotDLDependencyUpdater
 import com.bobbyesp.spowlo.features.spotify_api.data.remote.web.SpotifyWebTransport
 import com.bobbyesp.spowlo.features.spotify_api.data.remote.web.SpotifyUserSession
 import com.bobbyesp.spowlo.utils.AUDIO_DIRECTORY
-import com.bobbyesp.spowlo.utils.DownloaderUtil
 import com.bobbyesp.spowlo.utils.EXTRA_DIRECTORY
-import com.bobbyesp.spowlo.utils.FilesUtil
 import com.bobbyesp.spowlo.utils.FilesUtil.createEmptyFile
-import com.bobbyesp.spowlo.utils.FilesUtil.getCookiesFile
 import com.bobbyesp.spowlo.utils.NotificationsUtil
 import com.bobbyesp.spowlo.utils.PreferencesUtil
 import com.bobbyesp.spowlo.utils.PreferencesUtil.getString
 import com.bobbyesp.spowlo.utils.ToastUtil
+import com.bobbyesp.spowlo.utils.exportYoutubeCookies
 import com.google.android.material.color.DynamicColors
 import com.tencent.mmkv.MMKV
 import dagger.hilt.android.HiltAndroidApp
@@ -66,9 +64,7 @@ class App : Application() {
             try {
                 SpotDL.getInstance().init(this@App)
                 FFmpeg.init(this@App)
-                DownloaderUtil.getCookiesContentFromDatabase().getOrNull()?.let {
-                    FilesUtil.writeContentToFile(it, getCookiesFile())
-                }
+                exportYoutubeCookies()
             } catch (e: Exception) {
                 Looper.prepare()
                 ToastUtil.makeToast(text = e.message ?: "Unknown error")

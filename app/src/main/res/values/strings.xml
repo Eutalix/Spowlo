@@ -169,16 +169,22 @@
     <string name="experimental_features">Experimental features</string>
     <string name="close">Close</string>
     <string name="done">Done</string>
-    <string name="cookies">Cookies</string>
-    <string name="use_cookies">Use cookies</string>
-    <string name="generate_new_cookies">Generate new cookies</string>
-    <string name="export_to_clipboard">Export cookies to clipboard</string>
-    <string name="clear_all_cookies">Delete all cookies</string>
-    <string name="cookies_desc">Use Netscape-formatted cookies for downloads</string>
-    <string name="cookies_file_name" translatable="false">cookies.txt</string>
-    <string name="cookies_usage_msg">Cookies are passed to yt-dlp, including your YouTube account.</string>
-    <string name="remove_cookie_profile_desc">Remove cookies for \"%1$s\"?</string>
-    <string name="clear_all_cookies_desc">Delete all cookies stored in the app?</string>
+    <string name="cookies">YouTube cookies</string>
+    <string name="use_cookies">Use YouTube cookies</string>
+    <string name="use_cookies_desc">Pass your YouTube cookies to yt-dlp.</string>
+    <string name="youtube_account">Account</string>
+    <string name="sign_in_youtube">Sign in to YouTube</string>
+    <string name="sign_in_youtube_signed_in">Tap to switch accounts.</string>
+    <string name="signed_in_as">Signed in as %1$s</string>
+    <string name="signed_in_youtube">Signed in to YouTube</string>
+    <string name="cookies_scope_hint">These cookies never leave your device, and are only used to bypass restrictions on YouTube downloads.</string>
+    <string name="cookies_saved">Cookies saved</string>
+    <string name="cookies_not_found">No YouTube cookies found</string>
+    <string name="cookies_deleted">Cookies deleted</string>
+    <string name="clear_all_cookies">Delete cookies</string>
+    <string name="cookies_desc">Used for YouTube downloads</string>
+    <string name="clear_all_cookies_desc">Sign out of YouTube and delete your saved cookies?</string>
+    <string name="youtube" translatable="false">YouTube</string>
     <string name="download_lyrics">Download lyrics</string>
     <string name="download_lyrics_desc">Fetch and save lyrics</string>
     <string name="downloader">Downloader</string>
@@ -418,7 +424,6 @@
     <string name="app_language">App language</string>
     <string name="section_app">App</string>
     <string name="section_behavior">Behaviour</string>
-    <string name="cookies_profiles_hint">Tap a profile to edit it, long-press to remove it.</string>
     <string name="not_configured">Not configured</string>
     <string name="accent_color_unavailable">Disable dynamic color to choose a custom accent color</string>
     <string name="audio_quality_unavailable">Turn off \"Preserve original audio\" to pick a bitrate</string>

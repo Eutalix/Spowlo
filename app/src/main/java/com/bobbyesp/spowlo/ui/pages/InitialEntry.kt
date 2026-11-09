@@ -56,8 +56,7 @@ import com.bobbyesp.spowlo.ui.pages.settings.about.AboutPage
 import com.bobbyesp.spowlo.ui.pages.settings.appearance.AppThemePreferencesPage
 import com.bobbyesp.spowlo.ui.pages.settings.appearance.AppearancePage
 import com.bobbyesp.spowlo.ui.pages.settings.appearance.LanguagePage
-import com.bobbyesp.spowlo.ui.pages.settings.cookies.CookieProfilePage
-import com.bobbyesp.spowlo.ui.pages.settings.cookies.CookiesSettingsViewModel
+import com.bobbyesp.spowlo.ui.pages.settings.cookies.CookiesSettingsPage
 import com.bobbyesp.spowlo.ui.pages.settings.cookies.WebViewPage
 import com.bobbyesp.spowlo.ui.pages.settings.directories.DownloadsDirectoriesPage
 import com.bobbyesp.spowlo.ui.pages.settings.documentation.DocumentationPage
@@ -117,7 +116,6 @@ fun InitialEntry(
     var showDownloaderBottomSheet by remember { mutableStateOf(false) }
     val sheetState = androidx.compose.material3.rememberModalBottomSheetState()
 
-    val cookiesViewModel: CookiesSettingsViewModel = viewModel()
     val onBackPressed: () -> Unit = { navController.popBackStack() }
 
     // Keeps every metadata page on the back stack, except when re-opening the page already shown.
@@ -314,15 +312,14 @@ fun InitialEntry(
                 )
             }
             animatedComposable(Route.COOKIE_PROFILE) {
-                CookieProfilePage(
-                    cookiesViewModel = cookiesViewModel,
-                    navigateToCookieGeneratorPage = { navController.navigate(Route.COOKIE_GENERATOR_WEBVIEW) },
+                CookiesSettingsPage(
+                    navigateToYoutubeSignIn = { navController.navigate(Route.COOKIE_GENERATOR_WEBVIEW) },
                 ) { onBackPressed() }
             }
             animatedComposable(
                 Route.COOKIE_GENERATOR_WEBVIEW
             ) {
-                WebViewPage(cookiesViewModel) { onBackPressed() }
+                WebViewPage { onBackPressed() }
             }
             animatedComposable(Route.UPDATER_PAGE) {
                 UpdaterPage(
