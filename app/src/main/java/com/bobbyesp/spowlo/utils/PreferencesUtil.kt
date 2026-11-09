@@ -67,6 +67,8 @@ const val PROXY = "proxy"
 
 const val SPOTDL_UPDATE = "spotdl_update"
 const val COOKIES = "cookies"
+const val GOOGLE_ACCOUNT_EMAIL = "google_account_email"
+const val GOOGLE_ACCOUNT_STALE = "google_account_stale"
 const val AUTO_UPDATE = "auto_update"
 const val UPDATE_CHANNEL = "update_channel"
 const val INCOGNITO_MODE = "incognito_mode"
@@ -180,6 +182,22 @@ object PreferencesUtil {
     fun getValue(key: String): Boolean = key.getBoolean()
     fun encodeString(key: String, string: String) = key.updateString(string)
     fun containsKey(key: String) = kv.containsKey(key)
+
+    fun setGoogleAccountEmail(email: String) {
+        kv.encode(GOOGLE_ACCOUNT_EMAIL, email)
+        kv.removeValueForKey(GOOGLE_ACCOUNT_STALE)
+    }
+
+    fun getGoogleAccountEmail(): String? = kv.decodeString(GOOGLE_ACCOUNT_EMAIL)
+
+    fun markGoogleAccountStale() = kv.encode(GOOGLE_ACCOUNT_STALE, true)
+
+    fun isGoogleAccountStale(): Boolean = kv.decodeBool(GOOGLE_ACCOUNT_STALE, false)
+
+    fun clearGoogleAccountEmail() {
+        kv.removeValueForKey(GOOGLE_ACCOUNT_EMAIL)
+        kv.removeValueForKey(GOOGLE_ACCOUNT_STALE)
+    }
 
     // Updater Methods
     fun setLastUpdateCheck(time: Long) = kv.encode(LAST_UPDATE_CHECK_TIME, time)
