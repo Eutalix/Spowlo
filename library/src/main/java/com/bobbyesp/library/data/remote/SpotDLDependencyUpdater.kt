@@ -40,7 +40,7 @@ object SpotDLDependencyUpdater {
         "syncedlyrics"
     )
 
-    // Excluded by spotDL 4.6.0 due to broken localized search.
+    // Mirrors spotDL's ytmusicapi!=1.12.2,!=1.12.3 constraint.
     private val BLOCKED_VERSIONS = mapOf(
         "ytmusicapi" to setOf("1.12.2", "1.12.3")
     )
@@ -78,7 +78,7 @@ object SpotDLDependencyUpdater {
                         val result = checkAndInstallPackage(pkgName, sitePackages)
                         sb.append(result).append("\n")
                         if(isDebug) Log.d(TAG, ">>> DepUpdater: Processed $pkgName -> $result")
-                        if (result.contains("[Updated]")) {
+                        if (result.contains("[Updated]") || result.contains("[Downgraded]")) {
                             updatesCount++
                         }
                     } catch (e: Exception) {
@@ -135,11 +135,14 @@ object SpotDLDependencyUpdater {
         return ordered.associateWith { getLocalVersion(sitePackages, it) }
     }
 
-    /** True when every volatile package is present in custom site-packages. */
+    /** True when every volatile package is present and unblocked. */
     fun areDependenciesInstalled(context: Context): Boolean {
         val sitePackages = getSitePackagesDir(context)
         if (!sitePackages.exists()) return false
-        return TARGET_PACKAGES.all { getLocalVersion(sitePackages, it) != "0.0.0" }
+        return TARGET_PACKAGES.all { pkgName ->
+            val version = getLocalVersion(sitePackages, pkgName)
+            version != "0.0.0" && !isBlocked(pkgName, version)
+        }
     }
 
     /** Drops hotfix copies of packages that must stay on the bundled version. */
@@ -165,8 +168,8 @@ object SpotDLDependencyUpdater {
                     val remoteVersion = resolveRemoteVersion(pkgName, pypiInfo.info.version)
                     val localVersion = getLocalVersion(sitePackages, pkgName)
 
-                    // Missing packages (0.0.0) count as outdated.
-                    localVersion != remoteVersion
+                    // Missing packages (0.0.0) and blocked versions count as outdated.
+                    localVersion != remoteVersion || isBlocked(pkgName, localVersion)
                 } catch (e: Exception) {
                     false
                 }
@@ -188,11 +191,16 @@ object SpotDLDependencyUpdater {
                 ?: return "[Error] $pkgName: Failed to query PyPI for $remoteVersion"
         }
         val localVersion = getLocalVersion(sitePackagesDir, pkgName)
-        
+        val replacingBlocked = isBlocked(pkgName, localVersion)
+
         if(isDebug) Log.d(TAG, ">>> DepUpdater: $pkgName | Local: $localVersion | Remote: $remoteVersion")
 
         if (localVersion == remoteVersion) {
             return "[OK] $pkgName: Up to date ($localVersion)"
+        }
+
+        if (replacingBlocked) {
+            Log.w(TAG, ">>> DepUpdater: Replacing blocked $pkgName $localVersion with $remoteVersion")
         }
 
         val wheelUrl = pypiInfo.urls.find { 
@@ -211,11 +219,18 @@ object SpotDLDependencyUpdater {
 
             if(isDebug) Log.d(TAG, ">>> DepUpdater: Installing new wheel...")
             installWheelAtomically(tempFile, sitePackagesDir, pkgName)
-            return "[Updated] $pkgName: ($localVersion -> $remoteVersion)"
+            return if (replacingBlocked) {
+                "[Downgraded] $pkgName: ($localVersion -> $remoteVersion, blocked)"
+            } else {
+                "[Updated] $pkgName: ($localVersion -> $remoteVersion)"
+            }
         } finally {
             tempFile.delete()
         }
     }
+
+    private fun isBlocked(pkgName: String, version: String): Boolean =
+        version in BLOCKED_VERSIONS[pkgName].orEmpty()
 
     private fun resolveRemoteVersion(pkgName: String, latestVersion: String): String =
         if (latestVersion in BLOCKED_VERSIONS[pkgName].orEmpty()) {
