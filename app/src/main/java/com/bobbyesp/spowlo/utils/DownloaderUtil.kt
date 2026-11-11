@@ -403,7 +403,7 @@ object DownloaderUtil {
                     thumbnailUrl = songInfo.cover_url,
                     songPath = filePath,
                     songDuration = songInfo.duration ?: 0.0,
-                    extractor = "Youtube Music",
+                    extractor = "Spowlo",
                     consoleOutput = consoleOutput.takeLast(MAX_STORED_LOG_LENGTH),
                     downloadedAt = System.currentTimeMillis(),
                 )

@@ -692,11 +692,87 @@ abstract class SpotDLCore {
                 youtube.YouTube.get_results = youtube_results
 
 
+            def patch_soundcloud():
+                try:
+                    import datetime
+
+                    import dateutil.parser
+                    import requests
+                    from dacite import Config
+
+                    from soundcloud import SoundCloud
+                    from soundcloud.exceptions import ClientIDGenerationError
+                    from soundcloud.resource.base import BaseData
+                except Exception as error:
+                    print(f"SoundCloud patch skipped: {error}", file=sys.stderr)
+                    return
+
+                def parse_datetime(value):
+                    return None if value is None else dateutil.parser.isoparse(value)
+
+                BaseData.dacite_config = Config(
+                    type_hooks={datetime.datetime: parse_datetime},
+                    cast=[tuple],
+                    check_types=False,
+                )
+
+                script_regex = re.compile(
+                    r'<script[^>]+src="(https://a-v2\.sndcdn\.com/assets/[^"]+\.js)"'
+                )
+                client_id_regex = re.compile(r'client_id\s*:\s*"([0-9a-zA-Z]{32})"')
+
+                @classmethod
+                def generate_client_id(cls):
+                    with requests.Session() as session:
+                        session.headers["User-Agent"] = cls._DEFAULT_USER_AGENT
+                        home = session.get("https://soundcloud.com", timeout=30)
+                        home.raise_for_status()
+                        urls = script_regex.findall(home.text)
+                        if not urls:
+                            raise ClientIDGenerationError("No asset scripts found")
+                        for url in reversed(urls):
+                            try:
+                                script = session.get(url, timeout=30)
+                                script.raise_for_status()
+                            except requests.RequestException:
+                                continue
+                            match = client_id_regex.search(script.text)
+                            if match:
+                                return match.group(1)
+                    raise ClientIDGenerationError("Could not find client_id in any asset script")
+
+                SoundCloud.generate_client_id = generate_client_id
+
+                try:
+                    from spotdl.providers.audio import soundcloud as provider
+                except Exception:
+                    return
+
+                provider_init = provider.SoundCloud.__init__
+                provider_results = provider.SoundCloud.get_results
+
+                def soundcloud_init(self, *args, **kwargs):
+                    try:
+                        provider_init(self, *args, **kwargs)
+                    except Exception as error:
+                        print(f"SoundCloud unavailable: {error}", file=sys.stderr)
+                        self.client = None
+
+                def soundcloud_results(self, *args, **kwargs):
+                    if self.client is None:
+                        return []
+                    return provider_results(self, *args, **kwargs)
+
+                provider.SoundCloud.__init__ = soundcloud_init
+                provider.SoundCloud.get_results = soundcloud_results
+
+
             def main():
                 register_spotdl_package()
                 silence_dependency_warnings()
                 patch_search_providers()
                 patch_error_reporting()
+                patch_soundcloud()
 
                 from spotdl.download.downloader import Downloader
                 from spotdl.types.song import Song
