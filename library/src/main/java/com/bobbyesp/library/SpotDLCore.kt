@@ -587,6 +587,7 @@ abstract class SpotDLCore {
 
             def patch_ytmusic():
                 try:
+                    import ytmusicapi
                     from spotdl.providers.audio import ytmusic
                     from spotdl.providers.audio.base import ISRC_REGEX
                     from spotdl.types.result import Result
@@ -596,9 +597,9 @@ abstract class SpotDLCore {
                     print(f"YouTube Music search patch skipped: {error}")
                     return
 
-                # Without views, spotDL runs a full yt-dlp extraction per candidate.
-                def ytmusic_results(self, search_term, log_search_failures=True, **kwargs):
-                    search_results = self.client.search(search_term, **kwargs)
+                spotdl_upstream = ytmusic.YouTubeMusic.get_results
+
+                def build_results(self, search_term, search_results):
                     is_isrc_result = ISRC_REGEX.search(search_term) is not None
 
                     results = []
@@ -633,6 +634,41 @@ abstract class SpotDLCore {
                                     else None
                                 ),
                             )
+                        )
+
+                    return results
+
+                # Without views, spotDL runs a full yt-dlp extraction per candidate.
+                def ytmusic_results(self, search_term, log_search_failures=True, **kwargs):
+                    search_results = []
+                    for attempt in range(3):
+                        search_results = self.client.search(search_term, **kwargs)
+                        if search_results:
+                            break
+                        if attempt < 2:
+                            print(
+                                f"YouTube Music search returned nothing for {search_term!r} "
+                                f"with {kwargs}, retrying with a new client"
+                            )
+                            self.client = YTMusic(language="en")
+
+                    if not search_results and kwargs.get("filter"):
+                        print(f"YouTube Music falling back to an unfiltered search for {search_term!r}")
+                        search_results = self.client.search(search_term, limit=20)
+
+                    try:
+                        results = build_results(self, search_term, search_results)
+                    except Exception as error:
+                        print(
+                            f"YouTube Music result mapping failed ({error}), "
+                            "falling back to spotDL's implementation"
+                        )
+                        return spotdl_upstream(self, search_term, **kwargs)
+
+                    if not results:
+                        print(
+                            f"YouTube Music found nothing usable for {search_term!r} with {kwargs} "
+                            f"(ytmusicapi {getattr(ytmusicapi, '__version__', '?')})"
                         )
 
                     return results
