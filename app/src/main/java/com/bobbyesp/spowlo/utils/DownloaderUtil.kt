@@ -7,6 +7,7 @@ import android.util.Log
 import androidx.annotation.CheckResult
 import com.bobbyesp.library.SpotDL
 import com.bobbyesp.library.SpotDLRequest
+import com.bobbyesp.library.SpotDLResponse
 import com.bobbyesp.library.data.remote.SpotDLDependencyUpdater
 import com.bobbyesp.library.domain.model.SpotifySong
 import com.bobbyesp.library.util.exceptions.CanceledException
@@ -286,48 +287,73 @@ object DownloaderUtil {
 
         // SpotipyFree (curl_cffi) does not work on Android, so pass the resolved metadata instead.
         val metadataFile = writeMetadataFile(taskId, listOf(songInfo))
-
-        val request = createDownloadRequest(metadataFile.absolutePath, downloadPreferences)
         val pathBuilder = StringBuilder().append(audioDownloadDir).also { it.buildPathExtensions(downloadPreferences) }
 
         return try {
-            retryTransient(
+            runDownload(
+                preferences = downloadPreferences,
+                taskId = taskId,
+                callback = progressCallback,
                 onRetry = {
                     progressCallback?.invoke(0f, 0L, context.getString(R.string.retrying_download))
                 },
-            ) {
-                runCatching {
-                    SpotDL.getInstance().execute(request, taskId, callback = progressCallback)
-                }.fold(
-                    onSuccess = { response ->
-                        when {
-                            response.exitCode != 0 -> Result.failure(
-                                Throwable("The download process failed with exit code ${response.exitCode}.")
-                            )
-                            response.output.contains("LookupError") -> Result.failure(Throwable("A LookupError occurred. The song wasn't found. Try changing the audio provider."))
-                            response.output.contains("YT-DLP") -> Result.failure(Throwable("An error occurred with yt-dlp while downloading. Please report this issue."))
-                            response.output.contains("HTTPError") -> Result.failure(Throwable("A HTTPError occurred. Try changing providers."))
-                            response.output.contains("ReadTimeout") -> Result.failure(Throwable("A ReadTimeout occurred. Try changing providers."))
-                            response.output.contains("ValueError") -> Result.failure(Throwable("A ValueError occurred. Try changing providers."))
-                            response.output.contains("Skipping explicit song") -> Result.failure(Throwable("An explicit song has been skipped. Disable 'Skip explicit songs' in settings to download."))
-                            else -> onFinishDownloading(
-                                preferences = downloadPreferences,
-                                songInfo = songInfo,
-                                downloadPath = buildPathForDatabase(pathBuilder.toString(), songInfo),
-                                consoleOutput = response.output,
-                            )
-                        }
-                    },
-                    onFailure = { th ->
-                        th.printStackTrace()
-                        Result.failure(th)
+                shouldRetry = { true },
+                buildRequest = { createDownloadRequest(metadataFile.absolutePath, it) },
+            ).fold(
+                onSuccess = { response ->
+                    when {
+                        response.exitCode != 0 -> Result.failure(
+                            Throwable("The download process failed with exit code ${response.exitCode}.")
+                        )
+                        response.output.contains("LookupError") -> Result.failure(Throwable("A LookupError occurred. The song wasn't found. Try changing the audio provider."))
+                        response.output.contains("YT-DLP") -> Result.failure(Throwable("An error occurred with yt-dlp while downloading. Please report this issue."))
+                        response.output.contains("HTTPError") -> Result.failure(Throwable("A HTTPError occurred. Try changing providers."))
+                        response.output.contains("ReadTimeout") -> Result.failure(Throwable("A ReadTimeout occurred. Try changing providers."))
+                        response.output.contains("ValueError") -> Result.failure(Throwable("A ValueError occurred. Try changing providers."))
+                        response.output.contains("Skipping explicit song") -> Result.failure(Throwable("An explicit song has been skipped. Disable 'Skip explicit songs' in settings to download."))
+                        else -> onFinishDownloading(
+                            preferences = downloadPreferences,
+                            songInfo = songInfo,
+                            downloadPath = buildPathForDatabase(pathBuilder.toString(), songInfo),
+                            consoleOutput = response.output,
+                        )
                     }
-                )
-            }
+                },
+                onFailure = { th ->
+                    th.printStackTrace()
+                    Result.failure(th)
+                }
+            )
         } finally {
             metadataFile.delete()
         }
     }
+
+    private suspend fun runDownload(
+        preferences: DownloadPreferences,
+        taskId: String,
+        callback: ((Float, Long, String) -> Unit)?,
+        onRetry: () -> Unit,
+        shouldRetry: () -> Boolean,
+        buildRequest: (DownloadPreferences) -> SpotDLRequest,
+    ): Result<SpotDLResponse> {
+        suspend fun attempt(chosen: DownloadPreferences): Result<SpotDLResponse> =
+            retryTransient(onRetry = onRetry, shouldRetry = shouldRetry) {
+                runCatching {
+                    SpotDL.getInstance().execute(buildRequest(chosen), taskId, callback = callback)
+                }
+            }
+
+        val first = attempt(preferences)
+        if (preferences.dontFilter || !first.exceptionOrNull().isSongNotFound()) return first
+        callback?.invoke(0f, 0L, context.getString(R.string.retrying_without_filter))
+        return attempt(preferences.copy(dontFilter = true))
+    }
+
+    private fun Throwable?.isSongNotFound(): Boolean =
+        generateSequence(this) { it.cause }
+            .mapNotNull { it.message }
+            .any { it.contains("LookupError") || it.contains("No results found") }
 
     /** Writes the `spotdl --save-file` format that `spotdl download <file>` reads. */
     private fun writeMetadataFile(taskId: String, songs: List<SpotifySong>): File {
@@ -437,14 +463,6 @@ object DownloaderUtil {
             if (target == null) it.buildPathExtensions(downloadPreferences)
             else it.append("/").append(target.template)
         }
-        val request = createDownloadRequest(
-            url = metadataFile.absolutePath,
-            downloadPreferences = downloadPreferences,
-            outputTemplate = target?.template,
-            formatOverride = target?.format,
-        ).apply {
-            addOption("--threads", downloadPreferences.threads.toString())
-        }
         // Callers pass the URL or a collection name; the notification should show the track itself.
         val displayTitle = listOf(songInfo.name, songInfo.artist)
             .filter(String::isNotBlank)
@@ -482,18 +500,23 @@ object DownloaderUtil {
 
         var downloadSucceeded = false
         runCatching {
-            val response = retryTransient(
+            val response = runDownload(
+                preferences = downloadPreferences,
+                taskId = taskId,
+                callback = callback,
                 onRetry = { if (!metadataOnly) showRetry(taskId, displayTitle, url, isPlaylist = false, largeIcon = artwork) },
                 shouldRetry = { metadataOnly || Downloader.isTaskRunning(url) },
-            ) {
-                runCatching {
-                    SpotDL.getInstance().execute(
-                        request = request,
-                        processId = taskId,
-                        callback = callback,
-                    )
-                }
-            }.getOrThrow()
+                buildRequest = { prefs ->
+                    createDownloadRequest(
+                        url = metadataFile.absolutePath,
+                        downloadPreferences = prefs,
+                        outputTemplate = target?.template,
+                        formatOverride = target?.format,
+                    ).apply {
+                        addOption("--threads", prefs.threads.toString())
+                    }
+                },
+            ).getOrThrow()
             if (metadataOnly) {
                 downloadSucceeded = true
             } else {
